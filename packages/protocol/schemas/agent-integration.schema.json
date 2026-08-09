@@ -1,0 +1,84 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.useful.example/agent/useful.agent-integration.v1.schema.json",
+  "title": "Useful Agent Integration Plan V1",
+  "description": "Provider-neutral, secret-free plan for exposing Useful over local MCP stdio. The plan never authorizes writing a host configuration.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "target", "transport", "scope", "server"],
+  "properties": {
+    "schemaVersion": { "const": "useful.agent-integration.v1" },
+    "target": { "enum": ["codex", "claude-code", "claude-desktop", "mcp-servers-json"] },
+    "transport": { "const": "stdio" },
+    "scope": { "enum": ["user", "project"] },
+    "projectDirectory": { "$ref": "#/$defs/absoluteLocalPath" },
+    "server": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "nodePath", "launcherPath", "args", "env"],
+      "properties": {
+        "name": { "const": "useful" },
+        "nodePath": { "$ref": "#/$defs/absoluteLocalPath" },
+        "launcherPath": { "$ref": "#/$defs/absoluteLocalPath" },
+        "args": {
+          "type": "array",
+          "maxItems": 0
+        },
+        "env": {
+          "type": "object",
+          "additionalProperties": false,
+          "maxProperties": 3,
+          "properties": {
+            "NO_COLOR": { "const": "1" },
+            "USEFUL_LOG_LEVEL": { "enum": ["error", "warn", "info"] },
+            "USEFUL_PROFILE": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$"
+            }
+          }
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": { "scope": { "const": "project" } },
+        "required": ["scope"]
+      },
+      "then": {
+        "properties": {
+          "projectDirectory": { "$ref": "#/$defs/absoluteLocalPath" }
+        },
+        "required": ["projectDirectory"]
+      },
+      "else": {
+        "properties": {
+          "projectDirectory": false
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": { "target": { "enum": ["claude-desktop", "mcp-servers-json"] } },
+        "required": ["target"]
+      },
+      "then": {
+        "properties": { "scope": { "const": "user" } }
+      }
+    }
+  ],
+  "$defs": {
+    "absoluteLocalPath": {
+      "type": "string",
+      "minLength": 2,
+      "maxLength": 4096,
+      "anyOf": [
+        { "pattern": "^[A-Za-z]:[\\\\/](?![\\\\/])[^\\u0000-\\u001F\\u007F]*$" },
+        { "pattern": "^/(?!/)[^\\u0000-\\u001F\\u007F]*$" }
+      ]
+    }
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "name": "@useful/agent-integrations",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Useful 的跨 Agent MCP 配置计划与只读诊断。",
+  "types": "./src/integration.d.ts",
+  "exports": {
+    ".": {
+      "types": "./src/integration.d.ts",
+      "import": "./src/integration.mjs"
+    }
+  },
+  "scripts": {
+    "test": "node --test",
+    "typecheck": "node --check src/integration.mjs"
+  },
+  "dependencies": {
+    "@useful/protocol": "workspace:^"
+  },
+  "license": "Apache-2.0"
+}

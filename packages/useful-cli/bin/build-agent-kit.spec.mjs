@@ -43,6 +43,7 @@ const fixturePaths = [
   "licenses",
   "packages/action-contract",
   "packages/action-runtime",
+  "packages/agent-integrations",
   "packages/agent-profile",
   "packages/host-actions",
   "packages/office-core",
@@ -254,6 +255,16 @@ describe("Useful Agent Kit builder", () => {
     })).rejects.toMatchObject({ code: "SOURCE_DIRTY", exitCode: 3 });
   });
 
+  it("rejects dirty agent integration source", async () => {
+    const fixture = makeCleanFixture();
+    fs.appendFileSync(path.join(fixture.fixtureRoot, "packages/agent-integrations/src/integration.mjs"), "\n");
+    await expect(buildAgentKit({
+      repoRoot: fixture.fixtureRoot,
+      dependencyRoot: toolingRoot,
+      outDir: path.join(fixture.outer, "out"),
+    })).rejects.toMatchObject({ code: "SOURCE_DIRTY", exitCode: 3 });
+  });
+
   it("rejects linked repository and output path components before reading or creating through them", async () => {
     const fixture = makeCleanFixture();
     const linkedRoot = path.join(fixture.outer, "linked source");
@@ -323,6 +334,8 @@ describe("Useful Agent Kit builder", () => {
       "licenses/CC-BY-4.0.txt",
       "lib/office-worker-thread.mjs",
       "lib/regex-worker-thread.mjs",
+      "lib/provenance/agent-integrations/integration.d.ts",
+      "lib/provenance/agent-integrations/integration.mjs",
       "lib/provenance/action-runtime/action-suggest.mjs",
       "lib/provenance/action-runtime/builtins.mjs",
       "lib/provenance/action-runtime/office-worker-thread.mjs",
@@ -334,6 +347,7 @@ describe("Useful Agent Kit builder", () => {
       "lib/provenance/office-core/pdf.mjs",
       "lib/provenance/office-core/table-markdown.mjs",
       "lib/useful.plugin-action.v1.schema.json",
+      "schemas/agent-integration.schema.json",
       "schemas/package-manifest.schema.json",
     ]));
     expect(listed.filter((entry) => /^lib\/[^/]+\.mjs$/.test(entry)).sort()).toEqual([
@@ -384,6 +398,51 @@ describe("Useful Agent Kit builder", () => {
     expect(contractData.templates.map((template) => template.id)).toEqual(["minimal-web", "minimal-action", "starter-web"]);
     expect(contractData.commandSequence.slice(0, 7).every((command) => command.startsWith("useful "))).toBe(true);
     expect(contractData.commandSequence.join("\n")).not.toMatch(/\b(?:npx|pnpm\s+dlx)\b/);
+
+    const agentMcpLauncher = path.join(kitRoot, "lib", "useful-mcp.mjs");
+    const integrationPlan = expectJsonSuccess(runLauncher(kitRoot, "useful", [
+      "agent", "plan",
+      "--target", "codex",
+      "--launcher", agentMcpLauncher,
+      "--env", "NO_COLOR=1",
+      "--json",
+    ]));
+    expect(integrationPlan.plan.schemaVersion).toBe("useful.agent-integration.v1");
+    expect(integrationPlan.output.commandArgv).toEqual([
+      "codex", "mcp", "add", "useful", "--env", "NO_COLOR=1", "--",
+      process.execPath, agentMcpLauncher,
+    ]);
+    expect(integrationPlan.output.writesHostConfigWhenExecuted).toBe(true);
+    const integrationDoctor = expectJsonSuccess(runLauncher(kitRoot, "useful", [
+      "agent", "doctor",
+      "--target", "mcp-servers-json",
+      "--launcher", agentMcpLauncher,
+      "--json",
+    ]));
+    expect(integrationDoctor.ok).toBe(true);
+    expect(integrationDoctor.checks.map((check) => check.id)).toEqual(expect.arrayContaining([
+      "launcher.file",
+      "nodePath.file",
+      "node.version",
+      "generated-output.parse",
+    ]));
+
+    const projectDirectory = path.join(fixture.outer, "explicit project");
+    fs.mkdirSync(projectDirectory);
+    const projectPlan = expectJsonSuccess(runLauncher(kitRoot, "useful", [
+      "agent", "plan",
+      "--target", "codex",
+      "--launcher", agentMcpLauncher,
+      "--scope", "project",
+      "--project-dir", projectDirectory,
+      "--json",
+    ]));
+    expect(projectPlan.output).toMatchObject({
+      kind: "merge-fragment",
+      configPath: path.join(projectDirectory, ".codex", "config.toml"),
+      writesHostConfigWhenExecuted: false,
+    });
+    expect(projectPlan.output.commandArgv).toBeUndefined();
 
     const runtime = runLauncher(kitRoot, "useful-runtime", ["actions", "list", "--json"]);
     expect(runtime.status).toBe(0);

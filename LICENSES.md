@@ -9,8 +9,8 @@ Useful 包含开源客户端、开放协议、可自托管后端，以及规划�
 | --- | --- | --- |
 | 桌面客户端与客户端原生 Crate | MPL-2.0 | `apps/useful`、`crates/useful-*` |
 | 内置 Action、宿主及文档处理实现 | MPL-2.0 | `packages/action-runtime`、`packages/host-actions`、`packages/office-core` |
-| 软件源后端、管理后台、共享实现、迁移与部署资产 | AGPL-3.0-or-later | `services/source-server`、`services/source-worker`、`services/internal`、`services/migrations`、`services/Dockerfile`、`services/go.mod`、`services/go.sum`、`apps/source-admin`、`deploy/*` |
-| 协议、Schema、SDK、CLI 与 Agent 接口 | Apache-2.0 | `packages/protocol`、`packages/action-contract`、`packages/agent-profile`、`packages/plugin-actions`、`packages/useful-sdk`、`packages/useful-cli`、`packages/useful-mcp`、`packages/useful-runtime` |
+| 软件源后端、管理后台、共享实现、迁移与部署资产 | AGPL-3.0-or-later | `services/source-server`、`services/source-worker`、`services/internal`、`services/migrations`、`services/Dockerfile`、`services/OPERATIONS.md`、`services/go.mod`、`services/go.sum`、`apps/source-admin`、`deploy/*` |
+| 协议、Schema、SDK、CLI 与 Agent 接口 | Apache-2.0 | `packages/protocol`、`packages/action-contract`、`packages/agent-profile`、`packages/agent-integrations`、`packages/computer-use-contract`、`packages/plugin-actions`、`packages/useful-sdk`、`packages/useful-cli`、`packages/useful-mcp`、`packages/useful-runtime` |
 | 静态源与示例 | Apache-2.0 | `repositories/*`、`examples/*` |
 | 项目文档 | CC-BY-4.0 | `docs/*`、`README.md`、`README.zh-CN.md`、`AGENTS.md`、`CONTRIBUTING.md`、`GOVERNANCE.md`、`SECURITY.md`、`CODE_OF_CONDUCT.md` |
 | 其余第一方非独立组件的自动化、配置、构建元数据与测试夹具 | Apache-2.0 | `.github/*`、`scripts/*`、`config/*`、`fixtures/*`、`templates/*`、`binaries/*` 及未被上表覆盖的根构建文件 |
@@ -23,6 +23,8 @@ Useful 包含开源客户端、开放协议、可自托管后端，以及规划�
   提供该版本的 Corresponding Source；具体义务以许可证正文和精确候选法律复核为准。
 - 客户端采用 MPL-2.0（文件级 copyleft），便于与不同许可的插件/宿主集成。
 - 新增 package 或 service 根目录不能依赖兜底规则，必须先在本表和发布检查的闭集中显式登记。
+- `packages/agent-integrations` 与 `packages/computer-use-contract` 是 Apache-2.0 的协议与 Agent
+  集成契约层；后者不声明或提供可执行的 Computer Use 自动化能力。
 - `LICENSE`、`LICENSES.md`、`NOTICE`、`THIRD_PARTY_NOTICES.md`、`TRADEMARKS.md` 与
   `licenses/*` 保留各自声明用途和条款，不由上表重新许可。
 

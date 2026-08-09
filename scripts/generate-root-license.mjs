@@ -136,11 +136,12 @@ This repository is intentionally multi-licensed. The authoritative component map
   (see \`packages/action-runtime\`, \`packages/host-actions\`, and \`packages/office-core\`)
 - Source-service backend, administration UI, shared service implementation, database migrations,
   and deployment assets: ${mapping.backend} (see \`services/source-server\`,
-  \`services/source-worker\`, \`services/internal\`, \`services/migrations\`, the build files directly
-  under \`services/\`, \`apps/source-admin\`, and \`deploy/*\`)
+  \`services/source-worker\`, \`services/internal\`, \`services/migrations\`, \`services/OPERATIONS.md\`, the
+  build files directly under \`services/\`, \`apps/source-admin\`, and \`deploy/*\`)
 - Protocols, JSON Schema, SDK, CLI, Agent integration interfaces, static repository fixtures, and
   examples: ${mapping.protocolSdkCliExamples} (see \`packages/protocol\`, \`packages/action-contract\`,
-  \`packages/agent-profile\`, \`packages/plugin-actions\`, \`packages/useful-sdk\`,
+  \`packages/agent-profile\`, \`packages/agent-integrations\`, \`packages/computer-use-contract\`,
+  \`packages/plugin-actions\`, \`packages/useful-sdk\`,
   \`packages/useful-cli\`, \`packages/useful-mcp\`, \`packages/useful-runtime\`, \`repositories/*\`, and
   \`examples/*\`)
 - Project documentation: ${mapping.docs} (see \`docs/*\`, \`README.md\`, \`README.zh-CN.md\`, \`AGENTS.md\`,

@@ -323,6 +323,7 @@ function inspectPlatformBundlesWorkflow(file, workflow) {
 function inspectReleaseWorkflow(file, workflow) {
   const dispatch = workflow.on?.workflow_dispatch;
   const publishInput = dispatch?.inputs?.publish;
+  const scopeInput = dispatch?.inputs?.scope;
   if (
     !dispatch
     || publishInput?.type !== "boolean"
@@ -331,7 +332,18 @@ function inspectReleaseWorkflow(file, workflow) {
   ) {
     violations.push({ file, code: "release-publish-input-not-fail-closed" });
   }
-  const requiredJobs = ["identity", "verify", "verify-compose", "sbom", "agent-kit", "build", "assemble", "publish"];
+  if (
+    scopeInput?.type !== "choice"
+    || scopeInput?.required !== true
+    || scopeInput?.default !== "source-agent-kit"
+    || JSON.stringify(scopeInput?.options) !== JSON.stringify(["source-agent-kit", "desktop-full"])
+  ) {
+    violations.push({ file, code: "release-scope-input-not-closed" });
+  }
+  const requiredJobs = [
+    "identity", "verify", "verify-compose", "source-agent-kit", "publish-source-agent-kit",
+    "sbom", "agent-kit", "build", "assemble", "publish",
+  ];
   for (const jobId of requiredJobs) {
     if (!workflow.jobs?.[jobId]) violations.push({ file, code: "release-required-job-missing", details: jobId });
   }
@@ -345,7 +357,7 @@ function inspectReleaseWorkflow(file, workflow) {
   }
 
   for (const [jobId, job] of Object.entries(workflow.jobs ?? {})) {
-    if (jobId !== "publish" && job?.permissions?.contents === "write") {
+    if (!["publish", "publish-source-agent-kit"].includes(jobId) && job?.permissions?.contents === "write") {
       violations.push({ file, code: "release-write-permission-outside-publish", details: jobId });
     }
     const checkouts = (job?.steps ?? []).filter((step) => String(step?.uses ?? "").startsWith("actions/checkout@"));
@@ -353,6 +365,17 @@ function inspectReleaseWorkflow(file, workflow) {
       violations.push({ file, code: "release-exact-checkout-invalid", details: jobId });
     }
     const runText = jobRunText(job);
+    for (const [stepIndexValue, step] of (job?.steps ?? []).entries()) {
+      const run = String(step?.run ?? "");
+      const inline = run.match(/\$\{\{[^}]+\}\}/);
+      if (inline) {
+        violations.push({
+          file,
+          code: "release-inline-dynamic-context-forbidden",
+          details: `${jobId}:${stepIndexValue}:${inline[0]}`,
+        });
+      }
+    }
     for (const command of ["git rev-parse HEAD", "git status --porcelain --untracked-files=all", "SOURCE_DATE_EPOCH="]) {
       if (!runText.includes(command)) {
         violations.push({ file, code: "release-clean-checkout-gate-missing", details: `${jobId}:${command}` });
@@ -411,17 +434,41 @@ function inspectReleaseWorkflow(file, workflow) {
   }
   if (publish?.environment !== "release") violations.push({ file, code: "release-environment-gate-missing" });
 
+  const desktopCondition = "inputs.scope == 'desktop-full'";
+  for (const jobId of ["verify", "verify-compose", "sbom", "agent-kit", "build", "assemble", "publish"]) {
+    if (!String(workflow.jobs?.[jobId]?.if ?? "").includes(desktopCondition)) {
+      violations.push({ file, code: "release-desktop-scope-gate-missing", details: jobId });
+    }
+  }
+  const sourceJob = workflow.jobs?.["source-agent-kit"];
+  const sourcePublish = workflow.jobs?.["publish-source-agent-kit"];
+  const sourceCondition = "inputs.scope == 'source-agent-kit'";
+  if (!String(sourceJob?.if ?? "").includes(sourceCondition) || !needsOf(sourceJob).includes("identity")) {
+    violations.push({ file, code: "release-source-scope-gate-invalid", details: "source-agent-kit" });
+  }
+  if (
+    !String(sourcePublish?.if ?? "").includes("inputs.publish == true")
+    || !String(sourcePublish?.if ?? "").includes(sourceCondition)
+    || sourcePublish?.permissions?.contents !== "write"
+    || sourcePublish?.permissions?.checks !== "read"
+    || sourcePublish?.environment !== "release"
+    || !needsOf(sourcePublish).includes("identity")
+    || !needsOf(sourcePublish).includes("source-agent-kit")
+  ) {
+    violations.push({ file, code: "release-source-publish-gate-invalid" });
+  }
+
   const identityRun = jobRunText(workflow.jobs?.identity);
   const verifyRun = jobRunText(workflow.jobs?.verify);
   const buildRun = jobRunText(buildJob);
   const agentKitRun = jobRunText(workflow.jobs?.["agent-kit"]);
   const assembleRun = jobRunText(workflow.jobs?.assemble);
   const publishRun = jobRunText(publish);
+  const sourceRun = jobRunText(sourceJob);
+  const sourcePublishRun = jobRunText(sourcePublish);
   if (
-    !identityRun.includes("github.event_name")
-    || !identityRun.includes("workflow_dispatch")
-    || !identityRun.includes("github.ref_type")
-    || !identityRun.includes("tag")
+    !identityRun.includes('test "$EVENT_NAME" = "workflow_dispatch"')
+    || !identityRun.includes('test "$REF_TYPE" = "tag"')
   ) {
     violations.push({ file, code: "release-manual-tag-ref-gate-missing" });
   }
@@ -436,8 +483,106 @@ function inspectReleaseWorkflow(file, workflow) {
     "Agent Kit asset name/path binding failed",
     "Agent Kit asset digest binding failed",
     "Agent Kit receipt bytes binding failed",
+    "publicationAuthorized",
+    "legalMappingApproved",
+    "Agent Kit builder must not authorize publication",
+    "Agent Kit legal mapping is not approved",
   ]) {
     if (!agentKitRun.includes(required)) violations.push({ file, code: "release-agent-kit-contract-missing", details: required });
+  }
+  for (const required of [
+    "public-source-check.mjs --json",
+    "gen-sbom.mjs",
+    "pnpm --silent agent-kit:build -- --out-dir",
+    "publicationAuthorized !== false",
+    "legalMappingApproved !== true",
+    "SOURCE-CHECK.json",
+    "SOURCE-MANIFEST.json",
+    "SOURCE-PUBLISH-GATE.json",
+    "BUILD-PROVENANCE.json",
+    "RELEASE-ASSETS.txt",
+    "SHA256SUMS.txt",
+    "NON-DESKTOP PREVIEW",
+    "desktopAssetsIncluded: false",
+    "sha256sum --check --strict",
+    "unzip -Z1",
+    "useful.agent-kit.manifest.v1",
+    "Agent Kit MANIFEST",
+    "is not a closed schema",
+    "Agent Kit MANIFEST command drifted",
+    "Agent Kit ZIP entries are not closed by MANIFEST.json",
+  ]) {
+    if (!sourceRun.includes(required)) violations.push({ file, code: "release-source-evidence-contract-missing", details: required });
+  }
+  for (const forbidden of [
+    "tauri build", "WINDOWS_CERTIFICATE_BASE64", "APPLE_CERTIFICATE", "USEFUL_UPDATE_ROOT_PUBKEY_HEX",
+    "MEDIA-RUNTIMES.json", "release-signing-status.mjs",
+  ]) {
+    if (sourceRun.includes(forbidden)) violations.push({ file, code: "release-source-desktop-gate-leak", details: forbidden });
+  }
+  for (const required of [
+    "status=success&per_page=100",
+    ".display_title == $dryRunTitle",
+    "Useful source-agent-kit $RELEASE_CHANNEL $RELEASE_TAG publish=false",
+    "earlier successful source-agent-kit dry-run",
+    "ownerAuthorized:true",
+    "desktopAssetsAuthorized:false",
+  ]) {
+    if (!identityRun.includes(required)) violations.push({ file, code: "release-source-owner-gate-missing", details: required });
+  }
+  for (const required of [
+    "public-source-check.mjs --json",
+    "RELEASE-ASSETS.txt",
+    "SHA256SUMS.txt",
+    "SOURCE-PUBLISH-GATE.json",
+    "desktopAssetsIncluded !== false",
+    "gh release create",
+    "--verify-tag",
+    "--prerelease",
+    "No Desktop Binaries",
+    "git ls-remote --tags origin",
+    "refs/tags/$IDENTITY_TAG^{}",
+    "REMOTE_TAG_COMMIT",
+    'test "$REF_NAME" = "$IDENTITY_TAG"',
+    "gate.repository !== process.env.REPOSITORY",
+    "gate.actor !== process.env.RELEASE_ACTOR",
+    "gate.tag !== process.env.IDENTITY_TAG",
+    "gate.sourceRevision !== process.env.EXPECTED_SHA",
+  ]) {
+    if (!sourcePublishRun.includes(required)) violations.push({ file, code: "release-source-publish-revalidation-missing", details: required });
+  }
+  const sourceCheckIndex = stepIndex(sourcePublish, (step) => String(step?.run ?? "").includes("public-source-check.mjs --json"));
+  const sourceDownloadIndex = stepIndex(sourcePublish, (step) => String(step?.uses ?? "").startsWith("actions/download-artifact@"));
+  if (sourceCheckIndex < 0 || sourceDownloadIndex < 0 || sourceCheckIndex >= sourceDownloadIndex) {
+    violations.push({ file, code: "release-source-check-not-clean", details: "publish-source-agent-kit" });
+  }
+  if (sourcePublishRun.includes("source-release-candidate/*")) {
+    violations.push({ file, code: "release-source-publish-wildcard-forbidden" });
+  }
+  const sourceCreateRun = String((sourcePublish?.steps ?? []).find((step) => String(step?.run ?? "").includes("gh release create"))?.run ?? "");
+  if (
+    sourceCreateRun.indexOf("git ls-remote --tags origin") < 0
+    || sourceCreateRun.indexOf("git ls-remote --tags origin") > sourceCreateRun.indexOf("gh release create")
+    || !sourceCreateRun.includes('test "$REMOTE_TAG_COMMIT" = "$EXPECTED_SHA"')
+  ) {
+    violations.push({ file, code: "release-source-remote-tag-check-order-invalid" });
+  }
+  for (const required of [
+    "git ls-remote --tags origin",
+    "refs/tags/$TAG^{}",
+    "REMOTE_TAG_COMMIT",
+    'test "$REF_NAME" = "$TAG"',
+    'test "$REMOTE_TAG_COMMIT" = "$EXPECTED_SHA"',
+  ]) {
+    if (!publishRun.includes(required)) violations.push({ file, code: "release-desktop-remote-tag-gate-missing", details: required });
+  }
+  const desktopCreateRun = String((publish?.steps ?? []).find((step) => String(step?.name ?? "").includes("Create GitHub Release"))?.run ?? "");
+  if (
+    desktopCreateRun.indexOf("git ls-remote --tags origin") < 0
+    || desktopCreateRun.indexOf("git ls-remote --tags origin") > desktopCreateRun.indexOf("release create")
+    || !desktopCreateRun.includes('test "$REMOTE_TAG_COMMIT" = "$EXPECTED_SHA"')
+  ) {
+    violations.push({ file, code: "release-desktop-remote-tag-check-order-invalid" });
   }
   const assembleNeeds = new Set(needsOf(workflow.jobs?.assemble));
   if (!assembleNeeds.has("agent-kit")) violations.push({ file, code: "release-assemble-agent-kit-need-missing" });
@@ -568,7 +713,8 @@ function inspectReleaseWorkflow(file, workflow) {
   const windowsCleanupRun = String(windowsCleanup?.run ?? "");
   if (
     String(windowsCleanup?.if ?? "") !== "always() && matrix.platform == 'windows'"
-    || !windowsCleanupRun.includes("steps.windows-cert.outputs.thumbprint")
+    || !String(windowsCleanup?.env?.SIGNING_THUMBPRINT ?? "").includes("steps.windows-cert.outputs.thumbprint")
+    || !windowsCleanupRun.includes("$env:SIGNING_THUMBPRINT")
     || !windowsCleanupRun.includes("useful-signing-thumbprint.txt")
     || !windowsCleanupRun.includes("Get-Content -LiteralPath $receiptPath")
     || !windowsCleanupRun.includes("finally")

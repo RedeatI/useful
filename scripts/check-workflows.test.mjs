@@ -269,6 +269,22 @@ test("release publish default true is rejected", async (t) => {
   assertViolation(runChecker(root), "release.yml", "release-publish-input-not-fail-closed");
 });
 
+test("release shell rejects inline github context interpolation", async (t) => {
+  const root = await createFixture(t);
+  await mutateWorkflow(root, "release.yml", (workflow) => {
+    workflow.jobs.identity.steps.push({ run: 'echo "${{ github.ref_name }}"' });
+  });
+  assertViolation(runChecker(root), "release.yml", "release-inline-dynamic-context-forbidden");
+});
+
+test("release shell rejects inline dispatch input interpolation", async (t) => {
+  const root = await createFixture(t);
+  await mutateWorkflow(root, "release.yml", (workflow) => {
+    workflow.jobs.identity.steps.push({ run: 'echo "${{ inputs.channel }}"' });
+  });
+  assertViolation(runChecker(root), "release.yml", "release-inline-dynamic-context-forbidden");
+});
+
 test("automatic release tag push is rejected", async (t) => {
   const root = await createFixture(t);
   await mutateWorkflow(root, "release.yml", (workflow) => {

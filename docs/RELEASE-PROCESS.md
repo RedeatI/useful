@@ -19,6 +19,21 @@
 针对最终可见 ref 重跑；由于 GitHub source archive 暴露完整 tag 树，任何公开 ref 中仍存在的非公开路径
 都属于失败门禁。
 
+## Release workflow 的闭集 scope
+
+`.github/workflows/release.yml` 的 `scope` 只能是下列两项：
+
+- `source-agent-kit`：非桌面 prerelease，只生成并校验公开源码证据、Agent Kit、CycloneDX SBOM、
+  根 legal 闭集、源码 manifest、provenance、`RELEASE-ASSETS.txt` 与 `SHA256SUMS.txt`。它不构建桌面
+  程序，不读取桌面签名、更新根/feed 或媒体 Full 门禁，也不得选择 stable 通道。Agent Kit builder 的
+  `publicationAuthorized=false` 保持原义；发布授权来自独立 workflow Owner gate，不能改写该字段。
+- `desktop-full`：保留本文其余章节描述的多平台构建、签名/公证、更新信任、媒体合规、验证与发布
+  全部门禁；source scope 的存在不构成任何豁免。
+
+`publish` 默认为 `false`。同一 tag、同一 commit 必须先有成功的 `source-agent-kit` dry-run，之后才可
+在 `release` environment 审批下以 `publish=true` 创建 source preview。source preview 的 Release 名称
+和说明必须明确“不含桌面二进制”，不得宣传为安装包、正式桌面版或受支持平台证明。
+
 ## 0. 前置门禁（CI 必须全绿）
 
 - Rust：`cargo fmt --all -- --check`、`cargo clippy --workspace --all-targets -- -D warnings`、

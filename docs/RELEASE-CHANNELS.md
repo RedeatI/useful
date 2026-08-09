@@ -15,9 +15,15 @@
 会暴露 tag 的完整树，因此公共源检查默认必须严格失败：内部报告、handoff、legacy phase 脚本等任何
 非公开路径仍在候选树中时都不能发布；仅生成“排除清单”不构成发布证据。
 
-`.github/workflows/release.yml` 是 Useful 桌面产物的多平台 Release 编排。它只接受手动
-`workflow_dispatch`；选择已有 tag ref 后，操作者必须明确选择 `stable`、`beta` 或 `nightly`。
-推送 tag 本身不会触发构建或发布。
+`.github/workflows/release.yml` 是 Useful 唯一的 Release 编排。它只接受手动 `workflow_dispatch`；
+选择已有 tag ref 后，操作者必须明确选择 `source-agent-kit` 或 `desktop-full` scope，并选择
+`stable`、`beta` 或 `nightly` 通道。推送 tag 本身不会触发构建或发布。
+
+`source-agent-kit` 是非桌面 source preview，只允许 beta/nightly：资产闭集为公开源码证据、Agent Kit、
+SBOM、legal 文件、源码 manifest、provenance、Owner gate、资产清单和校验和。它不运行或削弱桌面
+build/signing/update/media Full 门禁，不包含任何桌面二进制，也不作签名、公证、安装或平台支持声明。
+Agent Kit builder 的 `publicationAuthorized=false` 不会被 workflow 改写；独立 Owner gate 只授权该次
+source preview 发布。`desktop-full` 继续执行本文描述的全部严格门禁。
 
 ## 版本、tag 与通道
 
@@ -116,7 +122,7 @@ beta/nightly 可以在未配置签名 secret 时构建，但最终元数据、�
 
 ## 唯一发布入口
 
-只有 `publish` job 拥有 `contents: write`，且它必须同时满足：
+只有两个隔离的 publish job 拥有 `contents: write`。`publish` 仅服务 `desktop-full`，并且必须同时满足：
 
 1. 事件是 `workflow_dispatch`；
 2. 当前 ref 是与版本严格一致的已有 tag；
@@ -128,3 +134,8 @@ beta/nightly 可以在未配置签名 secret 时构建，但最终元数据、�
 
 发布使用 runner 自带 `gh release create --verify-tag`，不会覆盖同名现有 Release。未选择
 `publish=true` 时只留下有保留期限的 Actions candidate artifact，不创建 Release、不上传到其他服务。
+
+`publish-source-agent-kit` 仅服务 `source-agent-kit`，固定创建 prerelease，且必须在同一 tag 和 commit 上
+先有一次成功的 `publish=false` dry-run；它同样受公开规范仓库、精确 actor allowlist 和 `release`
+environment 审批约束。其 Release 标题与 notes 固定声明不含桌面二进制，显式资产数组来自闭集
+`RELEASE-ASSETS.txt`，禁止目录 glob。

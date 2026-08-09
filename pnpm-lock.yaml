@@ -155,6 +155,12 @@ importers:
         specifier: 1.17.1
         version: 1.17.1
 
+  packages/agent-integrations:
+    dependencies:
+      '@useful/protocol':
+        specifier: workspace:^
+        version: link:../protocol
+
   packages/agent-profile:
     dependencies:
       '@useful/action-contract':
@@ -167,6 +173,8 @@ importers:
       ajv:
         specifier: ^8.20.0
         version: 8.20.0
+
+  packages/computer-use-contract: {}
 
   packages/host-actions:
     devDependencies:
@@ -216,6 +224,9 @@ importers:
 
   packages/useful-cli:
     dependencies:
+      '@useful/agent-integrations':
+        specifier: workspace:^
+        version: link:../agent-integrations
       '@useful/plugin-actions':
         specifier: workspace:^
         version: link:../plugin-actions

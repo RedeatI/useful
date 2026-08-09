@@ -11,9 +11,18 @@
     "src"
   ],
   "exports": {
+    "./agent-integration": {
+      "types": "./src/agent-integration.d.ts",
+      "import": "./src/agent-integration.mjs"
+    },
     "./schemas/*": "./schemas/*",
     "./openapi/*": "./openapi/*",
     "./src/*": "./src/*"
+  },
+  "typesVersions": {
+    "*": {
+      "agent-integration": ["src/agent-integration.d.ts"]
+    }
   },
   "scripts": {
     "test": "node --test",

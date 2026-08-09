@@ -19,9 +19,16 @@ import {
   failureEnvelope,
   successEnvelope,
   usageError,
+  validationError,
   writeJson,
 } from "./cli-contract.mjs";
 import { agentContractData } from "./agent-contract-data.mjs";
+import {
+  AgentIntegrationError,
+  doctorAgentIntegration,
+  parseEnvironmentAssignments,
+  planAgentIntegration,
+} from "@useful/agent-integrations";
 import {
   appUpdateCreate,
   appUpdateSign,
@@ -166,12 +173,92 @@ async function agentCommand(cmd, rest, jsonMode) {
   return null;
 }
 
+function parseAgentIntegrationArgs(args) {
+  const options = { environment: [] };
+  const seen = new Set();
+  for (let index = 0; index < args.length; index += 1) {
+    const value = args[index];
+    if (!value.startsWith("--")) {
+      throw usageError("INVALID_ARGUMENTS", "agent 子命令不接受位置参数", { value });
+    }
+    const equals = value.indexOf("=");
+    const name = value.slice(2, equals >= 0 ? equals : undefined);
+    if (name === "apply" || name === "install") {
+      throw usageError("APPLY_NOT_SUPPORTED", "V1 只生成和诊断配置，拒绝写入或安装", { option: name });
+    }
+    if (name !== "env" && seen.has(name)) {
+      throw usageError("DUPLICATE_FLAG", `--${name} 只能提供一次`, { option: name });
+    }
+    if (name !== "env") seen.add(name);
+    if (name === "json") {
+      if (equals >= 0) throw usageError("INVALID_FLAG_VALUE", "--json 不接受值", { option: name });
+      options.json = true;
+      continue;
+    }
+    if (!new Set(["target", "launcher", "scope", "project-dir", "env"]).has(name)) {
+      throw usageError("UNKNOWN_FLAG", `未知选项: --${name}`, { option: name });
+    }
+    const optionValue = equals >= 0 ? value.slice(equals + 1) : args[++index];
+    if (optionValue === undefined || optionValue.startsWith("--")) {
+      throw usageError("MISSING_OPTION_VALUE", `--${name} 需要值`, { option: name });
+    }
+    if (name === "env") options.environment.push(optionValue);
+    else options[name] = optionValue;
+  }
+  return options;
+}
+
+function asCliIntegrationError(error) {
+  if (error instanceof AgentIntegrationError) {
+    return validationError(error.code, error.message, error.details);
+  }
+  return error;
+}
+
+async function agentIntegrationCommand(rest) {
+  const [subcommand, ...args] = rest;
+  if (subcommand !== "plan" && subcommand !== "doctor") {
+    throw usageError("UNKNOWN_AGENT_COMMAND", "用法: useful agent <plan|doctor> --target <target> --launcher <绝对路径> [--scope user|project] [--project-dir <绝对目录>] [--env NAME=VALUE] --json", { subcommand: subcommand ?? null });
+  }
+  const options = parseAgentIntegrationArgs(args);
+  if (!options.json) {
+    throw usageError("JSON_REQUIRED", "agent plan/doctor 仅提供 --json 输出", { subcommand });
+  }
+  try {
+    const input = {
+      target: options.target,
+      launcher: options.launcher,
+      scope: options.scope ?? "user",
+      projectDirectory: options["project-dir"],
+      environment: parseEnvironmentAssignments(options.environment),
+    };
+    if (subcommand === "plan") return planAgentIntegration(input);
+    const result = doctorAgentIntegration(input);
+    if (!result.ok) {
+      throw validationError(
+        "AGENT_INTEGRATION_DOCTOR_FAILED",
+        "Agent 集成诊断未通过",
+        { failedChecks: result.checks.filter((check) => check.status === "fail").map((check) => check.id) },
+        { schemaVersion: result.schemaVersion, ok: false, checks: result.checks },
+      );
+    }
+    return result;
+  } catch (error) {
+    throw asCliIntegrationError(error);
+  }
+}
+
 async function main() {
   const [cmd, ...rest] = process.argv.slice(2);
   const jsonMode = process.argv.slice(2).includes("--json");
   const agentCommands = new Set(["create", "doctor", "validate", "pack", "agent-contract"]);
-  if (jsonMode && !agentCommands.has(cmd) && cmd !== "publisher") {
+  if (jsonMode && !agentCommands.has(cmd) && cmd !== "publisher" && cmd !== "agent") {
     throw usageError("JSON_UNSUPPORTED", `命令 ${cmd ?? "<none>"} 不支持 --json`, { command: cmd ?? null });
+  }
+  if (cmd === "agent") {
+    const data = await agentIntegrationCommand(rest);
+    writeJson(successEnvelope(`agent ${rest[0]}`, data));
+    return;
   }
   if (agentCommands.has(cmd)) {
     const data = await agentCommand(cmd, rest, jsonMode);
@@ -197,7 +284,7 @@ async function main() {
       break;
     default:
       if (cmd) throw usageError("UNKNOWN_COMMAND", `未知命令: ${cmd}`, { command: cmd });
-      console.log("用法: useful <create|doctor|dev|validate|pack|agent-contract> ...，或 useful <source|publisher|key|app-update> <子命令>");
+      console.log("用法: useful <create|doctor|dev|validate|pack|agent-contract|agent> ...，或 useful <source|publisher|key|app-update> <子命令>");
   }
 }
 
@@ -347,8 +434,9 @@ function appUpdateMain(rest) {
 
 const rawArguments = process.argv.slice(2);
 const jsonMode = rawArguments.includes("--json");
-const commandLabel = rawArguments[0] === "publisher" && rawArguments[1]
-  ? `publisher ${rawArguments[1]}`
+const compoundCommand = (rawArguments[0] === "publisher" || rawArguments[0] === "agent") && rawArguments[1];
+const commandLabel = compoundCommand
+  ? `${rawArguments[0]} ${rawArguments[1]}`
   : rawArguments[0] ?? "help";
 
 try {

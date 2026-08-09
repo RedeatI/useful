@@ -31,6 +31,8 @@ Windows 进程观测和第三方工具扩展能力。
   兼容的软件源。
 - **Agent 调用：** 通过 JSON CLI 或本地 stdio MCP 调用 36 个内置 Action；也可以用 Agent profile
   为特定宿主缩小可见范围。
+- **宿主配置计划：** 为 Codex、Claude Code、Claude Desktop 或采用 `mcpServers` JSON 的宿主生成
+  无 secret、可审阅的 MCP 配置计划，不修改宿主配置。
 
 界面支持简体中文和 English (US)，并提供浅色、深色主题。Windows 便携模式只需在 `Useful.exe`
 旁创建 `portable.flag`，数据便会写入 `./data`，而不是 `%APPDATA%\Useful`。
@@ -87,6 +89,17 @@ node packages/useful-runtime/bin/useful-runtime.mjs actions recipe --input @exam
 pnpm useful -- agent-contract --json
 ```
 
+只生成或诊断宿主对应的 stdio 配置，不写入配置文件：
+
+```console
+pnpm useful -- agent plan --target codex --launcher C:\ABSOLUTE\useful-mcp.mjs --json
+pnpm useful -- agent doctor --target claude-code --launcher C:\ABSOLUTE\useful-mcp.mjs --json
+```
+
+target 闭集为 `codex`、`claude-code`、`claude-desktop`、`mcp-servers-json`。Codex 与 Claude
+仍保留各自的审批和沙箱策略；Useful 不生成绕过权限或 always-allow 配置。scope 与 merge 语义见
+[AI 接入说明](docs/AI-INTEGRATION.md)。
+
 `packages/useful-runtime` 提供 JSON 运行时，`packages/useful-mcp` 通过 stdio 暴露同一份 Action
 注册表。两者目前都属于需要 Node.js 的开发入口，尚未作为独立二进制发布。MCP 另外保留
 `useful.actions.search`、`useful.actions.describe`、`useful.actions.suggest` 与
@@ -110,7 +123,13 @@ Office Action 只在有大小上限的 JSON 中传递 canonical Base64 文件内
 `--host-config` 显式加载；CLI 的破坏性调用还要求本次 `--confirm`，MCP 二进制只授权配置中已加载的
 只读 Action，绝不会代替用户确认。该 pack 仍需真实平台与精确发布候选验证。
 
-可构建的 Agent Kit 仍是 internal candidate，不是已发布或已获发布授权的资产。开发第三方工具请从
+仓库还包含供未来隔离浏览器/隔离 VM adapter 使用的 provider-neutral
+[Computer Use 合同](docs/COMPUTER-USE.md)。它默认禁用，没有可执行 provider，不注册为 Action 或 MCP
+工具，也不能控制宿主桌面。
+
+Agent Kit 构建器只会生成带 `publicationAuthorized: false` 的本地候选，构建本身不授予发布权；仅当
+受控发布工作流把它附加到匹配的 GitHub Release 时，才属于官方可用资产，且源码/Agent Kit Release
+不代表桌面平台已经验证。开发第三方工具请从
 [Agent 工具构建指南](docs/agent/BUILD-A-TOOL.md) 开始。需要管理软件源、签名、
 更新或自托管服务的人工维护者，可继续阅读 [开发者指南](docs/DEVELOPER-GUIDE.md)。
 
@@ -121,6 +140,8 @@ apps/useful/              Vue 前端与 Tauri 桌面宿主
 crates/useful-*/          Rust 核心、媒体、进程与信任组件
 packages/useful-sdk/      Web 工具 SDK
 packages/useful-cli/      工具创建、校验、打包与软件源 CLI
+packages/agent-integrations/  Codex/Claude/MCP 配置计划与只读 doctor
+packages/computer-use-contract/  默认禁用的隔离 Computer Use 合同
 packages/action-runtime/  共享 Action 注册表、契约与本地 handler
 packages/useful-runtime/  确定性 JSON Action 运行时
 packages/useful-mcp/      本地 stdio MCP 服务
