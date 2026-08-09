@@ -316,7 +316,7 @@ describe("Useful Agent Kit builder", () => {
 
     const inspected = inspectAgentKitZip(firstBytes);
     expect(inspected.manifest.schemaVersion).toBe(AGENT_KIT_SCHEMA_VERSION);
-    expect(inspected.manifest.product).toEqual({ name: "Useful", version: "0.1.0-beta.2" });
+    expect(inspected.manifest.product).toEqual({ name: "Useful", version: "0.1.0-beta.3" });
     expect(inspected.manifest.source.revision).toBe(git(fixture.fixtureRoot, ["rev-parse", "HEAD"]));
     const listed = inspected.manifest.files.map((entry) => entry.path);
     expect(new Set(listed).size).toBe(listed.length);

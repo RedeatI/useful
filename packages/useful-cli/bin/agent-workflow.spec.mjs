@@ -82,7 +82,7 @@ describe("Agent-first CLI workflow", () => {
 
     const doctor = runJson(["doctor", tool, "--json"]);
     expect(doctor.data.summary).toEqual(expect.objectContaining({ failed: 0, hardFailure: false }));
-    expect(doctor.data.checks.find((check) => check.id === "cli-version").message).toBe("Useful CLI 0.1.0-beta.2");
+    expect(doctor.data.checks.find((check) => check.id === "cli-version").message).toBe("Useful CLI 0.1.0-beta.3");
     expect(runJson(["validate", tool, "--json"]).data.valid).toBe(true);
 
     const out = path.join(root, "输出 目录");

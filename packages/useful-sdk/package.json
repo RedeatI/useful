@@ -1,6 +1,6 @@
 {
   "name": "@useful/sdk",
-  "version": "0.1.0-beta.2",
+  "version": "0.1.0-beta.3",
   "description": "Useful 插件开发 SDK：web 工具通过一次性 MessageChannel 与宿主通信，无需编写 Rust。",
   "type": "module",
   "main": "dist/index.js",
