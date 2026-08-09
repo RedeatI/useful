@@ -269,6 +269,42 @@ test("release publish default true is rejected", async (t) => {
   assertViolation(runChecker(root), "release.yml", "release-publish-input-not-fail-closed");
 });
 
+test("release actor allowlist preserves a newline for a single configured actor", async (t) => {
+  const root = await createFixture(t);
+  await mutateWorkflow(root, "release.yml", (workflow) => {
+    const step = workflow.jobs.identity.steps
+      .find((candidate) => String(candidate.run ?? "").includes("actor_allowed=false"));
+    step.run = step.run.replace(
+      "printf '%s\\n' \"$RELEASE_ACTORS\"",
+      "printf '%s' \"$RELEASE_ACTORS\"",
+    );
+  });
+  assertViolation(
+    runChecker(root),
+    "release.yml",
+    "release-source-actor-allowlist-parser-unsafe",
+  );
+});
+
+test("release Agent Kit invocation does not forward a literal option separator", async (t) => {
+  const root = await createFixture(t);
+  await mutateWorkflow(root, "release.yml", (workflow) => {
+    for (const jobName of ["source-agent-kit", "agent-kit"]) {
+      const step = workflow.jobs[jobName].steps
+        .find((candidate) => String(candidate.run ?? "").includes("agent-kit:build --out-dir"));
+      step.run = step.run.replace(
+        "agent-kit:build --out-dir",
+        "agent-kit:build -- --out-dir",
+      );
+    }
+  });
+  assertViolation(
+    runChecker(root),
+    "release.yml",
+    "release-agent-kit-argument-separator-invalid",
+  );
+});
+
 test("release shell rejects inline github context interpolation", async (t) => {
   const root = await createFixture(t);
   await mutateWorkflow(root, "release.yml", (workflow) => {
