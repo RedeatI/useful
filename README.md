@@ -48,7 +48,7 @@ mode is supported on Windows by placing `portable.flag` next to `Useful.exe`; da
 
 You will need:
 
-- Node.js 20 or newer
+- Node.js `^20.9.0` or `>=22.0.0` for source development and desktop builds
 - pnpm 9.15.0
 - the stable Rust toolchain
 - the [Tauri 2 prerequisites](https://v2.tauri.app/start/prerequisites/) for your platform

@@ -41,7 +41,7 @@ Windows 进程观测和第三方工具扩展能力。
 
 需要先安装：
 
-- Node.js 20 或更高版本
+- 源码开发与桌面构建需要 Node.js `^20.9.0` 或 `>=22.0.0`
 - pnpm 9.15.0
 - Rust stable 工具链
 - 当前平台对应的 [Tauri 2 系统依赖](https://v2.tauri.app/start/prerequisites/)

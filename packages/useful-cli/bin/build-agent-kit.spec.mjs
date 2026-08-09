@@ -27,6 +27,7 @@ const requireFromMcp = createRequire(path.join(toolingRoot, "packages/useful-mcp
 const { Client } = await import(pathToFileURL(requireFromMcp.resolve("@modelcontextprotocol/client")).href);
 const { StdioClientTransport } = await import(pathToFileURL(requireFromMcp.resolve("@modelcontextprotocol/client/stdio")).href);
 const temporaryRoots = [];
+const AGENT_KIT_FIXTURE_TIMEOUT_MS = 30_000;
 const expectedDefaultActionIds = Object.freeze(
   [...Object.values(ACTION_IDS), ...Object.values(OFFICE_ACTION_IDS)].sort(),
 );
@@ -225,7 +226,7 @@ describe("Useful Agent Kit builder", () => {
       code: "PATH_MISSING",
       exitCode: 3,
     });
-  });
+  }, AGENT_KIT_FIXTURE_TIMEOUT_MS);
 
   it("rejects a clean commit whose legal map differs from the owner-approved digest", async () => {
     const fixture = makeCleanFixture();
@@ -241,7 +242,7 @@ describe("Useful Agent Kit builder", () => {
       code: "LEGAL_MAPPING_UNAPPROVED",
       exitCode: 5,
     });
-  });
+  }, AGENT_KIT_FIXTURE_TIMEOUT_MS);
 
   it("rejects relevant dirty and untracked source instead of attributing it to HEAD", async () => {
     const fixture = makeCleanFixture();
@@ -253,7 +254,7 @@ describe("Useful Agent Kit builder", () => {
       dependencyRoot: toolingRoot,
       outDir: path.join(fixture.outer, "out"),
     })).rejects.toMatchObject({ code: "SOURCE_DIRTY", exitCode: 3 });
-  });
+  }, AGENT_KIT_FIXTURE_TIMEOUT_MS);
 
   it("rejects dirty agent integration source", async () => {
     const fixture = makeCleanFixture();
@@ -263,7 +264,7 @@ describe("Useful Agent Kit builder", () => {
       dependencyRoot: toolingRoot,
       outDir: path.join(fixture.outer, "out"),
     })).rejects.toMatchObject({ code: "SOURCE_DIRTY", exitCode: 3 });
-  });
+  }, AGENT_KIT_FIXTURE_TIMEOUT_MS);
 
   it("rejects linked repository and output path components before reading or creating through them", async () => {
     const fixture = makeCleanFixture();
@@ -284,7 +285,7 @@ describe("Useful Agent Kit builder", () => {
       dependencyRoot: toolingRoot,
       outDir: path.join(linkedOutput, "nested"),
     })).rejects.toMatchObject({ code: "PATH_LINK_REJECTED", exitCode: 4 });
-  });
+  }, AGENT_KIT_FIXTURE_TIMEOUT_MS);
 
   it("is byte-reproducible, closed, non-overwriting, and runnable from a Chinese path with spaces", async () => {
     const fixture = makeCleanFixture();

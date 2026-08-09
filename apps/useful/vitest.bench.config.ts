@@ -11,8 +11,10 @@ export default defineConfig({
   test: {
     globals: true,
     environment: "node",
-    include: ["bench/**/*.spec.ts"],
     // benchmark 单轮可能较久
     testTimeout: 120_000,
+    benchmark: {
+      include: ["bench/**/*.perf.spec.ts"],
+    },
   },
 });

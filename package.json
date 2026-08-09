@@ -3,6 +3,9 @@
   "private": true,
   "version": "0.1.0-beta.2",
   "packageManager": "pnpm@9.15.0",
+  "engines": {
+    "node": "^20.9.0 || >=22.0.0"
+  },
   "scripts": {
     "dev": "pnpm --filter @useful/app dev",
     "build": "pnpm -r build",
@@ -35,7 +38,7 @@
     "adm-zip": "^0.6.0",
     "esbuild": "0.25.12",
     "png-to-ico": "^2.1.8",
-    "sharp": "^0.33.5",
+    "sharp": "^0.35.0",
     "typescript": "^5.7.3",
     "yaml": "^2.6.1"
   },
