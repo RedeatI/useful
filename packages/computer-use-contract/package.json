@@ -1,0 +1,18 @@
+{
+  "name": "@useful/computer-use-contract",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Provider-neutral, fail-closed Computer Use session contract for Useful.",
+  "exports": {
+    ".": {
+      "types": "./src/index.d.ts",
+      "import": "./src/index.mjs"
+    }
+  },
+  "scripts": {
+    "test": "node --test",
+    "typecheck": "node --check src/index.mjs"
+  },
+  "license": "Apache-2.0"
+}

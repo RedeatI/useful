@@ -37,6 +37,8 @@ Agent host.
   during trusted installation, or host a compatible source yourself.
 - **Agent access:** call 36 built-in Actions through a JSON CLI or local stdio MCP server. An Agent
   profile can narrow that set for a particular host.
+- **Client setup plans:** generate secret-free, reviewable MCP configuration plans for Codex,
+  Claude Code, Claude Desktop, or an `mcpServers` JSON host without changing host configuration.
 
 The interface is available in Simplified Chinese and English, with light and dark themes. Portable
 mode is supported on Windows by placing `portable.flag` next to `Useful.exe`; data is then stored in
@@ -96,6 +98,17 @@ Inspect the wider machine-readable CLI contract with:
 pnpm useful -- agent-contract --json
 ```
 
+Generate or diagnose a host-specific stdio configuration without writing it:
+
+```console
+pnpm useful -- agent plan --target codex --launcher C:\ABSOLUTE\useful-mcp.mjs --json
+pnpm useful -- agent doctor --target claude-code --launcher C:\ABSOLUTE\useful-mcp.mjs --json
+```
+
+The plan target is one of `codex`, `claude-code`, `claude-desktop`, or `mcp-servers-json`.
+Codex and Claude keep their own approval and sandbox policies; Useful does not generate bypass or
+always-allow settings. See [AI Integration](docs/AI-INTEGRATION.md) for scope and merge semantics.
+
 `packages/useful-runtime` provides the JSON runtime, and `packages/useful-mcp` exposes the same
 registry over stdio. Both are development entry points that currently require Node.js; they are not
 published as standalone binaries. MCP also provides `useful.actions.search`,
@@ -127,7 +140,14 @@ default 36. A source checkout can opt in with `--host-config`: the CLI also requ
 `--confirm` for destructive work, while the MCP binary grants configured read-only Actions only and
 never invents user confirmation. The pack still needs real-platform and release-candidate validation.
 
-The buildable Agent Kit remains an internal candidate, not a published or release-approved asset.
+The repository also contains a provider-neutral [Computer Use contract](docs/COMPUTER-USE.md) for
+future isolated-browser or isolated-VM adapters. It is disabled by default, has no executable
+provider, is not registered as an Action or MCP tool, and cannot control the host desktop.
+
+The Agent Kit builder produces a local candidate with `publicationAuthorized: false`; building it
+does not grant release authority. An Agent Kit is officially available only when the controlled
+release workflow attaches it to a matching GitHub Release, and that source/Agent Kit release does
+not imply desktop-platform validation.
 To build a third-party tool, start with the [Agent tool guide](docs/agent/BUILD-A-TOOL.md). The
 longer [developer guide](docs/DEVELOPER-GUIDE.md) covers package sources, signing, updates, and
 self-hosting for human maintainers.
@@ -139,6 +159,8 @@ apps/useful/              Vue frontend and Tauri desktop host
 crates/useful-*/          Rust core, media, process, and trust components
 packages/useful-sdk/      SDK for web-based tools
 packages/useful-cli/      Tool creation, validation, packaging, and source CLI
+packages/agent-integrations/  Codex/Claude/MCP configuration plans and read-only doctor
+packages/computer-use-contract/  Disabled-by-default isolated Computer Use contract
 packages/action-runtime/  Shared Action registry, contracts, and local handlers
 packages/useful-runtime/  Deterministic JSON Action runtime
 packages/useful-mcp/      Local stdio MCP server

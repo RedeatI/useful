@@ -1,8 +1,17 @@
 name: Useful Release
+run-name: Useful ${{ inputs.scope }} ${{ inputs.channel }} ${{ github.ref_name }} publish=${{ inputs.publish }}
 
 on:
   workflow_dispatch:
     inputs:
+      scope:
+        description: Closed release scope; source previews never include desktop binaries
+        required: true
+        default: source-agent-kit
+        type: choice
+        options:
+          - source-agent-kit
+          - desktop-full
       channel:
         description: Release channel encoded by package.json and the selected tag
         required: true
@@ -31,6 +40,7 @@ jobs:
     permissions:
       contents: read
       checks: read
+      actions: read
     outputs:
       version: ${{ steps.identity.outputs.version }}
       tag: ${{ steps.identity.outputs.tag }}
@@ -42,6 +52,7 @@ jobs:
       media_source_compliance_status: ${{ steps.publish-gate.outputs.media_source_compliance_status }}
       media_source_distribution: ${{ steps.publish-gate.outputs.media_source_distribution }}
       publish_gate_json: ${{ steps.publish-gate.outputs.publish_gate_json }}
+      source_publish_gate_json: ${{ steps.source-owner-gate.outputs.source_publish_gate_json }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
@@ -60,10 +71,13 @@ jobs:
           node-version: 20
       - name: Require a manually selected existing tag
         shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          REF_TYPE: ${{ github.ref_type }}
         run: |
           set -euo pipefail
-          test "${{ github.event_name }}" = "workflow_dispatch"
-          test "${{ github.ref_type }}" = "tag" || {
+          test "$EVENT_NAME" = "workflow_dispatch"
+          test "$REF_TYPE" = "tag" || {
             echo "Release workflow must be dispatched on an existing tag ref." >&2
             exit 1
           }
@@ -73,17 +87,20 @@ jobs:
         id: identity
         env:
           SIGNING_READY: ${{ vars.USEFUL_SIGNING_READY || 'false' }}
+          RELEASE_TAG: ${{ github.ref_name }}
+          RELEASE_CHANNEL: ${{ inputs.channel }}
         run: >-
           node scripts/release-metadata.mjs
           --package package.json
-          --tag "${{ github.ref_name }}"
-          --channel "${{ inputs.channel }}"
+          --tag "$RELEASE_TAG"
+          --channel "$RELEASE_CHANNEL"
           --signing-ready "$SIGNING_READY"
           --identity-only
           --github-output "$GITHUB_OUTPUT"
 
       - name: Validate canonical repository, publisher, and production update trust
         id: publish-gate
+        if: inputs.scope == 'desktop-full'
         env:
           EXPECTED_REPOSITORY: ${{ vars.USEFUL_EXPECTED_REPOSITORY }}
           RELEASE_ACTORS: ${{ vars.USEFUL_RELEASE_ACTORS }}
@@ -94,15 +111,21 @@ jobs:
           STABLE_UPDATE_EVIDENCE_SHA256: ${{ vars.USEFUL_STABLE_UPDATE_EVIDENCE_SHA256 }}
           MEDIA_SOURCE_EVIDENCE_PATH: ${{ vars.USEFUL_MEDIA_SOURCE_EVIDENCE_PATH }}
           MEDIA_SOURCE_EVIDENCE_SHA256: ${{ vars.USEFUL_MEDIA_SOURCE_EVIDENCE_SHA256 }}
+          REPOSITORY: ${{ github.repository }}
+          REPOSITORY_VISIBILITY: ${{ github.event.repository.visibility }}
+          RELEASE_ACTOR: ${{ github.actor }}
+          PUBLISH_REQUESTED: ${{ inputs.publish }}
+          RELEASE_CHANNEL: ${{ inputs.channel }}
+          RELEASE_TAG: ${{ github.ref_name }}
         run: >-
           node scripts/release-publish-gate.mjs
-          --repository "${{ github.repository }}"
+          --repository "$REPOSITORY"
           --expected-repository "$EXPECTED_REPOSITORY"
-          --visibility "${{ github.event.repository.visibility }}"
-          --actor "${{ github.actor }}"
+          --visibility "$REPOSITORY_VISIBILITY"
+          --actor "$RELEASE_ACTOR"
           --allowed-actors "$RELEASE_ACTORS"
-          --publish "${{ inputs.publish }}"
-          --channel "${{ inputs.channel }}"
+          --publish "$PUBLISH_REQUESTED"
+          --channel "$RELEASE_CHANNEL"
           --update-root-pubkey "$UPDATE_ROOT_PUBKEY_HEX"
           --update-feed-template "$UPDATE_FEED_URL_TEMPLATE"
           --root-ceremony-sha256 "$UPDATE_ROOT_CEREMONY_SHA256"
@@ -111,17 +134,71 @@ jobs:
           --stable-evidence-sha256 "$STABLE_UPDATE_EVIDENCE_SHA256"
           --media-source-evidence-path "$MEDIA_SOURCE_EVIDENCE_PATH"
           --media-source-evidence-sha256 "$MEDIA_SOURCE_EVIDENCE_SHA256"
-          --tag "${{ github.ref_name }}"
+          --tag "$RELEASE_TAG"
           --github-output "$GITHUB_OUTPUT"
 
-      - name: Require all exact-commit CI and platform-limited checks before publish
-        if: inputs.publish == true
+      - name: Validate source preview scope and independent owner authorization
+        id: source-owner-gate
+        if: inputs.scope == 'source-agent-kit'
         env:
+          EXPECTED_REPOSITORY: ${{ vars.USEFUL_EXPECTED_REPOSITORY }}
+          RELEASE_ACTORS: ${{ vars.USEFUL_RELEASE_ACTORS }}
           GH_TOKEN: ${{ github.token }}
+          RELEASE_CHANNEL: ${{ inputs.channel }}
+          REPOSITORY: ${{ github.repository }}
+          REPOSITORY_VISIBILITY: ${{ github.event.repository.visibility }}
+          RELEASE_ACTOR: ${{ github.actor }}
+          PUBLISH_REQUESTED: ${{ inputs.publish }}
+          SOURCE_SHA: ${{ github.sha }}
+          RUN_ID: ${{ github.run_id }}
+          RELEASE_TAG: ${{ github.ref_name }}
         shell: bash
         run: |
           set -euo pipefail
-          checks=$(gh api --paginate --slurp "/repos/${{ github.repository }}/commits/${{ github.sha }}/check-runs?filter=all&per_page=100")
+          test "$RELEASE_CHANNEL" != stable || {
+            echo "source-agent-kit is a non-desktop preview scope and cannot publish on the stable channel." >&2
+            exit 1
+          }
+          test -n "$EXPECTED_REPOSITORY"
+          test "$REPOSITORY" = "$EXPECTED_REPOSITORY"
+          test "$REPOSITORY_VISIBILITY" = public
+          actor_allowed=false
+          while IFS= read -r actor; do
+            if test "$actor" = "$RELEASE_ACTOR"; then actor_allowed=true; fi
+          done < <(printf '%s' "$RELEASE_ACTORS" | tr ',[:space:]' '\n' | sed '/^$/d')
+          test "$actor_allowed" = true || {
+            echo "Current actor is not in USEFUL_RELEASE_ACTORS." >&2
+            exit 1
+          }
+          if test "$PUBLISH_REQUESTED" = true; then
+            runs=$(gh api --paginate --slurp "/repos/$REPOSITORY/actions/workflows/release.yml/runs?event=workflow_dispatch&status=success&per_page=100")
+            jq -e \
+              --arg sha "$SOURCE_SHA" \
+              --arg current "$RUN_ID" \
+              --arg dryRunTitle "Useful source-agent-kit $RELEASE_CHANNEL $RELEASE_TAG publish=false" \
+              '[.[].workflow_runs[] | select(
+                .id != ($current | tonumber)
+                and .head_sha == $sha
+                and .display_title == $dryRunTitle
+              )] | length > 0' <<<"$runs" >/dev/null || {
+                echo "Publish requires an earlier successful source-agent-kit dry-run for this exact tag and commit." >&2
+                exit 1
+              }
+          fi
+          printf 'source_publish_gate_json=%s\n' \
+            "$(jq -cn --arg repository "$REPOSITORY" --arg actor "$RELEASE_ACTOR" --arg tag "$RELEASE_TAG" --arg sha "$SOURCE_SHA" '{schemaVersion:"useful.source-preview-publish-gate.v1",scope:"source-agent-kit",repository:$repository,actor:$actor,tag:$tag,sourceRevision:$sha,ownerAuthorized:true,desktopAssetsAuthorized:false}')" \
+            >> "$GITHUB_OUTPUT"
+
+      - name: Require all exact-commit CI and platform-limited checks before publish
+        if: inputs.publish == true && inputs.scope == 'desktop-full'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          SOURCE_SHA: ${{ github.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          checks=$(gh api --paginate --slurp "/repos/$REPOSITORY/commits/$SOURCE_SHA/check-runs?filter=all&per_page=100")
           required=(
             build-and-test
             protocol-and-cli
@@ -137,7 +214,7 @@ jobs:
               '[.[].check_runs[] | select(.name == $name)] | if length == 0 then null else max_by(.id) end' \
               <<<"$checks")
             jq -e '. != null and .status == "completed" and .conclusion == "success"' <<<"$latest" >/dev/null || {
-                echo "Latest required check is missing or unsuccessful for ${{ github.sha }}: $name ($latest)" >&2
+                echo "Latest required check is missing or unsuccessful for $SOURCE_SHA: $name ($latest)" >&2
                 exit 1
               }
           done
@@ -145,6 +222,7 @@ jobs:
   verify:
     name: Re-run source and workspace release gates
     needs: identity
+    if: inputs.scope == 'desktop-full'
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -248,6 +326,7 @@ jobs:
   verify-compose:
     name: Re-run Compose release integration
     needs: identity
+    if: inputs.scope == 'desktop-full'
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -274,9 +353,339 @@ jobs:
           docker compose --profile e2e down -v --remove-orphans
           docker compose --profile e2e up --build --abort-on-container-exit --exit-code-from e2e-runner
 
+  source-agent-kit:
+    name: Assemble source and Agent Kit preview
+    needs: identity
+    if: inputs.scope == 'source-agent-kit'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Verify exact clean source checkout
+        shell: bash
+        env:
+          EXPECTED_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+          test -z "$(git status --porcelain --untracked-files=all)"
+          echo "SOURCE_DATE_EPOCH=$(git show -s --format=%ct "$EXPECTED_SHA")" >> "$GITHUB_ENV"
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+        with:
+          version: 9.15.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 20
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Capture strict public source evidence and legal closure
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/public-source-check.mjs --json > "$RUNNER_TEMP/SOURCE-CHECK.json"
+          for legal in LICENSE LICENSES.md NOTICE THIRD_PARTY_NOTICES.md TRADEMARKS.md; do
+            test -s "$legal"
+            test -f "$legal"
+            test ! -L "$legal"
+          done
+      - name: Generate source SBOM
+        run: node scripts/gen-sbom.mjs
+      - name: Build and close-verify source preview Agent Kit
+        env:
+          VERSION: ${{ needs.identity.outputs.version }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          out="$RUNNER_TEMP/useful-source-agent-kit"
+          test ! -e "$out"
+          mkdir "$out"
+          result=$(pnpm --silent agent-kit:build -- --out-dir "$out")
+          RESULT="$result" OUT="$out" REVISION="$GITHUB_SHA" VERSION="$VERSION" node --input-type=module <<'NODE'
+          import { createHash } from 'node:crypto';
+          import { lstatSync, readFileSync } from 'node:fs';
+          import path from 'node:path';
+          const exact = (value, fields, label) => {
+            if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error(`${label} must be an object`);
+            const actual = Object.keys(value).sort();
+            const expected = [...fields].sort();
+            if (JSON.stringify(actual) !== JSON.stringify(expected)) throw new Error(`${label} is not a closed schema`);
+          };
+          const value = JSON.parse(process.env.RESULT);
+          exact(value, [
+            'schemaVersion', 'ok', 'publicationAuthorized', 'legalMappingApproved', 'product',
+            'source', 'node', 'asset', 'receipt', 'manifest',
+          ], 'Agent Kit build result');
+          if (value.schemaVersion !== 'useful.agent-kit.build-result.v1' || value.ok !== true) throw new Error('Agent Kit build result schema/ok is invalid');
+          if (value.publicationAuthorized !== false) throw new Error('Agent Kit builder must not authorize publication');
+          if (value.legalMappingApproved !== true) throw new Error('Agent Kit legal mapping is not approved');
+          exact(value.product, ['name', 'version'], 'Agent Kit product');
+          exact(value.source, ['revision'], 'Agent Kit source');
+          exact(value.asset, ['name', 'path', 'sha256', 'size'], 'Agent Kit asset');
+          exact(value.receipt, ['name', 'path'], 'Agent Kit receipt');
+          if (value.product.name !== 'Useful' || value.product.version !== process.env.VERSION) throw new Error('Agent Kit product/version binding failed');
+          if (value.source.revision !== process.env.REVISION) throw new Error('Agent Kit source revision binding failed');
+          const zipName = `Useful-${process.env.VERSION}-agent-kit.zip`;
+          const receiptName = `${zipName}.sha256`;
+          const zipPath = path.resolve(process.env.OUT, zipName);
+          const receiptPath = path.resolve(process.env.OUT, receiptName);
+          if (value.asset.name !== zipName || path.resolve(value.asset.path) !== zipPath) throw new Error('Agent Kit asset name/path binding failed');
+          if (value.receipt.name !== receiptName || path.resolve(value.receipt.path) !== receiptPath) throw new Error('Agent Kit receipt name/path binding failed');
+          const zipInfo = lstatSync(zipPath);
+          const receiptInfo = lstatSync(receiptPath);
+          if (!zipInfo.isFile() || zipInfo.isSymbolicLink() || zipInfo.size !== value.asset.size || zipInfo.size <= 0) throw new Error('Agent Kit asset size/type binding failed');
+          if (!receiptInfo.isFile() || receiptInfo.isSymbolicLink()) throw new Error('Agent Kit receipt type binding failed');
+          const digest = createHash('sha256').update(readFileSync(zipPath)).digest('hex');
+          if (digest !== value.asset.sha256 || !/^[0-9a-f]{64}$/.test(digest)) throw new Error('Agent Kit asset digest binding failed');
+          if (readFileSync(receiptPath, 'utf8') !== `${digest}  ${zipName}\n`) throw new Error('Agent Kit receipt bytes binding failed');
+          NODE
+          (cd "$out" && sha256sum --check --strict "Useful-$VERSION-agent-kit.zip.sha256")
+          zip="$out/Useful-$VERSION-agent-kit.zip"
+          mapfile -t manifests < <(unzip -Z1 "$zip" | grep -E '(^|/)MANIFEST\.json$')
+          test "${#manifests[@]}" -eq 1
+          manifest_path="$RUNNER_TEMP/source-agent-kit-MANIFEST.json"
+          zip_list_path="$RUNNER_TEMP/source-agent-kit-ZIP-LIST.txt"
+          unzip -p "$zip" "${manifests[0]}" > "$manifest_path"
+          unzip -Z1 "$zip" > "$zip_list_path"
+          MANIFEST_PATH="$manifest_path" ZIP_LIST_PATH="$zip_list_path" REVISION="$GITHUB_SHA" VERSION="$VERSION" node --input-type=module <<'NODE'
+          import { readFileSync } from 'node:fs';
+          const exact = (value, fields, label) => {
+            if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error(`${label} must be an object`);
+            const actual = Object.keys(value).sort();
+            const expected = [...fields].sort();
+            if (JSON.stringify(actual) !== JSON.stringify(expected)) throw new Error(`${label} is not a closed schema`);
+          };
+          const manifest = JSON.parse(readFileSync(process.env.MANIFEST_PATH, 'utf8'));
+          exact(manifest, ['schemaVersion', 'product', 'source', 'node', 'commands', 'closure', 'files'], 'Agent Kit MANIFEST');
+          exact(manifest.product, ['name', 'version'], 'Agent Kit MANIFEST product');
+          exact(manifest.source, ['revision'], 'Agent Kit MANIFEST source');
+          exact(manifest.node, ['requirement'], 'Agent Kit MANIFEST node');
+          exact(manifest.closure, ['manifestPath', 'manifestSelfExcluded'], 'Agent Kit MANIFEST closure');
+          if (manifest.schemaVersion !== 'useful.agent-kit.manifest.v1' || manifest.product.name !== 'Useful' || manifest.product.version !== process.env.VERSION || manifest.source.revision !== process.env.REVISION || manifest.node.requirement !== '>=20' || manifest.closure.manifestPath !== 'MANIFEST.json' || manifest.closure.manifestSelfExcluded !== true) throw new Error('Agent Kit MANIFEST identity/closure is invalid');
+          const expectedCommands = {
+            useful: { entry: 'lib/useful.mjs', posix: 'bin/useful', windows: 'bin/useful.cmd' },
+            'useful-runtime': { entry: 'lib/useful-runtime.mjs', posix: 'bin/useful-runtime', windows: 'bin/useful-runtime.cmd' },
+            'useful-mcp': { entry: 'lib/useful-mcp.mjs', posix: 'bin/useful-mcp', windows: 'bin/useful-mcp.cmd' },
+          };
+          exact(manifest.commands, Object.keys(expectedCommands), 'Agent Kit MANIFEST commands');
+          for (const [name, expected] of Object.entries(expectedCommands)) {
+            exact(manifest.commands[name], ['entry', 'posix', 'windows'], `Agent Kit MANIFEST command ${name}`);
+            if (JSON.stringify(manifest.commands[name]) !== JSON.stringify(expected)) throw new Error(`Agent Kit MANIFEST command drifted: ${name}`);
+          }
+          if (!Array.isArray(manifest.files) || manifest.files.length === 0) throw new Error('Agent Kit MANIFEST files are empty');
+          let prior = '';
+          const listed = [];
+          for (const item of manifest.files) {
+            exact(item, ['path', 'sha256', 'size'], 'Agent Kit MANIFEST file');
+            if (!item.path || item.path === 'MANIFEST.json' || item.path <= prior || !/^[0-9a-f]{64}$/.test(item.sha256) || !Number.isSafeInteger(item.size) || item.size < 0) throw new Error('Agent Kit MANIFEST file closure is invalid');
+            prior = item.path;
+            listed.push(item.path);
+          }
+          const archiveEntries = readFileSync(process.env.ZIP_LIST_PATH, 'utf8').split('\n').filter(Boolean).sort();
+          const expectedEntries = ['MANIFEST.json', ...listed].sort();
+          if (JSON.stringify(archiveEntries) !== JSON.stringify(expectedEntries)) throw new Error('Agent Kit ZIP entries are not closed by MANIFEST.json');
+          NODE
+      - name: Assemble closed source preview asset set
+        env:
+          VERSION: ${{ needs.identity.outputs.version }}
+          TAG: ${{ needs.identity.outputs.tag }}
+          CHANNEL: ${{ needs.identity.outputs.channel }}
+          SOURCE_PUBLISH_GATE_JSON: ${{ needs.identity.outputs.source_publish_gate_json }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test ! -e source-release-candidate
+          mkdir source-release-candidate
+          cp --no-clobber dist-sbom/sbom.cdx.json "source-release-candidate/Useful-$VERSION-SBOM.cdx.json"
+          cp --no-clobber "$RUNNER_TEMP/useful-source-agent-kit/Useful-$VERSION-agent-kit.zip" source-release-candidate/
+          cp --no-clobber "$RUNNER_TEMP/useful-source-agent-kit/Useful-$VERSION-agent-kit.zip.sha256" source-release-candidate/
+          cp --no-clobber "$RUNNER_TEMP/SOURCE-CHECK.json" source-release-candidate/SOURCE-CHECK.json
+          for legal in LICENSE LICENSES.md NOTICE THIRD_PARTY_NOTICES.md TRADEMARKS.md; do cp --no-clobber "$legal" source-release-candidate/; done
+          printf '%s\n' "$SOURCE_PUBLISH_GATE_JSON" > source-release-candidate/SOURCE-PUBLISH-GATE.json
+          node --input-type=module <<'NODE'
+          import { execFileSync } from 'node:child_process';
+          import { createHash } from 'node:crypto';
+          import { lstatSync, readFileSync, writeFileSync } from 'node:fs';
+          import path from 'node:path';
+          const root = 'source-release-candidate';
+          const revision = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
+          if (revision !== process.env.GITHUB_SHA) throw new Error('source revision drifted');
+          const tree = execFileSync('git', ['rev-parse', 'HEAD^{tree}'], { encoding: 'utf8' }).trim();
+          const raw = execFileSync('git', ['ls-tree', '-r', '-z', '--full-tree', 'HEAD']);
+          const files = raw.toString('utf8').split('\0').filter(Boolean).map((entry) => {
+            const tab = entry.indexOf('\t');
+            if (tab < 0) throw new Error('unexpected git ls-tree entry');
+            const [mode, type, object] = entry.slice(0, tab).split(' ');
+            return { path: entry.slice(tab + 1), mode, type, object };
+          });
+          const manifest = { schemaVersion: 'useful.source-manifest.v1', repository: process.env.GITHUB_REPOSITORY, sourceRevision: revision, sourceTree: tree, version: process.env.VERSION, tag: process.env.TAG, channel: process.env.CHANNEL, scope: 'source-agent-kit', files };
+          writeFileSync(path.join(root, 'SOURCE-MANIFEST.json'), `${JSON.stringify(manifest)}\n`, { flag: 'wx' });
+          const assetNames = [
+            `Useful-${process.env.VERSION}-SBOM.cdx.json`, `Useful-${process.env.VERSION}-agent-kit.zip`,
+            `Useful-${process.env.VERSION}-agent-kit.zip.sha256`, 'SOURCE-CHECK.json', 'SOURCE-MANIFEST.json',
+            'SOURCE-PUBLISH-GATE.json', 'LICENSE', 'LICENSES.md', 'NOTICE', 'THIRD_PARTY_NOTICES.md',
+            'TRADEMARKS.md', 'BUILD-PROVENANCE.json', 'RELEASE-ASSETS.txt',
+          ];
+          writeFileSync(path.join(root, 'RELEASE-ASSETS.txt'), `${assetNames.join('\n')}\n`, { flag: 'wx' });
+          const subjects = assetNames.filter((name) => !['BUILD-PROVENANCE.json', 'RELEASE-ASSETS.txt'].includes(name)).map((name) => {
+            const file = path.join(root, name);
+            const info = lstatSync(file);
+            if (!info.isFile() || info.isSymbolicLink() || info.size <= 0) throw new Error(`invalid source preview asset: ${name}`);
+            const bytes = readFileSync(file);
+            return { name, sha256: createHash('sha256').update(bytes).digest('hex'), sizeBytes: bytes.length };
+          });
+          const provenance = { schemaVersion: 'useful.source-preview-provenance.v1', repository: process.env.GITHUB_REPOSITORY, sourceRevision: revision, sourceTree: tree, sourceTimestamp: Number(process.env.SOURCE_DATE_EPOCH), ref: process.env.GITHUB_REF, workflowRef: process.env.GITHUB_WORKFLOW_REF, runId: process.env.GITHUB_RUN_ID, runAttempt: process.env.GITHUB_RUN_ATTEMPT, version: process.env.VERSION, tag: process.env.TAG, channel: process.env.CHANNEL, scope: 'source-agent-kit', desktopAssetsIncluded: false, subjects };
+          if (!Number.isSafeInteger(provenance.sourceTimestamp) || provenance.sourceTimestamp <= 0) throw new Error('SOURCE_DATE_EPOCH is invalid');
+          writeFileSync(path.join(root, 'BUILD-PROVENANCE.json'), `${JSON.stringify(provenance, null, 2)}\n`, { flag: 'wx' });
+          NODE
+          cat > source-release-candidate/RELEASE-NOTES.md <<EOF
+          # Useful $VERSION — Source + Agent Kit Preview
+
+          Channel/tag: $CHANNEL / $TAG
+
+          > **NON-DESKTOP PREVIEW:** This Release contains public source evidence, the cross-platform Useful Agent Kit, an SBOM, provenance, checksums, and legal notices only. It contains no desktop executable, installer, portable package, update feed, code-signing claim, notarization claim, or supported-desktop-platform claim.
+
+          The Agent Kit builder deliberately reports publicationAuthorized=false. Publication of this preview is separately authorized by the workflow owner gate recorded in SOURCE-PUBLISH-GATE.json; that workflow authorization does not modify or reinterpret the builder field.
+          EOF
+          (
+            cd source-release-candidate
+            mapfile -t expected < <(sort RELEASE-ASSETS.txt)
+            mapfile -t actual < <(find . -maxdepth 1 -type f ! -name RELEASE-NOTES.md -printf '%f\n' | sort)
+            diff -u <(printf '%s\n' "${expected[@]}") <(printf '%s\n' "${actual[@]}")
+            : > SHA256SUMS.txt
+            for asset in "${expected[@]}"; do sha256sum "$asset" >> SHA256SUMS.txt; done
+            sha256sum --check --strict SHA256SUMS.txt
+          )
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: useful-source-agent-kit-candidate-${{ needs.identity.outputs.version }}
+          path: source-release-candidate/*
+          if-no-files-found: error
+          retention-days: 14
+
+  publish-source-agent-kit:
+    name: Publish source and Agent Kit preview
+    if: inputs.publish == true && inputs.scope == 'source-agent-kit'
+    needs: [identity, source-agent-kit]
+    runs-on: ubuntu-24.04
+    environment: release
+    permissions:
+      contents: write
+      checks: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Revalidate exact public source before downloading candidate
+        shell: bash
+        env:
+          EXPECTED_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+          test -z "$(git status --porcelain --untracked-files=all)"
+          echo "SOURCE_DATE_EPOCH=$(git show -s --format=%ct "$EXPECTED_SHA")" >> "$GITHUB_ENV"
+          node scripts/public-source-check.mjs --json > "$RUNNER_TEMP/PUBLISH-SOURCE-CHECK.json"
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: useful-source-agent-kit-candidate-${{ needs.identity.outputs.version }}
+          path: source-release-candidate
+      - name: Revalidate source preview owner gate and closed asset set
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EXPECTED_REPOSITORY: ${{ vars.USEFUL_EXPECTED_REPOSITORY }}
+          RELEASE_ACTORS: ${{ vars.USEFUL_RELEASE_ACTORS }}
+          VERSION: ${{ needs.identity.outputs.version }}
+          EVENT_NAME: ${{ github.event_name }}
+          REF_TYPE: ${{ github.ref_type }}
+          REF_NAME: ${{ github.ref_name }}
+          IDENTITY_TAG: ${{ needs.identity.outputs.tag }}
+          RELEASE_SCOPE: ${{ inputs.scope }}
+          PUBLISH_REQUESTED: ${{ inputs.publish }}
+          RELEASE_CHANNEL: ${{ inputs.channel }}
+          REPOSITORY: ${{ github.repository }}
+          REPOSITORY_VISIBILITY: ${{ github.event.repository.visibility }}
+          RELEASE_ACTOR: ${{ github.actor }}
+          EXPECTED_SHA: ${{ github.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$EVENT_NAME" = workflow_dispatch
+          test "$REF_TYPE" = tag
+          test "$REF_NAME" = "$IDENTITY_TAG"
+          test "$RELEASE_SCOPE" = source-agent-kit
+          test "$PUBLISH_REQUESTED" = true
+          test "$RELEASE_CHANNEL" != stable
+          test "$REPOSITORY" = "$EXPECTED_REPOSITORY"
+          test "$REPOSITORY_VISIBILITY" = public
+          printf '%s' "$RELEASE_ACTORS" | tr ',[:space:]' '\n' | sed '/^$/d' | grep -Fx -- "$RELEASE_ACTOR" >/dev/null
+          remote_refs=$(git ls-remote --tags origin "refs/tags/$IDENTITY_TAG" "refs/tags/$IDENTITY_TAG^{}")
+          mapfile -t direct_tag_objects < <(awk -v ref="refs/tags/$IDENTITY_TAG" '$2 == ref { print $1 }' <<<"$remote_refs")
+          mapfile -t peeled_tag_commits < <(awk -v ref="refs/tags/$IDENTITY_TAG^{}" '$2 == ref { print $1 }' <<<"$remote_refs")
+          test "${#direct_tag_objects[@]}" -eq 1
+          test "${#peeled_tag_commits[@]}" -le 1
+          REMOTE_TAG_COMMIT="${peeled_tag_commits[0]:-${direct_tag_objects[0]}}"
+          test "$REMOTE_TAG_COMMIT" = "$EXPECTED_SHA" || {
+            echo "Remote tag does not resolve to the exact workflow commit." >&2
+            exit 1
+          }
+          test ! -e "$RUNNER_TEMP/PUBLISH-SOURCE-CHECK.json" -o -s "$RUNNER_TEMP/PUBLISH-SOURCE-CHECK.json"
+          cd source-release-candidate
+          test -s RELEASE-NOTES.md
+          mapfile -t expected < <(sort RELEASE-ASSETS.txt)
+          mapfile -t actual < <(find . -maxdepth 1 -type f ! -name RELEASE-NOTES.md ! -name SHA256SUMS.txt -printf '%f\n' | sort)
+          diff -u <(printf '%s\n' "${expected[@]}") <(printf '%s\n' "${actual[@]}")
+          mapfile -t checksum_names < <(awk '{print $2}' SHA256SUMS.txt | sort)
+          diff -u <(printf '%s\n' "${expected[@]}") <(printf '%s\n' "${checksum_names[@]}")
+          sha256sum --check --strict SHA256SUMS.txt
+          node --input-type=module <<'NODE'
+          import { readFileSync } from 'node:fs';
+          const gate = JSON.parse(readFileSync('SOURCE-PUBLISH-GATE.json', 'utf8'));
+          if (gate.schemaVersion !== 'useful.source-preview-publish-gate.v1' || gate.scope !== 'source-agent-kit' || gate.repository !== process.env.REPOSITORY || gate.actor !== process.env.RELEASE_ACTOR || gate.tag !== process.env.IDENTITY_TAG || gate.sourceRevision !== process.env.EXPECTED_SHA || gate.ownerAuthorized !== true || gate.desktopAssetsAuthorized !== false) throw new Error('source preview owner gate is invalid');
+          const provenance = JSON.parse(readFileSync('BUILD-PROVENANCE.json', 'utf8'));
+          if (provenance.schemaVersion !== 'useful.source-preview-provenance.v1' || provenance.scope !== 'source-agent-kit' || provenance.sourceRevision !== process.env.EXPECTED_SHA || provenance.desktopAssetsIncluded !== false) throw new Error('source preview provenance is invalid');
+          NODE
+      - name: Create non-desktop prerelease from explicit assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.identity.outputs.tag }}
+          VERSION: ${{ needs.identity.outputs.version }}
+          REPOSITORY: ${{ github.repository }}
+          REF_NAME: ${{ github.ref_name }}
+          EXPECTED_SHA: ${{ github.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$REF_NAME" = "$TAG"
+          remote_refs=$(git ls-remote --tags origin "refs/tags/$TAG" "refs/tags/$TAG^{}")
+          mapfile -t direct_tag_objects < <(awk -v ref="refs/tags/$TAG" '$2 == ref { print $1 }' <<<"$remote_refs")
+          mapfile -t peeled_tag_commits < <(awk -v ref="refs/tags/$TAG^{}" '$2 == ref { print $1 }' <<<"$remote_refs")
+          test "${#direct_tag_objects[@]}" -eq 1
+          test "${#peeled_tag_commits[@]}" -le 1
+          REMOTE_TAG_COMMIT="${peeled_tag_commits[0]:-${direct_tag_objects[0]}}"
+          test "$REMOTE_TAG_COMMIT" = "$EXPECTED_SHA"
+          ! gh release view "$TAG" --repo "$REPOSITORY" >/dev/null 2>&1 || {
+            echo "Release already exists for $TAG; refusing to overwrite it." >&2
+            exit 1
+          }
+          cd source-release-candidate
+          mapfile -t names < RELEASE-ASSETS.txt
+          assets=()
+          for name in "${names[@]}"; do assets+=("$name"); done
+          assets+=(SHA256SUMS.txt)
+          gh release create "$TAG" \
+            --repo "$REPOSITORY" \
+            --verify-tag \
+            --prerelease \
+            --latest=false \
+            --title "Useful $VERSION — Source + Agent Kit Preview (No Desktop Binaries)" \
+            --notes-file RELEASE-NOTES.md \
+            "${assets[@]}"
+
   sbom:
     name: Generate release SBOM
     needs: [identity, verify, verify-compose]
+    if: inputs.scope == 'desktop-full'
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -313,6 +722,7 @@ jobs:
   agent-kit:
     name: Build deterministic Useful Agent Kit
     needs: [identity, verify, verify-compose]
+    if: inputs.scope == 'desktop-full'
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -357,10 +767,15 @@ jobs:
             if (JSON.stringify(actual) !== JSON.stringify(expected)) throw new Error(`${label} is not a closed schema`);
           };
           const value = JSON.parse(process.env.RESULT);
-          exact(value, ['schemaVersion', 'ok', 'product', 'source', 'node', 'asset', 'receipt', 'manifest'], 'Agent Kit build result');
+          exact(value, [
+            'schemaVersion', 'ok', 'publicationAuthorized', 'legalMappingApproved', 'product',
+            'source', 'node', 'asset', 'receipt', 'manifest',
+          ], 'Agent Kit build result');
           if (value.schemaVersion !== 'useful.agent-kit.build-result.v1' || value.ok !== true) {
             throw new Error('Agent Kit build result schema/ok is invalid');
           }
+          if (value.publicationAuthorized !== false) throw new Error('Agent Kit builder must not authorize publication');
+          if (value.legalMappingApproved !== true) throw new Error('Agent Kit legal mapping is not approved');
           exact(value.product, ['name', 'version'], 'Agent Kit product');
           exact(value.source, ['revision'], 'Agent Kit source');
           exact(value.asset, ['name', 'path', 'sha256', 'size'], 'Agent Kit asset');
@@ -405,6 +820,7 @@ jobs:
   build:
     name: Build ${{ matrix.platform }} ${{ matrix.arch }}
     needs: [identity, verify, verify-compose]
+    if: inputs.scope == 'desktop-full'
     runs-on: ${{ matrix.runner }}
     env:
       USEFUL_UPDATE_ROOT_PUBKEY_HEX: ${{ needs.identity.outputs.update_root_pubkey }}
@@ -479,10 +895,12 @@ jobs:
         run: test -z "${USEFUL_ALLOW_DEVELOPMENT_UPDATE_TRUST:-}"
       - name: Require a clean checkout and the committed matrix platform icon
         shell: bash
+        env:
+          PLATFORM: ${{ matrix.platform }}
         run: |
           set -euo pipefail
           test -z "$(git status --porcelain --untracked-files=all)"
-          case '${{ matrix.platform }}' in
+          case "$PLATFORM" in
             windows) icon='apps/useful/src-tauri/icons/icon.ico' ;;
             macos) icon='apps/useful/src-tauri/icons/icon.icns' ;;
             linux) icon='apps/useful/src-tauri/icons/icon.png' ;;
@@ -491,10 +909,14 @@ jobs:
           test -f "$icon"
           test -s "$icon"
       - name: Compile native application without a bundle
-        run: pnpm --filter @useful/app tauri build --target ${{ matrix.target }} --no-bundle
+        env:
+          TARGET: ${{ matrix.target }}
+        run: pnpm --filter @useful/app tauri build --target "$TARGET" --no-bundle
       - name: Compile Windows bootstrap compatibility binary
         if: matrix.platform == 'windows'
-        run: cargo build -p useful-bootstrap --release --target ${{ matrix.target }}
+        env:
+          TARGET: ${{ matrix.target }}
+        run: cargo build -p useful-bootstrap --release --target "$TARGET"
       - name: Verify Windows bootstrap update, tamper rejection, and rollback
         if: matrix.platform == 'windows'
         run: |
@@ -507,10 +929,11 @@ jobs:
         env:
           WINDOWS_CERTIFICATE_BASE64: ${{ secrets.WINDOWS_CERTIFICATE_BASE64 }}
           WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
+          RELEASE_CHANNEL: ${{ inputs.channel }}
         run: |
           $configured = -not [string]::IsNullOrWhiteSpace($env:WINDOWS_CERTIFICATE_BASE64) -and
             -not [string]::IsNullOrWhiteSpace($env:WINDOWS_CERTIFICATE_PASSWORD)
-          if ('${{ inputs.channel }}' -eq 'stable' -and -not $configured) {
+          if ($env:RELEASE_CHANNEL -eq 'stable' -and -not $configured) {
             throw 'Stable is blocked: Windows signing secrets are incomplete.'
           }
           "signed=$($configured.ToString().ToLowerInvariant())" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
@@ -557,21 +980,29 @@ jobs:
       - name: Sign Windows bootstrap compatibility binary
         if: matrix.platform == 'windows' && steps.windows-signing.outputs.signed == 'true'
         shell: pwsh
+        env:
+          TARGET: ${{ matrix.target }}
+          SIGNING_THUMBPRINT: ${{ steps.windows-cert.outputs.thumbprint }}
         run: |
-          $bootstrap = Join-Path $PWD 'target\${{ matrix.target }}\release\useful-bootstrap.exe'
-          & signtool.exe sign /sha1 '${{ steps.windows-cert.outputs.thumbprint }}' /fd SHA256 /tr http://timestamp.digicert.com /td SHA256 $bootstrap
+          $bootstrap = Join-Path $PWD "target\$env:TARGET\release\useful-bootstrap.exe"
+          & signtool.exe sign /sha1 $env:SIGNING_THUMBPRINT /fd SHA256 /tr http://timestamp.digicert.com /td SHA256 $bootstrap
           if ($LASTEXITCODE -ne 0) { throw "signtool failed with exit code $LASTEXITCODE" }
       - name: Create signed Windows NSIS bundle
         if: matrix.platform == 'windows' && steps.windows-signing.outputs.signed == 'true'
+        env:
+          TARGET: ${{ matrix.target }}
+          SIGNING_CONFIG: ${{ steps.windows-cert.outputs.config }}
         run: >-
           pnpm --filter @useful/app tauri bundle
-          --target ${{ matrix.target }}
+          --target "$TARGET"
           --bundles nsis
-          --config "${{ steps.windows-cert.outputs.config }}"
+          --config "$SIGNING_CONFIG"
           --ci
       - name: Create unsigned Windows NSIS preview bundle
         if: matrix.platform == 'windows' && steps.windows-signing.outputs.signed != 'true'
-        run: pnpm --filter @useful/app tauri bundle --target ${{ matrix.target }} --bundles nsis --no-sign --ci
+        env:
+          TARGET: ${{ matrix.target }}
+        run: pnpm --filter @useful/app tauri bundle --target "$TARGET" --bundles nsis --no-sign --ci
       - name: Fetch and verify locked media runtimes for Windows Portable Full
         if: matrix.platform == 'windows'
         shell: pwsh
@@ -579,6 +1010,10 @@ jobs:
       - name: Package Windows Setup Lite and deterministic Portable Lite/Full assets
         if: matrix.platform == 'windows'
         shell: pwsh
+        env:
+          VERSION: ${{ needs.identity.outputs.version }}
+          TARGET: ${{ matrix.target }}
+          WINDOWS_SIGNED: ${{ steps.windows-signing.outputs.signed }}
         run: |
           $ErrorActionPreference = 'Stop'
           if (Test-Path variable:PSNativeCommandUseErrorActionPreference) {
@@ -629,9 +1064,9 @@ jobs:
           }
 
           Assert-NoReparsePath $PWD.Path
-          $version = '${{ needs.identity.outputs.version }}'
-          $binary = Join-Path $PWD 'target\${{ matrix.target }}\release\Useful.exe'
-          $bootstrap = Join-Path $PWD 'target\${{ matrix.target }}\release\useful-bootstrap.exe'
+          $version = $env:VERSION
+          $binary = Join-Path $PWD "target\$env:TARGET\release\Useful.exe"
+          $bootstrap = Join-Path $PWD "target\$env:TARGET\release\useful-bootstrap.exe"
           Assert-OrdinaryFile $binary 'Useful.exe'
           Assert-OrdinaryFile $bootstrap 'useful-bootstrap.exe'
           $requiredDocs = @('LICENSE', 'LICENSES.md', 'NOTICE', 'THIRD_PARTY_NOTICES.md', 'TRADEMARKS.md')
@@ -639,13 +1074,13 @@ jobs:
             $docPath = Join-Path $PWD $doc
             Assert-OrdinaryFile $docPath "required release document $doc"
           }
-          $nsisDirectory = Join-Path $PWD 'target\${{ matrix.target }}\release\bundle\nsis'
+          $nsisDirectory = Join-Path $PWD "target\$env:TARGET\release\bundle\nsis"
           Assert-NoReparsePath $nsisDirectory
           $installers = @(Get-ChildItem -LiteralPath $nsisDirectory -Filter '*.exe' -Force)
           if ($installers.Count -ne 1) { throw "Expected exactly one NSIS installer, found $($installers.Count)." }
           $installer = $installers[0]
           Assert-OrdinaryFile $installer.FullName 'NSIS Setup Lite'
-          if ('${{ steps.windows-signing.outputs.signed }}' -eq 'true') {
+          if ($env:WINDOWS_SIGNED -eq 'true') {
             foreach ($file in @($binary, $bootstrap, $installer.FullName)) {
               $signature = Get-AuthenticodeSignature -LiteralPath $file
               if ($signature.Status -ne 'Valid') { throw "Authenticode verification failed for ${file}: $($signature.Status)" }
@@ -759,17 +1194,19 @@ jobs:
           $signingEvidence = @{
             platform = 'windows'; arch = 'x64';
             version = $version;
-            signingStatus = $(if ('${{ steps.windows-signing.outputs.signed }}' -eq 'true') { 'verified' } else { 'unsigned' });
-            verification = $(if ('${{ steps.windows-signing.outputs.signed }}' -eq 'true') { 'Get-AuthenticodeSignature=Valid' } else { 'not-performed' })
+            signingStatus = $(if ($env:WINDOWS_SIGNED -eq 'true') { 'verified' } else { 'unsigned' });
+            verification = $(if ($env:WINDOWS_SIGNED -eq 'true') { 'Get-AuthenticodeSignature=Valid' } else { 'not-performed' })
           } | ConvertTo-Json -Compress
           Write-NewText (Join-Path $PWD 'signing-windows-x64.json') "$signingEvidence`n" ([Text.UTF8Encoding]::new($false))
       - name: Remove ephemeral Windows certificate material
         if: always() && matrix.platform == 'windows'
         shell: pwsh
+        env:
+          SIGNING_THUMBPRINT: ${{ steps.windows-cert.outputs.thumbprint }}
         run: |
           $receiptPath = Join-Path $env:RUNNER_TEMP 'useful-signing-thumbprint.txt'
           try {
-            $thumbprint = '${{ steps.windows-cert.outputs.thumbprint }}'
+            $thumbprint = $env:SIGNING_THUMBPRINT
             if ([string]::IsNullOrWhiteSpace($thumbprint) -and (Test-Path -LiteralPath $receiptPath -PathType Leaf)) {
               $thumbprint = (Get-Content -LiteralPath $receiptPath -Raw -Encoding ascii).Trim()
             }
@@ -794,13 +1231,14 @@ jobs:
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          RELEASE_CHANNEL: ${{ inputs.channel }}
         run: |
           set -euo pipefail
           configured=true
           for name in APPLE_CERTIFICATE APPLE_CERTIFICATE_PASSWORD APPLE_KEYCHAIN_PASSWORD APPLE_ID APPLE_PASSWORD APPLE_TEAM_ID; do
             test -n "${!name:-}" || configured=false
           done
-          if test "${{ inputs.channel }}" = stable && test "$configured" != true; then
+          if test "$RELEASE_CHANNEL" = stable && test "$configured" != true; then
             echo 'Stable is blocked: macOS signing/notarization secrets are incomplete.' >&2
             exit 1
           fi
@@ -813,11 +1251,12 @@ jobs:
           APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
           APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
           APPLE_KEYCHAIN_PASSWORD: ${{ secrets.APPLE_KEYCHAIN_PASSWORD }}
+          ARCH: ${{ matrix.arch }}
         run: |
           set -euo pipefail
           umask 077
-          p12="$RUNNER_TEMP/useful-signing-${{ matrix.arch }}.p12"
-          keychain="$RUNNER_TEMP/useful-signing-${{ matrix.arch }}.keychain-db"
+          p12="$RUNNER_TEMP/useful-signing-$ARCH.p12"
+          keychain="$RUNNER_TEMP/useful-signing-$ARCH.keychain-db"
           printf '%s' "$APPLE_CERTIFICATE" | /usr/bin/base64 -D > "$p12"
           test -s "$p12"
           security create-keychain -p "$APPLE_KEYCHAIN_PASSWORD" "$keychain"
@@ -845,22 +1284,30 @@ jobs:
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-        run: pnpm --filter @useful/app tauri bundle --target ${{ matrix.target }} --bundles dmg --ci
+          TARGET: ${{ matrix.target }}
+        run: pnpm --filter @useful/app tauri bundle --target "$TARGET" --bundles dmg --ci
       - name: Create unsigned macOS DMG preview
         if: matrix.platform == 'macos' && steps.macos-signing.outputs.signed != 'true'
-        run: pnpm --filter @useful/app tauri bundle --target ${{ matrix.target }} --bundles dmg --no-sign --ci
+        env:
+          TARGET: ${{ matrix.target }}
+        run: pnpm --filter @useful/app tauri bundle --target "$TARGET" --bundles dmg --no-sign --ci
       - name: Package and verify macOS DMG
         if: matrix.platform == 'macos'
         shell: bash
+        env:
+          VERSION: ${{ needs.identity.outputs.version }}
+          TARGET: ${{ matrix.target }}
+          MACOS_SIGNED: ${{ steps.macos-signing.outputs.signed }}
+          ARCH: ${{ matrix.arch }}
         run: |
           set -euo pipefail
           mkdir -p release-assets
-          version='${{ needs.identity.outputs.version }}'
-          bundle="target/${{ matrix.target }}/release/bundle"
+          version="$VERSION"
+          bundle="target/$TARGET/release/bundle"
           dmgs=()
           while IFS= read -r file; do dmgs+=("$file"); done < <(find "$bundle/dmg" -maxdepth 1 -type f -name '*.dmg')
           test "${#dmgs[@]}" -eq 1
-          if test '${{ steps.macos-signing.outputs.signed }}' = true; then
+          if test "$MACOS_SIGNED" = true; then
             apps=()
             while IFS= read -r directory; do apps+=("$directory"); done < <(find "$bundle/macos" -maxdepth 1 -type d -name '*.app')
             test "${#apps[@]}" -eq 1
@@ -872,30 +1319,37 @@ jobs:
             status=unsigned
             verification=not-performed
           fi
-          cp "${dmgs[0]}" "release-assets/Useful-$version-macos-${{ matrix.arch }}.dmg"
+          cp "${dmgs[0]}" "release-assets/Useful-$version-macos-$ARCH.dmg"
           printf '{"platform":"macos","arch":"%s","version":"%s","signingStatus":"%s","verification":"%s"}\n' \
-            '${{ matrix.arch }}' "$version" "$status" "$verification" > "signing-macos-${{ matrix.arch }}.json"
+            "$ARCH" "$version" "$status" "$verification" > "signing-macos-$ARCH.json"
       - name: Remove ephemeral macOS certificate material
         if: always() && matrix.platform == 'macos'
         shell: bash
+        env:
+          ARCH: ${{ matrix.arch }}
         run: |
           set -euo pipefail
-          p12="$RUNNER_TEMP/useful-signing-${{ matrix.arch }}.p12"
-          keychain="$RUNNER_TEMP/useful-signing-${{ matrix.arch }}.keychain-db"
+          p12="$RUNNER_TEMP/useful-signing-$ARCH.p12"
+          keychain="$RUNNER_TEMP/useful-signing-$ARCH.keychain-db"
           security delete-keychain "$keychain" >/dev/null 2>&1 || true
           rm -f -- "$p12" "$keychain"
 
       - name: Create unsigned Linux AppImage and deb bundles
         if: matrix.platform == 'linux'
-        run: pnpm --filter @useful/app tauri bundle --target ${{ matrix.target }} --bundles appimage deb --no-sign --ci
+        env:
+          TARGET: ${{ matrix.target }}
+        run: pnpm --filter @useful/app tauri bundle --target "$TARGET" --bundles appimage deb --no-sign --ci
       - name: Package Linux assets
         if: matrix.platform == 'linux'
         shell: bash
+        env:
+          VERSION: ${{ needs.identity.outputs.version }}
+          TARGET: ${{ matrix.target }}
         run: |
           set -euo pipefail
           mkdir -p release-assets
-          version='${{ needs.identity.outputs.version }}'
-          bundle="target/${{ matrix.target }}/release/bundle"
+          version="$VERSION"
+          bundle="target/$TARGET/release/bundle"
           mapfile -t appimages < <(find "$bundle/appimage" -maxdepth 1 -type f -name '*.AppImage')
           mapfile -t debs < <(find "$bundle/deb" -maxdepth 1 -type f -name '*.deb')
           test "${#appimages[@]}" -eq 1
@@ -918,6 +1372,7 @@ jobs:
   assemble:
     name: Assemble checksums and release metadata
     needs: [identity, build, sbom, agent-kit]
+    if: inputs.scope == 'desktop-full'
     runs-on: ubuntu-24.04
     outputs:
       release_name: ${{ steps.metadata.outputs.release_name }}
@@ -1082,15 +1537,18 @@ jobs:
         id: metadata
         env:
           SIGNING_READY: ${{ vars.USEFUL_SIGNING_READY || 'false' }}
+          RELEASE_TAG: ${{ needs.identity.outputs.tag }}
+          RELEASE_CHANNEL: ${{ needs.identity.outputs.channel }}
+          SIGNING_STATUS: ${{ steps.signing.outputs.signed == 'true' && 'signed' || 'unsigned' }}
         run: |
           set -euo pipefail
           set -o noclobber
           node scripts/release-metadata.mjs \
             --package package.json \
-            --tag "${{ needs.identity.outputs.tag }}" \
-            --channel "${{ needs.identity.outputs.channel }}" \
+            --tag "$RELEASE_TAG" \
+            --channel "$RELEASE_CHANNEL" \
             --signing-ready "$SIGNING_READY" \
-            --signing-status "${{ steps.signing.outputs.signed == 'true' && 'signed' || 'unsigned' }}" \
+            --signing-status "$SIGNING_STATUS" \
             --github-output "$GITHUB_OUTPUT" \
             > release-candidate/RELEASE-METADATA.json
       - name: Write deterministic release notes and exact public asset allowlist
@@ -1101,14 +1559,17 @@ jobs:
           UNSIGNED_PREVIEW: ${{ steps.metadata.outputs.unsigned_preview }}
           VERSION: ${{ needs.identity.outputs.version }}
           PUBLISH_GATE_JSON: ${{ needs.identity.outputs.publish_gate_json }}
+          RELEASE_CHANNEL: ${{ needs.identity.outputs.channel }}
+          RELEASE_TAG: ${{ needs.identity.outputs.tag }}
+          MEDIA_SOURCE_COMPLIANCE_STATUS: ${{ needs.identity.outputs.media_source_compliance_status }}
         run: |
           set -euo pipefail
           set -o noclobber
           {
             echo "# $RELEASE_NAME"
             echo
-            echo "Channel: ${{ needs.identity.outputs.channel }}"
-            echo "Version/tag: ${{ needs.identity.outputs.version }} / ${{ needs.identity.outputs.tag }}"
+            echo "Channel: $RELEASE_CHANNEL"
+            echo "Version/tag: $VERSION / $RELEASE_TAG"
             echo "Windows and macOS signing verification complete: $SIGNED"
             if test "$UNSIGNED_PREVIEW" = true; then
               echo
@@ -1118,7 +1579,7 @@ jobs:
             echo 'Release assets and internal executables use the Useful product name. Windows publishes Setup Lite, Portable Lite, and Portable Full as distinct editions.'
             echo 'Portable Full contains the locked ffmpeg, ffprobe, and mpv Windows runtimes described by `MEDIA-RUNTIMES.json`; Portable Lite and Setup Lite do not include those media runtimes.'
             echo 'The macOS and Linux packages do not claim bundled mpv or ffmpeg runtimes.'
-            if test '${{ needs.identity.outputs.media_source_compliance_status }}' != verified; then
+            if test "$MEDIA_SOURCE_COMPLIANCE_STATUS" != verified; then
               echo
               echo '> **NOT FOR PUBLIC DISTRIBUTION:** media source compliance is pending for the exact GPL ffmpeg/ffprobe/mpv binaries. This candidate may be built and verified internally, but publishing is blocked until committed source/build/license evidence and its release assets pass the Owner Gate.'
             fi
@@ -1253,7 +1714,7 @@ jobs:
 
   publish:
     name: Publish guarded GitHub Release
-    if: inputs.publish == true
+    if: inputs.publish == true && inputs.scope == 'desktop-full'
     needs: [identity, assemble]
     runs-on: ubuntu-24.04
     environment: release
@@ -1304,21 +1765,41 @@ jobs:
           STABLE_UPDATE_EVIDENCE_SHA256: ${{ vars.USEFUL_STABLE_UPDATE_EVIDENCE_SHA256 }}
           MEDIA_SOURCE_EVIDENCE_PATH: ${{ vars.USEFUL_MEDIA_SOURCE_EVIDENCE_PATH }}
           MEDIA_SOURCE_EVIDENCE_SHA256: ${{ vars.USEFUL_MEDIA_SOURCE_EVIDENCE_SHA256 }}
+          EVENT_NAME: ${{ github.event_name }}
+          REF_TYPE: ${{ github.ref_type }}
+          REF_NAME: ${{ github.ref_name }}
+          PUBLISH_REQUESTED: ${{ inputs.publish }}
+          INPUT_CHANNEL: ${{ inputs.channel }}
+          REPOSITORY: ${{ github.repository }}
+          REPOSITORY_VISIBILITY: ${{ github.event.repository.visibility }}
+          RELEASE_ACTOR: ${{ github.actor }}
+          EXPECTED_SHA: ${{ github.sha }}
         shell: bash
         run: |
           set -euo pipefail
-          test "${{ github.event_name }}" = workflow_dispatch
-          test "${{ github.ref_type }}" = tag
-          test "${{ github.ref_name }}" = "${{ needs.identity.outputs.tag }}"
-          test "${{ inputs.publish }}" = true
+          test "$EVENT_NAME" = workflow_dispatch
+          test "$REF_TYPE" = tag
+          test "$REF_NAME" = "$TAG"
+          test "$PUBLISH_REQUESTED" = true
+          test "$INPUT_CHANNEL" = "$CHANNEL"
+          remote_refs=$(git ls-remote --tags origin "refs/tags/$TAG" "refs/tags/$TAG^{}")
+          mapfile -t direct_tag_objects < <(awk -v ref="refs/tags/$TAG" '$2 == ref { print $1 }' <<<"$remote_refs")
+          mapfile -t peeled_tag_commits < <(awk -v ref="refs/tags/$TAG^{}" '$2 == ref { print $1 }' <<<"$remote_refs")
+          test "${#direct_tag_objects[@]}" -eq 1
+          test "${#peeled_tag_commits[@]}" -le 1
+          REMOTE_TAG_COMMIT="${peeled_tag_commits[0]:-${direct_tag_objects[0]}}"
+          test "$REMOTE_TAG_COMMIT" = "$EXPECTED_SHA" || {
+            echo "Remote tag does not resolve to the exact workflow commit." >&2
+            exit 1
+          }
           node scripts/release-publish-gate.mjs \
-            --repository "${{ github.repository }}" \
+            --repository "$REPOSITORY" \
             --expected-repository "$EXPECTED_REPOSITORY" \
-            --visibility "${{ github.event.repository.visibility }}" \
-            --actor "${{ github.actor }}" \
+            --visibility "$REPOSITORY_VISIBILITY" \
+            --actor "$RELEASE_ACTOR" \
             --allowed-actors "$RELEASE_ACTORS" \
             --publish true \
-            --channel "${{ inputs.channel }}" \
+            --channel "$CHANNEL" \
             --update-root-pubkey "$UPDATE_ROOT_PUBKEY_HEX" \
             --update-feed-template "$UPDATE_FEED_URL_TEMPLATE" \
             --root-ceremony-sha256 "$UPDATE_ROOT_CEREMONY_SHA256" \
@@ -1327,7 +1808,7 @@ jobs:
             --stable-evidence-sha256 "$STABLE_UPDATE_EVIDENCE_SHA256" \
             --media-source-evidence-path "$MEDIA_SOURCE_EVIDENCE_PATH" \
             --media-source-evidence-sha256 "$MEDIA_SOURCE_EVIDENCE_SHA256" \
-            --tag "${{ github.ref_name }}" \
+            --tag "$TAG" \
             > /tmp/PUBLISH-GATE.json
           diff -u /tmp/PUBLISH-GATE.json release-candidate/PUBLISH-GATE.json
           node scripts/release-signing-status.mjs \
@@ -1342,8 +1823,8 @@ jobs:
           signed=$(node -e "const x=require('./release-candidate/SIGNING-STATUS.json'); process.stdout.write(String(x.signed))")
           node scripts/release-metadata.mjs \
             --package package.json \
-            --tag "${{ github.ref_name }}" \
-            --channel "${{ inputs.channel }}" \
+            --tag "$TAG" \
+            --channel "$CHANNEL" \
             --signing-ready "$SIGNING_READY" \
             --signing-status "$(test "$signed" = true && echo signed || echo unsigned)" \
             > /tmp/RELEASE-METADATA.json
@@ -1451,10 +1932,12 @@ jobs:
       - name: Revalidate exact-commit CI checks
         env:
           GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          EXPECTED_SHA: ${{ github.sha }}
         shell: bash
         run: |
           set -euo pipefail
-          checks=$(gh api --paginate --slurp "/repos/${{ github.repository }}/commits/${{ github.sha }}/check-runs?filter=all&per_page=100")
+          checks=$(gh api --paginate --slurp "/repos/$REPOSITORY/commits/$EXPECTED_SHA/check-runs?filter=all&per_page=100")
           required=(
             build-and-test
             protocol-and-cli
@@ -1470,16 +1953,29 @@ jobs:
               '[.[].check_runs[] | select(.name == $name)] | if length == 0 then null else max_by(.id) end' \
               <<<"$checks")
             jq -e '. != null and .status == "completed" and .conclusion == "success"' <<<"$latest" >/dev/null || {
-                echo "Latest required check is missing or unsuccessful for ${{ github.sha }}: $name ($latest)" >&2
+                echo "Latest required check is missing or unsuccessful for $EXPECTED_SHA: $name ($latest)" >&2
                 exit 1
               }
           done
       - name: Create GitHub Release without replacing existing evidence
         env:
           GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ needs.identity.outputs.tag }}
+          RELEASE_NAME: ${{ needs.assemble.outputs.release_name }}
+          PRERELEASE: ${{ needs.assemble.outputs.prerelease }}
+          REF_NAME: ${{ github.ref_name }}
+          EXPECTED_SHA: ${{ github.sha }}
         shell: bash
         run: |
           set -euo pipefail
+          test "$REF_NAME" = "$RELEASE_TAG"
+          remote_refs=$(git ls-remote --tags origin "refs/tags/$RELEASE_TAG" "refs/tags/$RELEASE_TAG^{}")
+          mapfile -t direct_tag_objects < <(awk -v ref="refs/tags/$RELEASE_TAG" '$2 == ref { print $1 }' <<<"$remote_refs")
+          mapfile -t peeled_tag_commits < <(awk -v ref="refs/tags/$RELEASE_TAG^{}" '$2 == ref { print $1 }' <<<"$remote_refs")
+          test "${#direct_tag_objects[@]}" -eq 1
+          test "${#peeled_tag_commits[@]}" -le 1
+          REMOTE_TAG_COMMIT="${peeled_tag_commits[0]:-${direct_tag_objects[0]}}"
+          test "$REMOTE_TAG_COMMIT" = "$EXPECTED_SHA"
           mapfile -t names < release-candidate/RELEASE-ASSETS.txt
           assets=()
           for name in "${names[@]}"; do
@@ -1490,13 +1986,13 @@ jobs:
           test -f release-candidate/SHA256SUMS.txt
           assets+=(release-candidate/SHA256SUMS.txt)
           args=(
-            release create "${{ needs.identity.outputs.tag }}"
+            release create "$RELEASE_TAG"
             "${assets[@]}"
             --verify-tag
-            --title "${{ needs.assemble.outputs.release_name }}"
+            --title "$RELEASE_NAME"
             --notes-file release-candidate/RELEASE-NOTES.md
           )
-          if test "${{ needs.assemble.outputs.prerelease }}" = true; then
+          if test "$PRERELEASE" = true; then
             args+=(--prerelease --latest=false)
           else
             args+=(--latest)

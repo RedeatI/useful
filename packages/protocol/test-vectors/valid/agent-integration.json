@@ -1,0 +1,16 @@
+{
+  "schemaVersion": "useful.agent-integration.v1",
+  "target": "claude-desktop",
+  "transport": "stdio",
+  "scope": "user",
+  "server": {
+    "name": "useful",
+    "nodePath": "C:\\Program Files\\nodejs\\node.exe",
+    "launcherPath": "C:\\Useful Agent Kit\\lib\\useful-mcp.mjs",
+    "args": [],
+    "env": {
+      "NO_COLOR": "1",
+      "USEFUL_LOG_LEVEL": "info"
+    }
+  }
+}

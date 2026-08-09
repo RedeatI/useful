@@ -273,6 +273,21 @@ test("license metadata rejects unapproved package paths even when they claim an 
   assert.equal(result.cargoUnexpected.some((item) => item.path === "crates/unmapped/Cargo.toml"), true);
 });
 
+test("Agent integration contract packages are explicitly Apache-2.0 mapped and metadata-gated", () => {
+  assert.equal(resolveApprovedLicenseForPath("packages/agent-integrations/src/integration.mjs"), "Apache-2.0");
+  assert.equal(resolveApprovedLicenseForPath("packages/computer-use-contract/src/index.mjs"), "Apache-2.0");
+  assert.equal(resolveApprovedLicenseForPath("services/OPERATIONS.md"), "AGPL-3.0-or-later");
+  const result = evaluatePackageLicenseMetadata({
+    npm: [
+      { path: "packages/agent-integrations/package.json", license: "Apache-2.0" },
+      { path: "packages/computer-use-contract/package.json", license: "Apache-2.0" },
+    ],
+    cargo: [],
+  });
+  assert.equal(result.npmUnexpected.some((item) => item.path === "packages/agent-integrations/package.json"), false);
+  assert.equal(result.npmUnexpected.some((item) => item.path === "packages/computer-use-contract/package.json"), false);
+});
+
 test("Cargo license parsing is section-bound and ignores metadata decoys", () => {
   assert.deepEqual(
     parseCargoLicenseMetadata(`
@@ -375,6 +390,8 @@ test("owner-approved path map is closed and assigns the intended SPDX families",
   assert.equal(resolveApprovedLicenseForPath("packages/host-actions/src/index.mjs"), "MPL-2.0");
   assert.equal(resolveApprovedLicenseForPath("packages/office-core/src/index.mjs"), "MPL-2.0");
   assert.equal(resolveApprovedLicenseForPath("packages/action-contract/src/index.mjs"), "Apache-2.0");
+  assert.equal(resolveApprovedLicenseForPath("packages/agent-integrations/src/integration.mjs"), "Apache-2.0");
+  assert.equal(resolveApprovedLicenseForPath("packages/computer-use-contract/src/index.mjs"), "Apache-2.0");
   assert.equal(resolveApprovedLicenseForPath("packages/useful-mcp/src/server.mjs"), "Apache-2.0");
   assert.equal(resolveApprovedLicenseForPath("services/internal/app/app.go"), "AGPL-3.0-or-later");
   assert.equal(resolveApprovedLicenseForPath("apps/source-admin/app.js"), "AGPL-3.0-or-later");

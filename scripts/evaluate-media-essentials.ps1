@@ -413,8 +413,7 @@ $estimatedFullZipWithEssentials = $null
 if ($full -and $ess) {
     $liteZip = 5.6 * 1MB
     $mpvExeCandidates = @(
-        (Join-Path $repoRoot "binaries\mpv.exe"),
-        "D:\_agents\tools\main\binaries\mpv.exe"
+        (Join-Path $repoRoot "binaries\mpv.exe")
     )
     $mpvExeBytes = $null
     foreach ($p in $mpvExeCandidates) {

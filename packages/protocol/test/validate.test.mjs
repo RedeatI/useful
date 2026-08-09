@@ -183,3 +183,22 @@ test("SourceDefinition.kind 枚举不含 app-update（普通源无法更新客�
   assert.deepEqual(kinds, ["tool", "mirror"]);
   assert.ok(!kinds.includes("app-update"));
 });
+
+test("Agent integration V1 严格拒绝秘密、扩展参数、UNC 与缺失 projectDirectory", () => {
+  const ajv = buildAjv();
+  const validate = getValidator(ajv, "agent-integration.schema.json");
+  const base = readJson(join(vectorsDir, "valid", "agent-integration.json"));
+  const invalid = [
+    { ...base, unknown: true },
+    { ...base, transport: "http" },
+    { ...base, scope: "project" },
+    { ...base, target: "mcp-servers-json", scope: "project", projectDirectory: "C:\\project" },
+    { ...base, server: { ...base.server, nodePath: "\\\\server\\node.exe" } },
+    { ...base, server: { ...base.server, launcherPath: `${base.server.launcherPath}\u007f` } },
+    { ...base, server: { ...base.server, args: ["--unsafe"] } },
+    { ...base, server: { ...base.server, env: { OPENAI_API_KEY: "not-allowed" } } },
+  ];
+  for (const document of invalid) {
+    assert.equal(validate(document), false, `期望拒绝: ${JSON.stringify(document)}`);
+  }
+});

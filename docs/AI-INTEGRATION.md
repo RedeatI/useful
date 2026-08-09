@@ -228,8 +228,62 @@ MCP host 推荐绕过 shell launcher，直接配置 `node <ABS_KIT>/lib/useful-m
 `THIRD_PARTY-LICENSES.json`，并把每个依赖包的许可证/notice 原文放在
 `third-party/<package>/<version>/`；缺少包名、版本、license metadata 或许可证文件会 fail closed。
 
-这些说明描述源码构建能力；Agent Kit 仍是 internal candidate，不表示 ZIP 已发布、获准公开分发或完成
-目标平台验证；现有显式 trust config、fail-closed 验证和 profile allowlist 边界全部不变。
+这些说明描述源码构建能力。构建结果中的 `publicationAuthorized: false` 表示构建器本身不授予发布权；
+只有受控发布工作流附加到匹配 GitHub Release 的 ZIP 才是官方可用资产。源码/Agent Kit Release 仍不
+表示桌面平台已验证；现有显式 trust config、fail-closed 验证和 profile allowlist 边界全部不变。
+
+## 跨 Agent 配置计划 V1（只生成，不写入）
+
+`useful agent plan` 为 Codex、Claude Code、Claude Desktop 与通用 MCP 宿主生成一个
+`useful.agent-integration.v1` 配置计划。V1 的 target 是固定集合 `codex`、`claude-code`、
+`claude-desktop`、`mcp-servers-json`，transport 固定为本地 `stdio`；不会启动 launcher、主动联网、安装依赖、
+读取宿主配置或向宿主写入配置。`--launcher` 必须是实际 MCP stdio 启动脚本的本地绝对路径，例如 Agent Kit 中的
+`lib/useful-mcp.mjs`。计划的 `nodePath` 固定为启动当前 CLI 的 `process.execPath`，并记录 launcher、固定 server
+name `useful`、空的 V1 扩展 args、安全闭集 env 与 scope。严格 JSON Schema 位于
+`packages/protocol/schemas/agent-integration.schema.json`。
+
+```powershell
+& "<ABS_KIT>\bin\useful.cmd" agent plan `
+  --target claude-desktop `
+  --launcher "<ABS_KIT>\lib\useful-mcp.mjs" `
+  --scope user `
+  --env NO_COLOR=1 `
+  --json
+
+& "<ABS_KIT>\bin\useful.cmd" agent doctor `
+  --target codex `
+  --launcher "<ABS_KIT>\lib\useful-mcp.mjs" `
+  --scope project `
+  --project-dir "C:\ABSOLUTE\PROJECT" `
+  --json
+```
+
+`commandArgv` 是命令型输出的唯一规范表示。Codex user scope 的顺序固定为
+`codex mcp add useful [--env K=V ...] -- <node> <launcher>`，没有 `--scope`；Codex project scope 只返回目标
+`.codex/config.toml` 的 TOML merge fragment，不提供写入命令。Claude Code 的顺序固定为
+`claude mcp add [--env K=V ...] --transport stdio --scope <user|project> useful -- <node> <launcher>`，Useful 的
+`user`/`project` 原样映射到 Claude Code 的 `user`/`project`。项目 scope 必须显式提供已存在且无链接路径组件的
+`--project-dir`；Claude Code 输出同时返回 `requiredWorkingDirectory`，调用方必须在该目录执行。
+
+`powershellCommand` 只是 `commandArgv` 的显示派生：以 `&` 开头、每个参数独立单引号并把内部 `'` 写成 `''`；
+它不是跨 shell 的通用命令字符串。Claude Desktop 和 `mcp-servers-json` 仅支持 user scope，只返回常见但非 MCP
+协议标准本身的 `mcpServers` JSON merge fragment。每个
+生成项均带 `writesHostConfigWhenExecuted`：宿主写入命令为 `true`，纯 merge fragment 为 `false`。JSON 片段只能
+与既有 `mcpServers` 合并，不能替换无关服务器。V1 不提供 `--apply` 或 `--install`；传入任一选项立即失败。
+
+`doctor` 只做路径与结构预检：逐级 `lstat` launcher/node/project directory，拒绝 symlink、junction、reparse
+point，要求 node/launcher 为常规文件、当前 Node 为 20 或更高版本，并检查生成物结构。它不执行 launcher、
+不主动联网，也不证明 MCP handshake、工具发现或调用已经成功。相对路径、UNC 路径、未知 target/scope、
+秘密型环境变量和未列入安全闭集的 env 都会失败。
+唯一允许的可选 env 是 `NO_COLOR=1`、`USEFUL_LOG_LEVEL=error|warn|info`，或受限格式的 `USEFUL_PROFILE`；
+密钥、token、密码、PATH 和任意自定义环境变量均不接受。
+
+MCP 是 Useful 对外的公共执行面，而不是宿主权限的替代者。Codex、Claude 和其他宿主各自决定审批、沙箱、
+日志、配置位置与配置变更确认；Useful 只提供本地 stdio server 及其已有的 action/profile 信任边界。始终先审阅
+生成物，再按对应宿主的官方文档手动合并或运行命令。
+
+本轮分发面是自包含 Agent Kit；仓库中的 `@useful/cli` 标记为 private workspace package，不承诺 npm 发布或
+全局 npm 安装路径。
 
 ## Windows 源码工作树 MCP 配置
 

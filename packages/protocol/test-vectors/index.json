@@ -11,6 +11,7 @@
     { "file": "security-advisory.json", "schema": "security-advisory.schema.json" },
     { "file": "source-definition.json", "schema": "source-definition.schema.json" },
     { "file": "app-update-source.json", "schema": "app-update-source.schema.json" },
-    { "file": "installed-origin.json", "schema": "installed-origin.schema.json" }
+    { "file": "installed-origin.json", "schema": "installed-origin.schema.json" },
+    { "file": "agent-integration.json", "schema": "agent-integration.schema.json" }
   ]
 }

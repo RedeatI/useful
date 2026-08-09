@@ -10,9 +10,12 @@ This repository is a multi-license project. The owner-approved component map is:
   `packages/host-actions`, `packages/office-core`): MPL-2.0
 - Source service, administration UI, shared implementation, migrations, and deployment
   (`services/source-server`, `services/source-worker`, `services/internal`, `services/migrations`,
-  the build files directly under `services/`, `apps/source-admin`, `deploy/*`): AGPL-3.0-or-later
-- Protocols, JSON Schema, SDK, CLI, Agent integration interfaces, repository fixtures, examples,
-  and remaining first-party repository automation/configuration: Apache-2.0
+  `services/OPERATIONS.md`, the build files directly under `services/`, `apps/source-admin`,
+  `deploy/*`): AGPL-3.0-or-later
+- Protocols, JSON Schema, SDK, CLI, Agent integration interfaces (including
+  `packages/agent-integrations` and the non-executable `packages/computer-use-contract` contract),
+  repository fixtures, examples, and remaining first-party repository automation/configuration:
+  Apache-2.0
 - Project documentation under `docs/*` and the root documentation/community files listed in
   `LICENSES.md`: CC-BY-4.0
 

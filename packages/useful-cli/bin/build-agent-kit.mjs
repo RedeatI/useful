@@ -45,6 +45,7 @@ const SOURCE_PATHS = Object.freeze([
   "licenses",
   "packages/action-contract",
   "packages/action-runtime",
+  "packages/agent-integrations",
   "packages/agent-profile",
   "packages/host-actions",
   "packages/office-core",
@@ -58,6 +59,10 @@ const COMMANDS = Object.freeze([
   { name: "useful", entry: "lib/useful.mjs", posix: "bin/useful", windows: "bin/useful.cmd" },
   { name: "useful-runtime", entry: "lib/useful-runtime.mjs", posix: "bin/useful-runtime", windows: "bin/useful-runtime.cmd" },
   { name: "useful-mcp", entry: "lib/useful-mcp.mjs", posix: "bin/useful-mcp", windows: "bin/useful-mcp.cmd" },
+]);
+const AGENT_INTEGRATIONS_PROVENANCE_FILES = Object.freeze([
+  "integration.mjs",
+  "integration.d.ts",
 ]);
 const ACTION_RUNTIME_PROVENANCE_FILES = Object.freeze([
   "action-suggest.mjs",
@@ -645,6 +650,7 @@ function workspaceResolver(repoRoot) {
     "@useful/action-contract": "packages/action-contract/src/index.mjs",
     "@useful/action-runtime": "packages/action-runtime/src/index.mjs",
     "@useful/action-runtime/browser": "packages/action-runtime/src/browser.mjs",
+    "@useful/agent-integrations": "packages/agent-integrations/src/integration.mjs",
     "@useful/agent-profile": "packages/agent-profile/src/index.mjs",
     "@useful/agent-profile/node": "packages/agent-profile/src/node.mjs",
     "@useful/host-actions": "packages/host-actions/src/index.mjs",
@@ -792,6 +798,7 @@ async function buildBundles(repoRoot, dependencyRoot) {
         path.join(dependencyRoot, "node_modules"),
         path.join(dependencyRoot, "packages/action-contract/node_modules"),
         path.join(dependencyRoot, "packages/action-runtime/node_modules"),
+        path.join(dependencyRoot, "packages/agent-integrations/node_modules"),
         path.join(dependencyRoot, "packages/agent-profile/node_modules"),
         path.join(dependencyRoot, "packages/host-actions/node_modules"),
         path.join(dependencyRoot, "packages/office-core/node_modules"),
@@ -864,6 +871,10 @@ function launcherBytes(command, windows) {
 }
 
 async function addRuntimeResources(entries, repoRoot) {
+  for (const relative of AGENT_INTEGRATIONS_PROVENANCE_FILES) {
+    const source = `packages/agent-integrations/src/${relative}`;
+    addEntry(entries, `lib/provenance/agent-integrations/${relative}`, normalizedText(await readSourceFile(repoRoot, source)));
+  }
   for (const relative of ACTION_RUNTIME_PROVENANCE_FILES) {
     const source = `packages/action-runtime/src/${relative}`;
     addEntry(entries, `lib/provenance/action-runtime/${relative}`, normalizedText(await readSourceFile(repoRoot, source)));
