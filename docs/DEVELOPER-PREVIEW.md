@@ -13,7 +13,7 @@ publisher verify` 流程，以 [`agent/BUILD-A-TOOL.md`](agent/BUILD-A-TOOL.md) 
 
 - 已解压的 Agent Kit：使用 `<ABS_KIT>\bin\useful.cmd`（Windows）或
   `<ABS_KIT>/bin/useful`（macOS/Linux）。Agent Kit 当前是预期附加资产，不表示已经发布。
-- 源码 checkout：使用仓库内 `packages/useful-cli/bin/useful.mjs`，并由本机 Node.js 20 或更高
+- 源码 checkout：使用仓库内 `packages/useful-cli/bin/useful.mjs`，并由本机 Node.js `^20.9.0` 或 `>=22.0.0`
   版本直接运行。下列示例采用这个入口。
 
 不要使用在线 package runner、全局同名命令或任何会在执行时隐式从 registry 解析包的入口。本页不提供

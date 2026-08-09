@@ -24,7 +24,7 @@ vulnerabilities through the private process in [SECURITY.md](SECURITY.md), not a
 
 Required:
 
-- Node.js 20 or newer;
+- Node.js `^20.9.0` or `>=22.0.0`;
 - pnpm 9.15.0;
 - stable Rust;
 - Tauri 2 platform prerequisites.

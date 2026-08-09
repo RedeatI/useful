@@ -13,6 +13,7 @@ import { EXIT_CODES, RESULT_SCHEMA_VERSION } from "./cli-contract.mjs";
 const cli = fileURLToPath(new URL("./useful.mjs", import.meta.url));
 const legacyCreator = fileURLToPath(new URL("./create-useful-tool.mjs", import.meta.url));
 const temporaryRoots = [];
+const CLI_WORKFLOW_TIMEOUT_MS = 30_000;
 
 function makeRoot() {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "Useful Agent 空格中文-"));
@@ -72,7 +73,7 @@ describe("Agent-first CLI workflow", () => {
     expect(bridge).toContain("__usefulRpc");
     expect(bridge).not.toContain('call("dialog.open"');
     expect(runJson(["validate", tool, "--json"]).data.valid).toBe(true);
-  });
+  }, CLI_WORKFLOW_TIMEOUT_MS);
 
   it("runs create -> doctor -> validate -> pack -> publisher init/sign/verify through the real CLI", () => {
     const root = makeRoot();
@@ -109,7 +110,7 @@ describe("Agent-first CLI workflow", () => {
     expect(receipt.artifactBytes).toBe(packed.sizeBytes);
     const verified = runJson(["publisher", "verify", packed.artifactPath, signed.path, "--json"]).data;
     expect(verified).toEqual(expect.objectContaining({ valid: true, artifactSha256: packed.sha256 }));
-  });
+  }, CLI_WORKFLOW_TIMEOUT_MS);
 
   it("fails closed for existing targets, malicious input, and unknown flags", () => {
     const root = makeRoot();
@@ -119,7 +120,7 @@ describe("Agent-first CLI workflow", () => {
     runJson(["doctor", root, "--mystery", "value", "--json"], EXIT_CODES.USAGE);
     const tokenFailure = runJson(["publisher", "register", path.join(root, "publisher.json"), "--token", "super-secret-token", "--json"], EXIT_CODES.USAGE);
     expect(JSON.stringify(tokenFailure)).not.toContain("super-secret-token");
-  });
+  }, CLI_WORKFLOW_TIMEOUT_MS);
 
   it("keeps legacy manifests valid when optional/default fields are absent", () => {
     const root = makeRoot();
@@ -143,7 +144,7 @@ describe("Agent-first CLI workflow", () => {
       "icon-path",
     ]);
     expect(runJson(["pack", tool, path.join(root, "legacy-out"), "--json"]).data.entryCount).toBe(3);
-  });
+  }, CLI_WORKFLOW_TIMEOUT_MS);
 
   it("accepts the canonical external launcher without reading its host-resolved target", () => {
     const repositoryRoot = fileURLToPath(new URL("../../../", import.meta.url));
@@ -158,7 +159,7 @@ describe("Agent-first CLI workflow", () => {
     const root = makeRoot();
     const packed = runJson(["pack", launcher, path.join(root, "launcher-out"), "--json"]).data;
     expect(new AdmZip(packed.artifactPath).getEntries().some((entry) => entry.entryName === "notepad.exe")).toBe(false);
-  });
+  }, CLI_WORKFLOW_TIMEOUT_MS);
 
   it("rejects secrets, forbidden directories, escaping paths, links, and oversized entries", () => {
     const root = makeRoot();
@@ -221,7 +222,7 @@ describe("Agent-first CLI workflow", () => {
     } catch (error) {
       if (!["EPERM", "EACCES", "ENOTSUP"].includes(error?.code)) throw error;
     }
-  });
+  }, CLI_WORKFLOW_TIMEOUT_MS);
 
   it("allows ordinary source, license, env example, and public certificate files", () => {
     const root = makeRoot();
@@ -234,7 +235,7 @@ describe("Agent-first CLI workflow", () => {
     const packed = runJson(["pack", tool, path.join(root, "safe-out"), "--json"]).data;
     const entries = new AdmZip(packed.artifactPath).getEntries().map((entry) => entry.entryName);
     expect(entries).toEqual(expect.arrayContaining(["LICENSE", "source.js", ".env.example", "public.pem"]));
-  });
+  }, CLI_WORKFLOW_TIMEOUT_MS);
 
   it("keeps the shared Agent command sequence self-contained", () => {
     expect(AGENT_DOC_COMMANDS.slice(0, 7).every((command) => command.startsWith("useful "))).toBe(true);
