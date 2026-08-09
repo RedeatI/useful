@@ -1,6 +1,6 @@
 # Beta 安装、升级、通道切换与回滚
 
-本页描述 `0.1.0-beta.1` 公开 Beta 候选的预期操作。候选资产尚未上传 GitHub，也没有可填写的下载
+本页描述 `0.1.0-beta.2` 公开 Beta 候选的预期操作。桌面候选资产尚未上传 GitHub，也没有可填写的下载
 URL；只有在所有者完成发布门禁并提供最终资产清单、校验和与签名后，才能把下列步骤当作分发说明。
 
 Useful 的 Windows x64 edition 约定为 setup Lite、Portable Lite 和 Portable Full。Lite 不内置媒体

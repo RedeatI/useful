@@ -165,7 +165,7 @@ jobs:
           actor_allowed=false
           while IFS= read -r actor; do
             if test "$actor" = "$RELEASE_ACTOR"; then actor_allowed=true; fi
-          done < <(printf '%s' "$RELEASE_ACTORS" | tr ',[:space:]' '\n' | sed '/^$/d')
+          done < <(printf '%s\n' "$RELEASE_ACTORS" | tr ',[:space:]' '\n' | sed '/^$/d')
           test "$actor_allowed" = true || {
             echo "Current actor is not in USEFUL_RELEASE_ACTORS." >&2
             exit 1
@@ -400,7 +400,7 @@ jobs:
           out="$RUNNER_TEMP/useful-source-agent-kit"
           test ! -e "$out"
           mkdir "$out"
-          result=$(pnpm --silent agent-kit:build -- --out-dir "$out")
+          result=$(pnpm --silent agent-kit:build --out-dir "$out")
           RESULT="$result" OUT="$out" REVISION="$GITHUB_SHA" VERSION="$VERSION" node --input-type=module <<'NODE'
           import { createHash } from 'node:crypto';
           import { lstatSync, readFileSync } from 'node:fs';
@@ -755,7 +755,7 @@ jobs:
           test ! -e "$out"
           mkdir "$out"
           for legal in LICENSE LICENSES.md NOTICE THIRD_PARTY_NOTICES.md TRADEMARKS.md; do test -s "$legal"; done
-          result=$(pnpm --silent agent-kit:build -- --out-dir "$out")
+          result=$(pnpm --silent agent-kit:build --out-dir "$out")
           RESULT="$result" OUT="$out" REVISION="$GITHUB_SHA" node --input-type=module <<'NODE'
           import { createHash } from 'node:crypto';
           import { lstatSync, readFileSync } from 'node:fs';

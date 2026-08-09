@@ -473,7 +473,7 @@ function inspectReleaseWorkflow(file, workflow) {
     violations.push({ file, code: "release-manual-tag-ref-gate-missing" });
   }
   for (const required of [
-    "pnpm --silent agent-kit:build -- --out-dir",
+    "pnpm --silent agent-kit:build --out-dir",
     "useful.agent-kit.build-result.v1",
     "useful.agent-kit.manifest.v1",
     'receipt="$zip.sha256"',
@@ -493,7 +493,7 @@ function inspectReleaseWorkflow(file, workflow) {
   for (const required of [
     "public-source-check.mjs --json",
     "gen-sbom.mjs",
-    "pnpm --silent agent-kit:build -- --out-dir",
+    "pnpm --silent agent-kit:build --out-dir",
     "publicationAuthorized !== false",
     "legalMappingApproved !== true",
     "SOURCE-CHECK.json",
@@ -514,6 +514,13 @@ function inspectReleaseWorkflow(file, workflow) {
   ]) {
     if (!sourceRun.includes(required)) violations.push({ file, code: "release-source-evidence-contract-missing", details: required });
   }
+  if (agentKitRun.includes("agent-kit:build -- --out-dir") || sourceRun.includes("agent-kit:build -- --out-dir")) {
+    violations.push({
+      file,
+      code: "release-agent-kit-argument-separator-invalid",
+      details: "pnpm must not forward a literal -- argument to the strict Agent Kit CLI",
+    });
+  }
   for (const forbidden of [
     "tauri build", "WINDOWS_CERTIFICATE_BASE64", "APPLE_CERTIFICATE", "USEFUL_UPDATE_ROOT_PUBKEY_HEX",
     "MEDIA-RUNTIMES.json", "release-signing-status.mjs",
@@ -529,6 +536,13 @@ function inspectReleaseWorkflow(file, workflow) {
     "desktopAssetsAuthorized:false",
   ]) {
     if (!identityRun.includes(required)) violations.push({ file, code: "release-source-owner-gate-missing", details: required });
+  }
+  if (!identityRun.includes("printf '%s\\n' \"$RELEASE_ACTORS\" | tr ',[:space:]' '\\n' | sed '/^$/d'")) {
+    violations.push({
+      file,
+      code: "release-source-actor-allowlist-parser-unsafe",
+      details: "USEFUL_RELEASE_ACTORS must be newline-terminated before exact per-entry matching",
+    });
   }
   for (const required of [
     "public-source-check.mjs --json",
