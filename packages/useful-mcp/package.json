@@ -1,0 +1,28 @@
+{
+  "name": "@useful/mcp",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Useful ActionRegistry/ActionExecutor 的本地 stdio MCP 薄适配器。",
+  "bin": {
+    "useful-mcp": "bin/useful-mcp.mjs"
+  },
+  "exports": {
+    ".": "./src/server.mjs"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/server": "2.0.0",
+    "@useful/action-runtime": "workspace:^",
+    "@useful/agent-profile": "workspace:^",
+    "@useful/host-actions": "workspace:^",
+    "@useful/plugin-actions": "workspace:^"
+  },
+  "devDependencies": {
+    "@modelcontextprotocol/client": "2.0.0"
+  },
+  "scripts": {
+    "test": "node --test --test-concurrency=1",
+    "typecheck": "node --check src/server.mjs && node --check bin/useful-mcp.mjs"
+  },
+  "license": "Apache-2.0"
+}

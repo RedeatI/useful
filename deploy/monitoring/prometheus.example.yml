@@ -1,0 +1,23 @@
+# Prometheus 抓取配置示例（本地可运行，不强制引入 Kubernetes）。
+# 用法：prometheus --config.file=deploy/monitoring/prometheus.example.yml
+# 与 alert-rules.example.yml 配合；source-server 暴露 /metrics（Prometheus 文本格式）。
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+rule_files:
+  - alert-rules.example.yml
+
+scrape_configs:
+  - job_name: useful-source-server
+    metrics_path: /metrics
+    static_configs:
+      - targets:
+          - "127.0.0.1:8080" # 本地开发；生产改为服务地址
+        labels:
+          service: source-server
+          env: dev
+
+  # 健康/就绪探针（可选，用于 blackbox 或直接抓取 /v1/health、/v1/ready）
+  # readiness 返回 jobQueueDepth，/metrics 已含 useful_job_queue_depth 仪表。

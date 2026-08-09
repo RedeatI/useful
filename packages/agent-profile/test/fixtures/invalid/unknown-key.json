@@ -1,0 +1,7 @@
+{
+  "schemaVersion": "useful.agent-profile.v1",
+  "profileId": "default",
+  "name": "invalid",
+  "actions": [],
+  "command": "forbidden"
+}

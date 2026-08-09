@@ -1,0 +1,11 @@
+{
+  "sourceId": "com.example.tools",
+  "publisherKeyId": "ed25519:9f8e7d6c5b4a39281706f5e4d3c2b1a09f8e7d6c5b4a3928",
+  "toolId": "com.example.hello-web",
+  "installedVersion": "1.0.0",
+  "artifactSha256": "c0535e4be2b79ffd93291305436bf889314e4a3faec05ecffcbb7df31ad9e51a",
+  "channel": "stable",
+  "manifestDigest": "3a7bd3e2360a3d29eea436fcfb7e44c735d117c42d1c1835420b6b9942dd4f1b",
+  "installedAt": "2026-07-20T09:10:00Z",
+  "lastCheckedAt": "2026-07-29T09:10:00Z"
+}

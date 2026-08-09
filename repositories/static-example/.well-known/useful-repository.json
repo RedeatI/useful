@@ -1,0 +1,21 @@
+{
+  "schemaVersion": "1.0",
+  "source": {
+    "id": "com.example.static",
+    "name": "Useful 静态示例源",
+    "description": "可由任意静态 HTTP 服务器托管的示例软件源。",
+    "operator": "Example Community"
+  },
+  "repository": {
+    "profile": "tuf-v1",
+    "metadataBaseUrl": "https://static.example.com/metadata/",
+    "targetsBaseUrl": "https://static.example.com/targets/",
+    "rootUrl": "https://static.example.com/metadata/1.root.json",
+    "rootSha256": "c35cfebe4c6d443820bad30fefee29adf5094bef5bf47d85a08fb39763a3979a"
+  },
+  "capabilities": {
+    "catalog": true,
+    "staticMirror": true,
+    "nativeWorkers": false
+  }
+}

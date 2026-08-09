@@ -1,0 +1,99 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.useful.local/agent/useful.agent-profile.v1.schema.json",
+  "title": "Useful Agent Profile v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "profileId", "name", "actions"],
+  "properties": {
+    "schemaVersion": { "const": "useful.agent-profile.v1" },
+    "profileId": { "$ref": "#/$defs/stableId" },
+    "name": { "type": "string", "minLength": 1, "maxLength": 120 },
+    "actions": {
+      "type": "array",
+      "maxItems": 128,
+      "items": { "$ref": "#/$defs/action" }
+    }
+  },
+  "$defs": {
+    "stableId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$"
+    },
+    "actionId": {
+      "type": "string",
+      "minLength": 3,
+      "maxLength": 200,
+      "pattern": "^[a-z][a-z0-9_-]*(\\.[a-z0-9][a-z0-9_-]*)+$"
+    },
+    "semver": {
+      "type": "string",
+      "maxLength": 80,
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(?:-[0-9A-Za-z.-]+)?$"
+    },
+    "alias": {
+      "type": "string",
+      "minLength": 2,
+      "maxLength": 64,
+      "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$"
+    },
+    "enabled": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["cli", "mcp"],
+      "properties": {
+        "cli": { "type": "boolean" },
+        "mcp": { "type": "boolean" }
+      }
+    },
+    "preset": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["presetId", "name", "defaults"],
+      "properties": {
+        "presetId": { "$ref": "#/$defs/stableId" },
+        "name": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "defaults": {
+          "type": "object",
+          "maxProperties": 64,
+          "additionalProperties": true
+        }
+      }
+    },
+    "action": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "actionId",
+        "expectedContractVersion",
+        "expectedActionVersion",
+        "expectedSourceKind",
+        "expectedPublisherId",
+        "enabled",
+        "aliases",
+        "presets"
+      ],
+      "properties": {
+        "actionId": { "$ref": "#/$defs/actionId" },
+        "expectedContractVersion": { "const": "1.0" },
+        "expectedActionVersion": { "$ref": "#/$defs/semver" },
+        "expectedSourceKind": { "enum": ["builtin", "plugin", "local"] },
+        "expectedPublisherId": { "type": "string", "minLength": 1, "maxLength": 256 },
+        "enabled": { "$ref": "#/$defs/enabled" },
+        "aliases": {
+          "type": "array",
+          "maxItems": 16,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/alias" }
+        },
+        "presets": {
+          "type": "array",
+          "maxItems": 32,
+          "items": { "$ref": "#/$defs/preset" }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,22 @@
+[package]
+name = "useful-shortcuts"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+serde = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+
+[target.'cfg(windows)'.dependencies]
+windows = { workspace = true, features = [
+    "Win32_Foundation",
+    "Win32_System_Com",
+    "Win32_UI_Shell",
+    # Required for IShellLinkW::GetPath (WIN32_FIND_DATAW).
+    "Win32_Storage_FileSystem",
+] }
+
+[dev-dependencies]
+tempfile = { workspace = true }

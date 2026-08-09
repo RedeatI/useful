@@ -1,0 +1,30 @@
+:root {
+  color-scheme: dark;
+  font-family: Inter, "Segoe UI", sans-serif;
+  background: #0d1117;
+  color: #e6edf3;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; min-height: 100vh; background: radial-gradient(circle at top right, #17203a, #0d1117 45%); }
+main { width: min(1040px, calc(100% - 32px)); margin: 0 auto; padding: 40px 0 64px; }
+header { display: flex; justify-content: space-between; gap: 24px; align-items: flex-start; }
+h1 { margin: 4px 0 8px; font-size: clamp(28px, 5vw, 44px); }
+h2 { margin: 0; font-size: 18px; }
+p { color: #9da7b3; }
+.eyebrow { color: #8cb4ff; font-size: 12px; font-weight: 700; letter-spacing: .12em; }
+.card { border: 1px solid #2d3748; border-radius: 14px; background: rgba(21, 27, 35, .92); padding: 20px; box-shadow: 0 18px 44px rgba(0, 0, 0, .24); }
+.connection { display: grid; grid-template-columns: 1fr 1fr auto; gap: 14px; align-items: end; margin-top: 28px; }
+label { display: grid; gap: 8px; color: #c9d1d9; font-size: 13px; }
+input, button { font: inherit; }
+input { width: 100%; border: 1px solid #3b4656; border-radius: 8px; background: #0d1117; color: #e6edf3; padding: 10px 12px; }
+button { border: 1px solid #4f79c6; border-radius: 8px; background: #2859a7; color: #fff; padding: 10px 14px; cursor: pointer; }
+button:hover, button:focus-visible { background: #356bc1; outline: 2px solid #8cb4ff; outline-offset: 2px; }
+.secondary { background: transparent; border-color: #3b4656; }
+.actions { display: flex; flex-wrap: wrap; gap: 10px; margin: 18px 0; }
+.badge { display: inline-flex; border-radius: 999px; background: #28313d; padding: 7px 12px; font-size: 13px; white-space: nowrap; }
+.badge.ok { background: #163c2b; color: #7ee2ad; }
+.badge.error { background: #4b2228; color: #ff9ca5; }
+.result-head { display: flex; justify-content: space-between; align-items: center; }
+pre { min-height: 260px; max-height: 560px; overflow: auto; margin: 16px 0 0; border-radius: 10px; background: #080b10; padding: 16px; color: #b9d5ff; white-space: pre-wrap; word-break: break-word; }
+@media (max-width: 760px) { .connection { grid-template-columns: 1fr; } header { flex-direction: column; } }

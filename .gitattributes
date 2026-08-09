@@ -1,0 +1,23 @@
+# 字节敏感夹具与签名 metadata：任何行尾转换都会破坏 SHA-256/签名验证。
+# repositories/static-example 的 rootSha256 承诺覆盖 1.root.json 的原始字节；
+# core.autocrlf=true 的 Windows 检出若无本文件会将 LF 转为 CRLF，导致
+# 根指纹不匹配、TRP 客户端拒绝同步（真实事故：trp_flow 集成测试失败）。
+
+# 静态示例源：全部按原始字节检出
+repositories/static-example/** -text
+
+# 协议测试向量与 TUF/签名夹具：摘要锚定，禁止转换
+packages/protocol/test-vectors/** -text
+fixtures/** -text
+dist-release/test-keys/** -text
+
+# Go tooling requires LF even when the repository is checked out with core.autocrlf=true.
+*.go text eol=lf
+
+# 二进制
+*.useful binary
+*.png binary
+*.ico binary
+*.zip binary
+*.exe binary
+*.dll binary

@@ -1,0 +1,13 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head><meta charset="UTF-8" /><meta name="viewport" content="width=device-width" /><title>文件 SHA-256</title><link rel="stylesheet" href="styles.css" /></head>
+  <body><main>
+    <h1>文件 SHA-256</h1>
+    <p>文件仅在你选择后按 512 KiB 分块读取，不会整体载入内存，也不会上传。</p>
+    <div class="toolbar"><button id="choose">选择文件并计算</button><input id="file-input" type="file" hidden /><button id="cancel" disabled>取消</button></div>
+    <p id="file">尚未选择文件</p>
+    <progress id="progress" max="100" value="0"></progress><span id="percent">0%</span>
+    <label>SHA-256<textarea id="digest" readonly></textarea></label>
+    <p id="status" role="status"></p>
+  </main><script src="main.js"></script></body>
+</html>

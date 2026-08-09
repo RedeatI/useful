@@ -1,0 +1,37 @@
+# Useful multi-license notice
+
+Copyright (c) 2026 RedeatI
+
+This repository is intentionally multi-licensed. The authoritative component map is:
+
+- Desktop client and client-side native crates: MPL-2.0
+  (see `apps/useful` and `crates/useful-*`)
+- Built-in Action implementations and local host/document-processing code: MPL-2.0
+  (see `packages/action-runtime`, `packages/host-actions`, and `packages/office-core`)
+- Source-service backend, administration UI, shared service implementation, database migrations,
+  and deployment assets: AGPL-3.0-or-later (see `services/source-server`,
+  `services/source-worker`, `services/internal`, `services/migrations`, the build files directly
+  under `services/`, `apps/source-admin`, and `deploy/*`)
+- Protocols, JSON Schema, SDK, CLI, Agent integration interfaces, static repository fixtures, and
+  examples: Apache-2.0 (see `packages/protocol`, `packages/action-contract`,
+  `packages/agent-profile`, `packages/plugin-actions`, `packages/useful-sdk`,
+  `packages/useful-cli`, `packages/useful-mcp`, `packages/useful-runtime`, `repositories/*`, and
+  `examples/*`)
+- Project documentation: CC-BY-4.0 (see `docs/*`, `README.md`, `README.zh-CN.md`, `AGENTS.md`,
+  `CONTRIBUTING.md`, `GOVERNANCE.md`, `SECURITY.md`, and `CODE_OF_CONDUCT.md`)
+- Remaining first-party, non-component repository automation, configuration, build metadata, and
+  test fixtures not covered above: Apache-2.0 (including `.github/*`, `scripts/*`,
+  `config/*`, `fixtures/*`, `templates/*`, and `binaries/*`)
+
+Unless a file states otherwise, use the map above. New package or service roots must be added to the
+component map explicitly before public distribution. Third-party components remain under their own
+licenses; THIRD_PARTY_NOTICES.md summarizes major dependencies, while exact candidate inventories
+and bundled license texts come from its SBOM or artifact-specific legal closure. License texts and
+notices retain their stated terms;
+trademarks are governed by TRADEMARKS.md and are not licensed by this file.
+
+The full license texts for the SPDX identifiers above must remain available from the project
+documentation and package metadata. This root file is the owner-approved copyright and mapping
+notice required before a public repository or public contribution intake can begin.
+
+This file is not legal advice.

@@ -1,0 +1,29 @@
+{
+  "name": "@useful/protocol",
+  "version": "1.0.0",
+  "description": "Useful 联邦软件源协议 TRP v1（兼容历史名称 Useful Repository Protocol）规范：公开 JSON Schema、OpenAPI 与测试向量。Apache-2.0。",
+  "license": "Apache-2.0",
+  "type": "module",
+  "files": [
+    "schemas",
+    "openapi",
+    "test-vectors",
+    "src"
+  ],
+  "exports": {
+    "./schemas/*": "./schemas/*",
+    "./openapi/*": "./openapi/*",
+    "./src/*": "./src/*"
+  },
+  "scripts": {
+    "test": "node --test",
+    "validate": "node src/validate-cli.mjs"
+  },
+  "dependencies": {
+    "ajv": "^8.17.1",
+    "ajv-formats": "^3.0.1"
+  },
+  "devDependencies": {
+    "yaml": "^2.6.1"
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.useful.example/trp/v1/download-grant.schema.json",
+  "title": "TRP v1 Download Grant",
+  "description": "POST /v1/download-grants 的响应。URL 绑定 artifact digest，但不作为 artifact 身份；客户端以 TUF metadata 与 SHA-256 为最终依据。短期有效。",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["grantId", "artifactSha256", "size", "downloadUrl", "expiresAt", "supportsRange"],
+  "properties": {
+    "grantId": {
+      "type": "string",
+      "pattern": "^dg_[A-Za-z0-9._-]{8,128}$"
+    },
+    "artifactSha256": { "$ref": "common.schema.json#/$defs/sha256" },
+    "size": { "type": "integer", "minimum": 0, "maximum": 5368709120 },
+    "downloadUrl": {
+      "$ref": "common.schema.json#/$defs/httpsUrl",
+      "description": "短期临时 URL。审计时不得记录完整 URL；不作为 artifact 身份。"
+    },
+    "expiresAt": { "$ref": "common.schema.json#/$defs/rfc3339" },
+    "supportsRange": { "type": "boolean" }
+  }
+}

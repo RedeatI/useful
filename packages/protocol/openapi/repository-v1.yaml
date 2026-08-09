@@ -1,0 +1,562 @@
+openapi: 3.1.0
+info:
+  title: Useful Repository Protocol / TRP v1 (Useful-compatible)
+  version: 1.0.0
+  summary: 联邦式软件源 REST API。
+  description: >
+    Useful 联邦软件源协议（TRP v1，兼容历史名称 Useful Repository Protocol）的公共契约。OpenAPI 3.1 是唯一公共契约；
+    TypeScript / Rust / Go 类型由本文件生成，不得包含业务逻辑。
+    时间用 RFC3339 UTC，版本用 SemVer，摘要首版用 SHA-256。
+    普通工具源不能更新 Useful 客户端主程序：本 API 不存在任何客户端更新端点。
+  license:
+    name: Apache-2.0
+    identifier: Apache-2.0
+servers:
+  - url: https://api.source.example/v1
+    description: 源 API 基地址（来自 discovery.api.baseUrl）
+tags:
+  - name: discovery
+  - name: catalog
+  - name: tools
+  - name: account
+  - name: downloads
+  - name: publisher
+  - name: billing
+  - name: system
+paths:
+  /.well-known/useful-repository.json:
+    get:
+      operationId: getDiscovery
+      tags: [discovery]
+      summary: 软件源发现文档
+      description: 不构成信任根；source.id 不构成官方身份。
+      responses:
+        "200":
+          description: discovery 文档
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RepositoryDiscovery"
+        default:
+          $ref: "#/components/responses/Problem"
+  /v1/source:
+    get:
+      operationId: getSource
+      tags: [discovery]
+      summary: 源自述信息与能力
+      responses:
+        "200":
+          description: 源信息
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RepositoryDiscovery"
+        default:
+          $ref: "#/components/responses/Problem"
+  /v1/catalog/snapshot:
+    get:
+      operationId: getCatalogSnapshot
+      tags: [catalog]
+      summary: 目录快照（支持增量同步）
+      parameters:
+        - $ref: "#/components/parameters/Since"
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Cursor"
+      responses:
+        "200":
+          description: 目录快照
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [schemaVersion, sourceId, generatedAt, entries]
+                properties:
+                  schemaVersion: { const: "1.0" }
+                  sourceId: { type: string }
+                  generatedAt: { type: string, format: date-time }
+                  nextCursor: { type: [string, "null"] }
+                  entries:
+                    type: array
+                    maxItems: 1000
+                    items:
+                      $ref: "#/components/schemas/CatalogEntry"
+        default:
+          $ref: "#/components/responses/Problem"
+  /v1/catalog/search:
+    get:
+      operationId: searchCatalog
+      tags: [catalog]
+      summary: 远程搜索（会把搜索词发送给本源；客户端必须在 UI 标记）
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema: { type: string, minLength: 1, maxLength: 200 }
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: 搜索结果
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [entries]
+                properties:
+                  entries:
+                    type: array
+                    maxItems: 200
+                    items:
+                      $ref: "#/components/schemas/CatalogEntry"
+        default:
+          $ref: "#/components/responses/Problem"
+  /v1/tools/{publisherId}/{toolId}:
+    get:
+      operationId: getTool
+      tags: [tools]
+      parameters:
+        - $ref: "#/components/parameters/PublisherId"
+        - $ref: "#/components/parameters/ToolId"
+      responses:
+        "200":
+          description: 工具目录条目
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CatalogEntry"
+        "404":
+          $ref: "#/components/responses/Problem"
+        default:
+          $ref: "#/components/responses/Problem"
+  /v1/tools/{publisherId}/{toolId}/versions:
+    get:
+      operationId: listToolVersions
+      tags: [tools]
+      parameters:
+        - $ref: "#/components/parameters/PublisherId"
+        - $ref: "#/components/parameters/ToolId"
+      responses:
+        "200":
+          description: 历史版本
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [versions]
+                properties:
+                  versions:
+                    type: array
+                    items: { type: string }
+        default:
+          $ref: "#/components/responses/Problem"
+  /v1/me:
+    get:
+      operationId: getMe
+      tags: [account]
+      security: [{ oauth2: [profile] }]
+      responses:
+        "200":
+          description: 当前源账户
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [sourceId, subjectId]
+                properties:
+                  sourceId: { type: string }
+                  subjectId: { type: string }
+                  displayName: { type: string }
+        "401":
+          $ref: "#/components/responses/Problem"
+        default:
+          $ref: "#/components/responses/Problem"
+  /v1/me/entitlements:
+    get:
+      operationId: listEntitlements
+      tags: [account]
+      security: [{ oauth2: [entitlements] }]
+      responses:
+        "200":
+          description: 当前用户在本源的权益
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [entitlements]
+                properties:
+                  entitlements:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Entitlement"
+        default:
+          $ref: "#/components/responses/Problem"
+  /v1/download-grants:
+    post:
+      operationId: createDownloadGrant
+      tags: [downloads]
+      summary: 申请下载授权（付费工具校验本源权益）
+      security: [{ oauth2: [downloads] }, {}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [toolId, publisherKeyId, version, platform, arch, channel]
+              properties:
+                toolId: { type: string }
+                publisherKeyId: { type: string }
+                version: { type: string }
+                platform: { type: string, enum: [windows, macos, linux] }
+                arch: { type: string, enum: [x86_64, aarch64] }
+                channel: { type: string, enum: [stable, beta, nightly] }
+      responses:
+        "201":
+          description: 授权已创建
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DownloadGrant"
+        "402":
+          $ref: "#/components/responses/Problem"
+        "403":
+          $ref: "#/components/responses/Problem"
+        default:
+          $ref: "#/components/responses/Problem"
+  /v1/download-grants/{grantId}:
+    get:
+      operationId: getDownloadGrant
+      tags: [downloads]
+      parameters:
+        - name: grantId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: 授权详情
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DownloadGrant"
+        "404":
+          $ref: "#/components/responses/Problem"
+        default:
+          $ref: "#/components/responses/Problem"
+  /v1/publisher/upload-sessions:
+    post:
+      operationId: createUploadSession
+      tags: [publisher]
+      security: [{ oauth2: [publisher] }]
+      responses:
+        "201":
+          description: 上传会话
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [uploadSessionId, stagingUrl]
+                properties:
+                  uploadSessionId: { type: string }
+                  stagingUrl: { type: string, format: uri }
+        default:
+          $ref: "#/components/responses/Problem"
+  /v1/publisher/releases:
+    post:
+      operationId: createRelease
+      tags: [publisher]
+      security: [{ oauth2: [publisher] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [uploadSessionId, artifactSha256]
+              properties:
+                uploadSessionId: { type: string }
+                artifactSha256: { type: string }
+      responses:
+        "202":
+          description: 已接收，进入 quarantine 与扫描/审核
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [releaseId, status]
+                properties:
+                  releaseId: { type: string }
+                  status: { type: string, enum: [quarantined, scanning, review, published, rejected] }
+        default:
+          $ref: "#/components/responses/Problem"
+  /v1/publisher/releases/{releaseId}:
+    get:
+      operationId: getRelease
+      tags: [publisher]
+      security: [{ oauth2: [publisher] }]
+      parameters:
+        - name: releaseId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: 发布状态
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [releaseId, status]
+                properties:
+                  releaseId: { type: string }
+                  status: { type: string }
+        default:
+          $ref: "#/components/responses/Problem"
+  /v1/billing/checkout-sessions:
+    post:
+      operationId: createCheckoutSession
+      tags: [billing]
+      security: [{ oauth2: [profile] }]
+      responses:
+        "201":
+          description: 托管结账会话
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [checkoutUrl]
+                properties:
+                  checkoutUrl: { type: string, format: uri }
+        "409":
+          $ref: "#/components/responses/Problem"
+        default:
+          $ref: "#/components/responses/Problem"
+  /v1/billing/customer-portal:
+    post:
+      operationId: createCustomerPortalSession
+      tags: [billing]
+      security: [{ oauth2: [profile] }]
+      responses:
+        "201":
+          description: 客户自助门户
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [portalUrl]
+                properties:
+                  portalUrl: { type: string, format: uri }
+        default:
+          $ref: "#/components/responses/Problem"
+  /v1/billing/webhooks/{provider}:
+    post:
+      operationId: billingWebhook
+      tags: [billing]
+      summary: 支付回调（验签、幂等、乱序处理由服务端保证）
+      parameters:
+        - name: provider
+          in: path
+          required: true
+          schema: { type: string, enum: [fake, hosted, stripe] }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        "200":
+          description: 快速确认（长任务放入 Worker）
+        default:
+          $ref: "#/components/responses/Problem"
+  /v1/health:
+    get:
+      operationId: getHealth
+      tags: [system]
+      responses:
+        "200":
+          description: 存活
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { const: ok }
+  /v1/ready:
+    get:
+      operationId: getReady
+      tags: [system]
+      responses:
+        "200":
+          description: 就绪
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { const: ready }
+        "503":
+          $ref: "#/components/responses/Problem"
+components:
+  securitySchemes:
+    oauth2:
+      type: oauth2
+      description: Authorization Code + PKCE S256；禁止 implicit/password flow。
+      flows:
+        authorizationCode:
+          authorizationUrl: https://auth.source.example/authorize
+          tokenUrl: https://auth.source.example/token
+          scopes:
+            profile: 基础资料
+            entitlements: 读取权益
+            downloads: 申请下载授权
+            publisher: 发布者操作
+  parameters:
+    Since:
+      name: since
+      in: query
+      required: false
+      schema: { type: string, format: date-time }
+    Limit:
+      name: limit
+      in: query
+      required: false
+      schema: { type: integer, minimum: 1, maximum: 1000, default: 100 }
+    Cursor:
+      name: cursor
+      in: query
+      required: false
+      schema: { type: string, maxLength: 512 }
+    PublisherId:
+      name: publisherId
+      in: path
+      required: true
+      schema: { type: string, maxLength: 200 }
+    ToolId:
+      name: toolId
+      in: path
+      required: true
+      schema: { type: string, maxLength: 200 }
+  responses:
+    Problem:
+      description: 错误（application/problem+json）
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/Problem"
+  schemas:
+    Problem:
+      type: object
+      description: RFC 9457 problem+json 风格错误。
+      required: [type, title, status]
+      properties:
+        type: { type: string }
+        title: { type: string }
+        status: { type: integer }
+        detail: { type: string }
+        instance: { type: string }
+        requestId: { type: string }
+    RepositoryDiscovery:
+      $comment: 权威定义见 schemas/repository-discovery.schema.json
+      type: object
+      required: [schemaVersion, source, repository, capabilities]
+      properties:
+        schemaVersion: { const: "1.0" }
+        source:
+          type: object
+          required: [id, name, operator]
+          properties:
+            id: { type: string }
+            name: { type: string }
+            description: { type: string }
+            operator: { type: string }
+            homepage: { type: string, format: uri }
+            supportUrl: { type: string, format: uri }
+        repository:
+          type: object
+          required: [profile, metadataBaseUrl, targetsBaseUrl, rootUrl, rootSha256]
+          properties:
+            profile: { const: tuf-v1 }
+            metadataBaseUrl: { type: string, format: uri }
+            targetsBaseUrl: { type: string, format: uri }
+            rootUrl: { type: string, format: uri }
+            rootSha256: { type: string }
+        api:
+          type: object
+          required: [baseUrl]
+          properties:
+            baseUrl: { type: string, format: uri }
+        capabilities:
+          type: object
+          additionalProperties: false
+          required: [catalog]
+          properties:
+            catalog: { type: boolean }
+            remoteSearch: { type: boolean }
+            authentication: { type: boolean }
+            entitlements: { type: boolean }
+            paidDownloads: { type: boolean }
+            publisherPortal: { type: boolean }
+            privateTools: { type: boolean }
+            staticMirror: { type: boolean }
+            nativeWorkers: { type: boolean }
+    ToolIdentity:
+      type: object
+      required: [publisherKeyId, toolId]
+      properties:
+        publisherKeyId: { type: string }
+        toolId: { type: string }
+    CatalogEntry:
+      $comment: 权威定义见 schemas/catalog-entry.schema.json
+      type: object
+      required: [identity, name, channels, latest, offer]
+      properties:
+        identity: { $ref: "#/components/schemas/ToolIdentity" }
+        name: { type: string }
+        summary: { type: string }
+        license: { type: string }
+        channels:
+          type: array
+          items: { type: string, enum: [stable, beta, nightly] }
+        latest:
+          type: object
+          additionalProperties: { type: string }
+        offer:
+          type: object
+          required: [accessMode]
+          properties:
+            accessMode:
+              type: string
+              enum: [free, entitlement, external-purchase, private, unavailable]
+            productId: { type: [string, "null"] }
+            planIds:
+              type: array
+              items: { type: string }
+            purchaseUrl: { type: [string, "null"] }
+    Entitlement:
+      $comment: 权威定义见 schemas/entitlement.schema.json
+      type: object
+      required: [sourceId, subjectId, entitlementId, status, updatedAt]
+      properties:
+        sourceId: { type: string }
+        subjectId: { type: string }
+        entitlementId: { type: string }
+        productId: { type: [string, "null"] }
+        planId: { type: [string, "null"] }
+        status:
+          type: string
+          enum: [active, trialing, grace, past_due, canceled, expired, revoked]
+        startsAt: { type: string, format: date-time }
+        expiresAt: { type: [string, "null"], format: date-time }
+        graceUntil: { type: [string, "null"], format: date-time }
+        updatedAt: { type: string, format: date-time }
+    DownloadGrant:
+      $comment: 权威定义见 schemas/download-grant.schema.json
+      type: object
+      required: [grantId, artifactSha256, size, downloadUrl, expiresAt, supportsRange]
+      properties:
+        grantId: { type: string }
+        artifactSha256: { type: string }
+        size: { type: integer }
+        downloadUrl: { type: string, format: uri }
+        expiresAt: { type: string, format: date-time }
+        supportsRange: { type: boolean }

@@ -1,0 +1,13 @@
+{
+  "name": "@useful-example/base64",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "build": "node ../../scripts/build-plugin-example.mjs . ../../artifacts/plugin-build/base64"
+  },
+  "dependencies": {
+    "@useful/sdk": "workspace:*"
+  },
+  "license": "Apache-2.0"
+}

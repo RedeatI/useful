@@ -1,0 +1,43 @@
+{
+  "name": "useful-monorepo",
+  "private": true,
+  "version": "0.1.0-beta.1",
+  "packageManager": "pnpm@9.15.0",
+  "scripts": {
+    "dev": "pnpm --filter @useful/app dev",
+    "build": "pnpm -r build",
+    "test": "pnpm -r test",
+    "lint": "pnpm -r lint",
+    "typecheck": "pnpm -r typecheck",
+    "tauri": "pnpm --filter @useful/app tauri",
+    "useful": "node packages/useful-cli/bin/useful.mjs",
+    "agent-kit:build": "node packages/useful-cli/bin/build-agent-kit.mjs --json",
+    "source:check": "node scripts/public-source-check.mjs",
+    "source:prepare": "node scripts/prepare-public-source.mjs",
+    "brand:check": "node scripts/check-brand.mjs",
+    "i18n:check": "node scripts/check-i18n.mjs",
+    "workflow:check": "node scripts/check-workflows.mjs",
+    "policy:test": "node --test scripts/check-brand.test.mjs scripts/check-workflows.test.mjs scripts/public-source-check.test.mjs scripts/prepare-public-source.test.mjs scripts/release-readiness.test.mjs scripts/public-release-path.test.mjs scripts/verify-public-commit.test.mjs",
+    "release:checks": "node --test scripts/gen-sbom.test.mjs scripts/install-media-pack.test.mjs scripts/media-pack-catalog.test.mjs scripts/media-pack-signing.test.mjs scripts/media-pack-v2.test.mjs scripts/release-metadata-media.test.mjs scripts/release-metadata.test.mjs scripts/release-packaging-contract.test.mjs scripts/release-publish-gate.test.mjs scripts/release-signing-status.test.mjs scripts/size-budget.test.mjs",
+    "size:measure": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/measure-size.ps1",
+    "size:editions": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/measure-edition-size.ps1",
+    "size:media-essentials": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/evaluate-media-essentials.ps1",
+    "size:media-packs-candidate": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/package-media-packs.ps1",
+    "size:media-packs-evaluate": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/evaluate-media-packs.ps1",
+    "version:check": "node scripts/check-version-drift.mjs",
+    "version:set": "node scripts/set-version.mjs",
+    "release:readiness": "node scripts/release-readiness.mjs",
+    "license:root": "node scripts/generate-root-license.mjs",
+    "release:candidates": "node scripts/list-public-commit-candidates.mjs",
+    "release:path-test": "node --test scripts/public-release-path.test.mjs scripts/verify-public-commit.test.mjs"
+  },
+  "devDependencies": {
+    "adm-zip": "^0.6.0",
+    "esbuild": "0.25.12",
+    "png-to-ico": "^2.1.8",
+    "sharp": "^0.33.5",
+    "typescript": "^5.7.3",
+    "yaml": "^2.6.1"
+  },
+  "license": "SEE LICENSE IN LICENSES.md"
+}

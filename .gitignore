@@ -1,0 +1,56 @@
+# Node
+node_modules/
+dist/
+*.local
+.vite/
+
+# Rust
+target/
+
+# Tauri
+apps/useful/src-tauri/gen/
+
+# 便携运行数据（开发时）
+data/
+apps/useful/src-tauri/data/
+
+# 第三方二进制（由 scripts/fetch-binaries.ps1 下载并校验）
+binaries/*.exe
+binaries/*.dll
+!binaries/README.md
+
+# IDE / OS
+.idea/
+.vscode/
+*.suo
+Thumbs.db
+.DS_Store
+
+# 测试输出
+coverage/
+artifacts/
+*.log
+/.playwright-cli/
+/outputs/
+/step*.png
+
+# 发布与 benchmark 产物
+dist-release/
+dist-sbom/
+bench-results/
+binaries/CHECKSUMS.txt
+
+# compose e2e generated artifacts (keys/packages)
+deploy/docker-compose/e2e/out/
+
+# 本地开发配置与私钥（示例模板显式放行）
+.env*
+**/.env*
+!.env.example
+!**/.env.example
+*.env
+!*.example.env
+!**/*.example.env
+*.private.pem
+*.p12
+*.pfx

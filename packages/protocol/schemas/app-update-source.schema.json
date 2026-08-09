@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.useful.example/trp/v1/app-update-source.schema.json",
+  "title": "TRP v1 App Update Source",
+  "description": "客户端主程序更新源。独立信任域：与工具源信任根完全分开，拥有专用的客户端更新根密钥指纹。只有此类型可更新 Useful 客户端。默认使用官方预置公钥；高级用户更换需单独页面、单独警告、明确导入客户端更新根密钥，且不从任何工具源自动继承。",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["kind", "updateFeedUrl", "updateTrustRoot", "isDefaultOfficial"],
+  "properties": {
+    "kind": {
+      "type": "string",
+      "description": "固定为 app-update，与 SourceDefinition 的 tool/mirror 互斥，不可混用。",
+      "const": "app-update"
+    },
+    "updateFeedUrl": {
+      "$ref": "common.schema.json#/$defs/httpsUrl",
+      "description": "客户端更新源地址；必须 HTTPS。"
+    },
+    "channel": {
+      "type": "string",
+      "enum": ["stable", "beta"],
+      "default": "stable",
+      "description": "客户端更新通道；切换通道不改变更新信任根。"
+    },
+    "updateTrustRoot": {
+      "type": "object",
+      "description": "客户端更新专用信任根，字段名与工具源刻意不同，禁止相互赋值。",
+      "additionalProperties": false,
+      "required": ["updateRootKeyFingerprint", "confirmedAt"],
+      "properties": {
+        "updateRootKeyFingerprint": { "$ref": "common.schema.json#/$defs/sha256" },
+        "confirmedAt": { "$ref": "common.schema.json#/$defs/rfc3339" }
+      }
+    },
+    "isDefaultOfficial": {
+      "type": "boolean",
+      "description": "是否为官方预置默认更新源。"
+    },
+    "warningAcknowledgedAt": {
+      "anyOf": [{ "$ref": "common.schema.json#/$defs/rfc3339" }, { "type": "null" }],
+      "description": "更换为非官方更新源时，用户确认单独警告的时间。"
+    }
+  }
+}

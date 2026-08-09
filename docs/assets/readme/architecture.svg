@@ -1,0 +1,106 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="650" viewBox="0 0 1440 650" role="img" aria-labelledby="title desc">
+  <title id="title">Useful local-first and Agent security boundaries</title>
+  <desc id="desc">The desktop UI, CLI, and MCP enter a controlled runtime through an explicit Action contract. Signed tools are registered only after independent verification and execute locally by default.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#f7fbfc"/>
+      <stop offset="1" stop-color="#eef8f8"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#1ca7c4"/>
+      <stop offset="1" stop-color="#38e1d6"/>
+    </linearGradient>
+    <filter id="shadow" x="-12%" y="-18%" width="124%" height="145%">
+      <feDropShadow dx="0" dy="8" stdDeviation="12" flood-color="#173b45" flood-opacity="0.10"/>
+    </filter>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto" markerUnits="strokeWidth">
+      <path d="M0 0 10 5 0 10z" fill="#71a6b1"/>
+    </marker>
+  </defs>
+  <rect width="1440" height="650" rx="24" fill="url(#bg)"/>
+  <g font-family="Segoe UI, Microsoft YaHei UI, sans-serif">
+    <text x="72" y="70" font-size="28" font-weight="700" fill="#18333c">One capability model, three controlled entry points</text>
+    <text x="72" y="100" font-size="14" fill="#5e747c">GUI, JSON CLI, and local stdio MCP share one descriptor / executor; network and privileged access are never implicit.</text>
+
+    <g filter="url(#shadow)">
+      <rect x="72" y="150" width="255" height="112" rx="16" fill="#ffffff" stroke="#d9e5e8"/>
+      <rect x="92" y="172" width="42" height="42" rx="11" fill="#e2f7fa"/>
+      <rect x="102" y="182" width="22" height="17" rx="3" fill="none" stroke="#1698b4" stroke-width="2"/>
+      <text x="150" y="190" font-size="17" font-weight="700" fill="#1d343c">Desktop GUI</text>
+      <text x="150" y="213" font-size="12" fill="#74868c">Vue 3 + Tauri 2</text>
+      <text x="92" y="241" font-size="12" fill="#566c73">Search, preview, confirm, inspect feedback</text>
+
+      <rect x="72" y="280" width="255" height="112" rx="16" fill="#ffffff" stroke="#d9e5e8"/>
+      <rect x="92" y="302" width="42" height="42" rx="11" fill="#e2f7fa"/>
+      <text x="113" y="329" text-anchor="middle" font-family="Consolas, monospace" font-size="16" font-weight="700" fill="#1698b4">&gt;_</text>
+      <text x="150" y="320" font-size="17" font-weight="700" fill="#1d343c">JSON CLI</text>
+      <text x="150" y="343" font-size="12" fill="#74868c">useful-runtime</text>
+      <text x="92" y="371" font-size="12" fill="#566c73">Deterministic input, output, and exit codes</text>
+
+      <rect x="72" y="410" width="255" height="112" rx="16" fill="#ffffff" stroke="#d9e5e8"/>
+      <rect x="92" y="432" width="42" height="42" rx="11" fill="#e2f7fa"/>
+      <circle cx="105" cy="453" r="5" fill="#1698b4"/><circle cx="121" cy="443" r="5" fill="#1698b4"/><circle cx="121" cy="463" r="5" fill="#1698b4"/>
+      <path d="m109 451 8-6m-8 10 8 6" stroke="#1698b4" stroke-width="2"/>
+      <text x="150" y="450" font-size="17" font-weight="700" fill="#1d343c">Local MCP</text>
+      <text x="150" y="473" font-size="12" fill="#74868c">useful-mcp · stdio</text>
+      <text x="92" y="501" font-size="12" fill="#566c73">No bundled model or host reconfiguration</text>
+    </g>
+
+    <path d="M327 206H423M327 336H423M327 466H423" stroke="#71a6b1" stroke-width="2.5" marker-end="url(#arrow)"/>
+
+    <g filter="url(#shadow)">
+      <rect x="440" y="187" width="300" height="300" rx="22" fill="#ffffff" stroke="#b9dce3" stroke-width="2"/>
+      <rect x="464" y="213" width="252" height="54" rx="12" fill="#e4f8fb"/>
+      <path d="m486 241 8 8 17-19" fill="none" stroke="#1596b2" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+      <text x="526" y="245" font-size="17" font-weight="700" fill="#17687b">Action Contract</text>
+      <text x="464" y="301" font-size="13" font-weight="700" fill="#283f47">Independent checks before registration</text>
+      <g font-size="12" fill="#586e75">
+        <circle cx="474" cy="330" r="4" fill="#1ca7c4"/><text x="488" y="334">Schema and closed-world inputs</text>
+        <circle cx="474" cy="360" r="4" fill="#1ca7c4"/><text x="488" y="364">Artifact / publisher double pins</text>
+        <circle cx="474" cy="390" r="4" fill="#1ca7c4"/><text x="488" y="394">Explicit permissions and Agent allowlist</text>
+        <circle cx="474" cy="420" r="4" fill="#1ca7c4"/><text x="488" y="424">Path, archive, and resource budgets</text>
+        <circle cx="474" cy="450" r="4" fill="#1ca7c4"/><text x="488" y="454">Fail closed without lowering trust</text>
+      </g>
+    </g>
+
+    <path d="M740 337H836" stroke="#71a6b1" stroke-width="2.5" marker-end="url(#arrow)"/>
+
+    <g filter="url(#shadow)">
+      <rect x="852" y="150" width="256" height="174" rx="18" fill="#ffffff" stroke="#d9e5e8"/>
+      <rect x="874" y="172" width="42" height="42" rx="11" fill="#eaf8ed"/>
+      <path d="M887 192h16m-13-7v14m10-18v18" stroke="#39834a" stroke-width="2.3" stroke-linecap="round"/>
+      <text x="932" y="190" font-size="17" font-weight="700" fill="#1d343c">Built-in tools</text>
+      <text x="932" y="213" font-size="12" fill="#74868c">Local pure functions and desktop features</text>
+      <text x="874" y="249" font-size="12" fill="#566c73">Base64 · JSON · Hash</text>
+      <text x="874" y="274" font-size="12" fill="#566c73">Video · Process · Network</text>
+      <rect x="874" y="288" width="92" height="22" rx="7" fill="#eaf8ed"/>
+      <text x="920" y="303" text-anchor="middle" font-size="10" fill="#397642">Local execution</text>
+
+      <rect x="852" y="350" width="256" height="172" rx="18" fill="#ffffff" stroke="#d9e5e8"/>
+      <rect x="874" y="372" width="42" height="42" rx="11" fill="#fff6df"/>
+      <path d="M885 382h20v22h-20zM890 378h10v6h-10z" fill="none" stroke="#9d6b00" stroke-width="2"/>
+      <text x="932" y="390" font-size="17" font-weight="700" fill="#1d343c">Signed .useful</text>
+      <text x="932" y="413" font-size="12" fill="#74868c">Declarative third-party tools</text>
+      <text x="874" y="449" font-size="12" fill="#566c73">Signature, digest, and permission checks</text>
+      <text x="874" y="474" font-size="12" fill="#566c73">Enters the registry only after verification</text>
+      <rect x="874" y="488" width="76" height="22" rx="7" fill="#fff6df"/>
+      <text x="912" y="503" text-anchor="middle" font-size="10" fill="#8b6100">Fail closed</text>
+    </g>
+
+    <path d="M1108 237H1194M1108 436H1194" stroke="#71a6b1" stroke-width="2.5" marker-end="url(#arrow)"/>
+
+    <g filter="url(#shadow)">
+      <rect x="1210" y="208" width="158" height="250" rx="22" fill="#17333d"/>
+      <rect x="1250" y="237" width="78" height="78" rx="20" fill="url(#accent)"/>
+      <path d="M1267 277h44M1289 255v44" stroke="#ffffff" stroke-width="5" stroke-linecap="round"/>
+      <text x="1289" y="348" text-anchor="middle" font-size="18" font-weight="700" fill="#ffffff">Your device</text>
+      <text x="1289" y="374" text-anchor="middle" font-size="12" fill="#b9d5dc">files · OS · data</text>
+      <line x1="1236" y1="397" x2="1342" y2="397" stroke="#36525b"/>
+      <text x="1289" y="424" text-anchor="middle" font-size="11" fill="#8fe9e1">local-first default</text>
+    </g>
+
+    <rect x="440" y="548" width="668" height="48" rx="12" fill="#fff9ea" stroke="#ebd79e"/>
+    <path d="M465 562v18m-8-9h16" stroke="#9d6b00" stroke-width="2" stroke-linecap="round"/>
+    <text x="488" y="578" font-size="11" fill="#795400">Network, process control, and installation cross the boundary only after declaration, policy approval, and user confirmation.</text>
+  </g>
+</svg>

@@ -1,0 +1,67 @@
+# 最小告警规则示例（对应 /metrics 暴露的指标）。
+# 阈值为保守起点，生产按 SLO 调整。
+
+groups:
+  - name: useful-source-server
+    rules:
+      # 发布失败：5 分钟内新增即告警（发布是低频高危操作）
+      - alert: UsefulPublishFailures
+        expr: increase(useful_publish_failures_total[5m]) > 0
+        for: 0m
+        labels: { severity: warning }
+        annotations:
+          summary: "发布失败在过去 5 分钟内出现"
+
+      # 元数据发布失败：TUF metadata 签发失败直接影响客户端信任链
+      - alert: UsefulMetadataPublishFailures
+        expr: increase(useful_metadata_publish_failures_total[5m]) > 0
+        for: 0m
+        labels: { severity: critical }
+        annotations:
+          summary: "TUF metadata 发布失败"
+
+      # 下载授权失败激增（可能是攻击或配置问题）
+      - alert: UsefulDownloadAuthFailureSpike
+        expr: increase(useful_download_authorization_failures_total[5m]) > 50
+        for: 2m
+        labels: { severity: warning }
+        annotations:
+          summary: "下载授权失败激增（>50/5m）"
+
+      # OAuth / Webhook 失败
+      - alert: UsefulOAuthFailures
+        expr: increase(useful_oauth_failures_total[10m]) > 20
+        for: 5m
+        labels: { severity: warning }
+        annotations:
+          summary: "OAuth 失败偏高"
+      - alert: UsefulWebhookFailures
+        expr: increase(useful_webhook_failures_total[10m]) > 10
+        for: 5m
+        labels: { severity: warning }
+        annotations:
+          summary: "计费 Webhook 失败偏高"
+
+      # 任务队列积压（worker 处理不过来或卡住）
+      - alert: UsefulJobQueueBacklog
+        expr: useful_job_queue_depth > 100
+        for: 10m
+        labels: { severity: warning }
+        annotations:
+          summary: "任务队列深度持续 >100（worker 可能卡住）"
+
+      # source health：有制品长期不可用
+      - alert: UsefulArtifactsUnavailable
+        expr: useful_source_artifacts_unavailable > 0
+        for: 15m
+        labels: { severity: warning }
+        annotations:
+          summary: "有已发布制品持续不可用（对象缺失/损坏）"
+
+      # 扫描失败
+      - alert: UsefulScanFailures
+        expr: increase(useful_scan_failures_total[15m]) > 0
+        for: 0m
+        labels: { severity: info }
+        annotations:
+          summary: "制品扫描失败（可能为发布者提交问题）"

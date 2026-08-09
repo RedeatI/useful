@@ -1,0 +1,20 @@
+{
+  "sourceId": "org.useful.official",
+  "subjectId": "user_01hzy3k9m2n4p6q8",
+  "entitlementId": "ent_video_pro_monthly",
+  "productId": "prod_video_pro",
+  "planId": "plan_monthly",
+  "toolScope": [
+    {
+      "publisherKeyId": "ed25519:1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f",
+      "toolId": "com.useful.video-pro"
+    }
+  ],
+  "versionScope": null,
+  "channelScope": ["stable"],
+  "status": "active",
+  "startsAt": "2026-07-01T00:00:00Z",
+  "expiresAt": "2026-08-01T00:00:00Z",
+  "graceUntil": "2026-08-04T00:00:00Z",
+  "updatedAt": "2026-07-20T00:00:00Z"
+}

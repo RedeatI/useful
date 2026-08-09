@@ -1,0 +1,30 @@
+{
+  "name": "@useful/cli",
+  "version": "0.1.0-beta.1",
+  "description": "Useful 工具开发命令行：create / dev / validate / pack，以及 useful source 静态源生成器。",
+  "type": "module",
+  "bin": {
+    "useful": "bin/useful.mjs",
+    "create-useful-tool": "bin/create-useful-tool.mjs"
+  },
+  "files": [
+    "bin",
+    "templates"
+  ],
+  "scripts": {
+    "test": "vitest run",
+    "lint": "eslint bin --ext .mjs --max-warnings 0"
+  },
+  "dependencies": {
+    "adm-zip": "^0.6.0",
+    "yaml": "^2.6.1",
+    "@useful/protocol": "workspace:^",
+    "@useful/plugin-actions": "workspace:^"
+  },
+  "devDependencies": {
+    "esbuild": "0.25.12",
+    "vitest": "^2.1.8",
+    "eslint": "^8.57.1"
+  },
+  "license": "Apache-2.0"
+}

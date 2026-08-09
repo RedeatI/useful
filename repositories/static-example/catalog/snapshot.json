@@ -1,0 +1,55 @@
+{
+  "schemaVersion": "1.0",
+  "sourceId": "com.example.static",
+  "generatedAt": "2026-08-09T08:11:22Z",
+  "entries": [
+    {
+      "identity": {
+        "publisherKeyId": "ed25519:fe7fc9912d9807705bd80897d21bfdee9b8e4b30aeddd2ba717c47e75d50b7b1",
+        "toolId": "com.useful.hello-web"
+      },
+      "name": "示例 Web 工具",
+      "summary": "演示 Useful 零 native 权限 web 插件：获取宿主主题并报告就绪。",
+      "license": "Apache-2.0",
+      "channels": [
+        "stable"
+      ],
+      "latest": {
+        "stable": "1.0.0"
+      },
+      "artifacts": [
+        {
+          "version": "1.0.0",
+          "channel": "stable",
+          "platform": "windows",
+          "arch": "x86_64",
+          "artifactSha256": "af7f0b0d8166a4de3cbda0cb60e9fe5204ae2953af6256f6b516320c5d70e47d",
+          "manifestDigest": "e7a2ffad40efef86b6e5108dba7f1d8b1627dafdf70b7b0e7be3e1abae6416e5",
+          "size": 6032,
+          "permissions": [],
+          "publishedAt": "2026-08-09T08:11:22Z",
+          "withdrawn": false,
+          "publisherSignatureVerified": true,
+          "signatureMethod": "ed25519",
+          "signatureIdentity": "ed25519:fe7fc9912d9807705bd80897d21bfdee9b8e4b30aeddd2ba717c47e75d50b7b1"
+        }
+      ],
+      "offer": {
+        "accessMode": "free",
+        "productId": null,
+        "planIds": [],
+        "purchaseUrl": null
+      },
+      "review": {
+        "repositorySignatureVerified": true,
+        "publisherSignatureVerified": true,
+        "officialReviewPassed": false,
+        "securityScanPassed": false,
+        "sourceAvailable": false,
+        "reproducibleBuildVerified": false
+      },
+      "isNativeWorker": false,
+      "updatedAt": "2026-08-09T08:11:22Z"
+    }
+  ]
+}

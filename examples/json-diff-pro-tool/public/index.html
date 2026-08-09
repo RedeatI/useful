@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" href="data:," />
+    <title>JSON Diff Pro</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main>
+      <header>
+        <div>
+          <p class="eyebrow">DEVELOPER PRO · <span id="version">1.0.0</span></p>
+          <h1>JSON Diff Pro</h1>
+          <p class="subtitle">比较结构，而不只是文本行。所有处理均在本机离线完成。</p>
+        </div>
+        <div class="header-actions">
+          <button id="sample" class="ghost">载入示例</button>
+          <button id="swap" class="ghost">交换</button>
+          <button id="clear" class="ghost">清空</button>
+          <button id="compare">比较 JSON</button>
+        </div>
+      </header>
+
+      <section class="editors" aria-label="JSON 输入">
+        <label>基准版本<textarea id="left" spellcheck="false" aria-label="基准 JSON"></textarea></label>
+        <label>候选版本<textarea id="right" spellcheck="false" aria-label="候选 JSON"></textarea></label>
+      </section>
+      <p id="status" role="status">输入两份 JSON 后开始比较。</p>
+
+      <section id="results" class="results" hidden>
+        <div class="summary" aria-label="差异摘要">
+          <div><strong id="total">0</strong><span>全部差异</span></div>
+          <div class="added"><strong id="added">0</strong><span>新增</span></div>
+          <div class="removed"><strong id="removed">0</strong><span>删除</span></div>
+          <div class="changed"><strong id="changed">0</strong><span>值变化</span></div>
+          <div class="typed"><strong id="typed">0</strong><span>类型变化</span></div>
+        </div>
+        <div class="result-toolbar">
+          <input id="filter" type="search" placeholder="按 JSONPath 或值筛选" aria-label="筛选差异" />
+          <span id="visible-count"></span>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>JSONPath</th><th>变化</th><th>旧值</th><th>新值</th></tr></thead>
+            <tbody id="diff-body"></tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+    <script src="main.js"></script>
+  </body>
+</html>

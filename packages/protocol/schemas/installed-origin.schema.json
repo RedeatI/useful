@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.useful.example/trp/v1/installed-origin.schema.json",
+  "title": "TRP v1 Installed Origin",
+  "description": "InstalledOrigin = SourceId + PublisherKeyId + ToolId。客户端数据库记录已安装工具的来源，用于更新时的来源固定与发布者固定；来源迁移必须是明确操作，不得静默切换。",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "sourceId",
+    "publisherKeyId",
+    "toolId",
+    "installedVersion",
+    "artifactSha256",
+    "channel",
+    "manifestDigest",
+    "installedAt",
+    "lastCheckedAt"
+  ],
+  "properties": {
+    "sourceId": { "$ref": "common.schema.json#/$defs/lowercaseId" },
+    "publisherKeyId": { "$ref": "common.schema.json#/$defs/publisherKeyId" },
+    "toolId": { "$ref": "common.schema.json#/$defs/lowercaseId" },
+    "installedVersion": { "$ref": "common.schema.json#/$defs/semver" },
+    "artifactSha256": { "$ref": "common.schema.json#/$defs/sha256" },
+    "channel": { "$ref": "common.schema.json#/$defs/channel" },
+    "manifestDigest": { "$ref": "common.schema.json#/$defs/sha256" },
+    "installedAt": { "$ref": "common.schema.json#/$defs/rfc3339" },
+    "lastCheckedAt": { "$ref": "common.schema.json#/$defs/rfc3339" }
+  }
+}

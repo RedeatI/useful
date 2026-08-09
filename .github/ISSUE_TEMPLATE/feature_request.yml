@@ -1,0 +1,38 @@
+name: Feature request
+description: Propose a focused improvement to Useful.
+title: "[Feature]: "
+labels:
+  - enhancement
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What task is difficult today, and who encounters it?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed behavior
+      description: Describe the user-visible result rather than an implementation mandate.
+    validations:
+      required: true
+  - type: textarea
+    id: boundaries
+    attributes:
+      label: Permissions and platform boundaries
+      description: Note any file, network, process, installation, Agent, or platform capability involved.
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before submitting
+      options:
+        - label: I checked the existing tools and open issues for equivalent behavior.
+          required: true
+        - label: The proposal does not require silent permission escalation or arbitrary command execution.
+          required: true

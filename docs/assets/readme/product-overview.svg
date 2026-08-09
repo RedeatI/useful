@@ -1,0 +1,188 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="900" viewBox="0 0 1440 900" role="img" aria-labelledby="title desc">
+  <title id="title">Useful desktop utility workspace overview</title>
+  <desc id="desc">A Tool Library overview drawn from the current Useful interface, with navigation, filters, and six local capability cards.</desc>
+  <defs>
+    <linearGradient id="canvas" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#e9fbff"/>
+      <stop offset="0.52" stop-color="#f6f8fb"/>
+      <stop offset="1" stop-color="#ecfdf7"/>
+    </linearGradient>
+    <linearGradient id="brand" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#1ca7c4"/>
+      <stop offset="1" stop-color="#38e1d6"/>
+    </linearGradient>
+    <filter id="windowShadow" x="-10%" y="-14%" width="120%" height="135%">
+      <feDropShadow dx="0" dy="24" stdDeviation="28" flood-color="#1b3440" flood-opacity="0.17"/>
+    </filter>
+    <filter id="cardShadow" x="-8%" y="-10%" width="116%" height="125%">
+      <feDropShadow dx="0" dy="5" stdDeviation="8" flood-color="#193c48" flood-opacity="0.08"/>
+    </filter>
+  </defs>
+
+  <rect width="1440" height="900" fill="url(#canvas)"/>
+  <circle cx="1290" cy="80" r="190" fill="#38e1d6" opacity="0.09"/>
+  <circle cx="115" cy="810" r="245" fill="#1ca7c4" opacity="0.08"/>
+
+  <g filter="url(#windowShadow)">
+    <rect x="60" y="55" width="1320" height="790" rx="24" fill="#f3f3f3" stroke="#d7e2e6"/>
+    <path d="M84 55h1272a24 24 0 0 1 24 24v40H60V79a24 24 0 0 1 24-24z" fill="#ffffff"/>
+    <line x1="60" y1="119" x2="1380" y2="119" stroke="#dfe5e8"/>
+    <circle cx="96" cy="87" r="7" fill="#ff6b6b"/>
+    <circle cx="120" cy="87" r="7" fill="#ffd166"/>
+    <circle cx="144" cy="87" r="7" fill="#6ccb5f"/>
+    <rect x="650" y="75" width="140" height="25" rx="12.5" fill="#f2f6f7"/>
+    <text x="720" y="92" text-anchor="middle" font-family="Segoe UI, Microsoft YaHei UI, sans-serif" font-size="12" fill="#6f7d82">USEFUL · LOCAL</text>
+  </g>
+
+  <rect x="60" y="119" width="234" height="726" fill="#ffffff"/>
+  <line x1="294" y1="119" x2="294" y2="845" stroke="#dfe5e8"/>
+  <g font-family="Segoe UI, Microsoft YaHei UI, sans-serif">
+    <rect x="86" y="145" width="42" height="42" rx="12" fill="url(#brand)"/>
+    <text x="107" y="173" text-anchor="middle" font-size="23" font-weight="700" fill="#ffffff">U</text>
+    <text x="143" y="173" font-size="22" font-weight="700" fill="#1a1a1a">Useful</text>
+
+    <g font-size="15" fill="#56666c">
+      <rect x="76" y="214" width="202" height="44" rx="10" fill="#eff5f6"/>
+      <path d="M98 235h16m-8-8v16" stroke="#64757b" stroke-width="2" stroke-linecap="round"/>
+      <text x="130" y="242">Home</text>
+
+      <rect x="76" y="266" width="202" height="44" rx="10" fill="#dff6fa"/>
+      <rect x="96" y="280" width="19" height="19" rx="4" fill="none" stroke="#1ca7c4" stroke-width="2"/>
+      <path d="M101 286h9M101 292h6" stroke="#1ca7c4" stroke-width="2" stroke-linecap="round"/>
+      <text x="130" y="294" font-weight="600" fill="#13879f">Tool Library</text>
+
+      <path d="M98 337h18v14H98zM102 333h10l2 4h-14z" fill="none" stroke="#64757b" stroke-width="2" stroke-linejoin="round"/>
+      <text x="130" y="348">Tool Shop</text>
+
+      <path d="M106 382v16m-7-7 7 7 7-7" fill="none" stroke="#64757b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      <text x="130" y="398">Downloads</text>
+
+      <circle cx="106" cy="447" r="9" fill="none" stroke="#64757b" stroke-width="2"/>
+      <path d="M106 433v4m0 20v4m-14-14h4m20 0h4" stroke="#64757b" stroke-width="2"/>
+      <text x="130" y="453">Settings</text>
+    </g>
+
+    <text x="84" y="531" font-size="11" font-weight="700" letter-spacing="1.2" fill="#8a989d">QUICK ACCESS</text>
+    <rect x="84" y="552" width="186" height="66" rx="12" fill="#f7f9fa" stroke="#e6ebed"/>
+    <circle cx="107" cy="575" r="9" fill="#1ca7c4" opacity="0.18"/>
+    <path d="M103 575h8M107 571v8" stroke="#1ca7c4" stroke-width="2" stroke-linecap="round"/>
+    <text x="124" y="578" font-size="13" fill="#4f6066">Pin favorite tools</text>
+    <text x="99" y="600" font-size="11" fill="#8a989d">One entry for GUI and Actions</text>
+
+    <rect x="84" y="784" width="186" height="38" rx="9" fill="#f7f9fa" stroke="#e6ebed"/>
+    <circle cx="104" cy="803" r="6" fill="#6ccb5f"/>
+    <text x="118" y="808" font-size="12" fill="#627278">Local-first by default</text>
+  </g>
+
+  <g font-family="Segoe UI, Microsoft YaHei UI, sans-serif">
+    <text x="336" y="172" font-size="27" font-weight="700" fill="#1a1a1a">Tool Library</text>
+    <text x="336" y="200" font-size="14" fill="#637278">Search, filter, and launch local tools and controlled Agent Actions</text>
+
+    <g transform="translate(992 148)">
+      <rect width="346" height="48" rx="12" fill="#ffffff" stroke="#d9e1e4"/>
+      <circle cx="23" cy="23" r="7" fill="none" stroke="#75858a" stroke-width="2"/>
+      <path d="m28 28 6 6" stroke="#75858a" stroke-width="2" stroke-linecap="round"/>
+      <text x="48" y="30" font-size="13" fill="#96a1a5">Search tools, Actions, or publishers…</text>
+    </g>
+
+    <g font-size="13">
+      <rect x="336" y="229" width="67" height="34" rx="9" fill="#dff6fa" stroke="#1ca7c4"/>
+      <text x="369" y="251" text-anchor="middle" font-weight="600" fill="#13879f">All</text>
+      <rect x="413" y="229" width="76" height="34" rx="9" fill="#ffffff" stroke="#d9e1e4"/>
+      <text x="451" y="251" text-anchor="middle" fill="#56666c">Desktop</text>
+      <rect x="499" y="229" width="86" height="34" rx="9" fill="#ffffff" stroke="#d9e1e4"/>
+      <text x="542" y="251" text-anchor="middle" fill="#56666c">Agent Action</text>
+      <rect x="595" y="229" width="67" height="34" rx="9" fill="#ffffff" stroke="#d9e1e4"/>
+      <text x="628" y="251" text-anchor="middle" fill="#56666c">Installed</text>
+      <rect x="672" y="229" width="67" height="34" rx="9" fill="#ffffff" stroke="#d9e1e4"/>
+      <text x="705" y="251" text-anchor="middle" fill="#56666c">Favorites</text>
+    </g>
+    <text x="336" y="296" font-size="12" fill="#8a989d">Local capabilities · permissions shown before execution</text>
+  </g>
+
+  <g font-family="Segoe UI, Microsoft YaHei UI, sans-serif" filter="url(#cardShadow)">
+    <g transform="translate(336 322)">
+      <rect width="318" height="205" rx="14" fill="#ffffff" stroke="#e0e7e9"/>
+      <rect x="18" y="18" width="44" height="44" rx="11" fill="#e4f8fb"/>
+      <text x="40" y="47" text-anchor="middle" font-family="Consolas, monospace" font-size="18" font-weight="700" fill="#1596b2">64</text>
+      <text x="76" y="38" font-size="16" font-weight="700" fill="#1f2b2f">Base64</text>
+      <text x="76" y="57" font-family="Consolas, monospace" font-size="10" fill="#849297">builtin.utilities.base64</text>
+      <text x="18" y="91" font-size="12" fill="#637278">Local encoding across GUI, CLI, and MCP.</text>
+      <rect x="18" y="111" width="47" height="24" rx="7" fill="#f0f4f5"/><text x="41" y="127" text-anchor="middle" font-size="10" fill="#617176">Built-in</text>
+      <rect x="71" y="111" width="43" height="24" rx="7" fill="#f0f4f5"/><text x="92" y="127" text-anchor="middle" font-size="10" fill="#617176">GUI</text>
+      <rect x="120" y="111" width="57" height="24" rx="7" fill="#eaf8ed"/><text x="148" y="127" text-anchor="middle" font-size="10" fill="#397642">No access</text>
+      <rect x="18" y="158" width="68" height="30" rx="8" fill="#1ca7c4"/><text x="52" y="178" text-anchor="middle" font-size="12" font-weight="600" fill="#ffffff">Open</text>
+      <rect x="94" y="158" width="68" height="30" rx="8" fill="#ffffff" stroke="#d8e0e3"/><text x="128" y="178" text-anchor="middle" font-size="12" fill="#59696f">Pin</text>
+    </g>
+
+    <g transform="translate(674 322)">
+      <rect width="318" height="205" rx="14" fill="#ffffff" stroke="#e0e7e9"/>
+      <rect x="18" y="18" width="44" height="44" rx="11" fill="#e4f8fb"/>
+      <path d="M30 30h20v20H30zM35 35h10M35 40h10M35 45h7" fill="none" stroke="#1596b2" stroke-width="2" stroke-linecap="round"/>
+      <text x="76" y="38" font-size="16" font-weight="700" fill="#1f2b2f">JSON Tools</text>
+      <text x="76" y="57" font-family="Consolas, monospace" font-size="10" fill="#849297">builtin.utilities.json</text>
+      <text x="18" y="91" font-size="12" fill="#637278">Format, minify, validate. Input stays local.</text>
+      <rect x="18" y="111" width="47" height="24" rx="7" fill="#f0f4f5"/><text x="41" y="127" text-anchor="middle" font-size="10" fill="#617176">Built-in</text>
+      <rect x="71" y="111" width="43" height="24" rx="7" fill="#f0f4f5"/><text x="92" y="127" text-anchor="middle" font-size="10" fill="#617176">CLI</text>
+      <rect x="120" y="111" width="57" height="24" rx="7" fill="#eaf8ed"/><text x="148" y="127" text-anchor="middle" font-size="10" fill="#397642">Read only</text>
+      <rect x="18" y="158" width="68" height="30" rx="8" fill="#1ca7c4"/><text x="52" y="178" text-anchor="middle" font-size="12" font-weight="600" fill="#ffffff">Open</text>
+      <rect x="94" y="158" width="68" height="30" rx="8" fill="#ffffff" stroke="#d8e0e3"/><text x="128" y="178" text-anchor="middle" font-size="12" fill="#59696f">Pin</text>
+    </g>
+
+    <g transform="translate(1012 322)">
+      <rect width="326" height="205" rx="14" fill="#ffffff" stroke="#e0e7e9"/>
+      <rect x="18" y="18" width="44" height="44" rx="11" fill="#e4f8fb"/>
+      <path d="M30 39h20M33 33h14M35 45h10" stroke="#1596b2" stroke-width="2.5" stroke-linecap="round"/>
+      <text x="76" y="38" font-size="16" font-weight="700" fill="#1f2b2f">Hash</text>
+      <text x="76" y="57" font-family="Consolas, monospace" font-size="10" fill="#849297">builtin.utilities.hash</text>
+      <text x="18" y="91" font-size="12" fill="#637278">Deterministic hashes for text and files.</text>
+      <rect x="18" y="111" width="47" height="24" rx="7" fill="#f0f4f5"/><text x="41" y="127" text-anchor="middle" font-size="10" fill="#617176">Built-in</text>
+      <rect x="71" y="111" width="43" height="24" rx="7" fill="#f0f4f5"/><text x="92" y="127" text-anchor="middle" font-size="10" fill="#617176">MCP</text>
+      <rect x="120" y="111" width="57" height="24" rx="7" fill="#eaf8ed"/><text x="148" y="127" text-anchor="middle" font-size="10" fill="#397642">No access</text>
+      <rect x="18" y="158" width="68" height="30" rx="8" fill="#1ca7c4"/><text x="52" y="178" text-anchor="middle" font-size="12" font-weight="600" fill="#ffffff">Open</text>
+      <rect x="94" y="158" width="68" height="30" rx="8" fill="#ffffff" stroke="#d8e0e3"/><text x="128" y="178" text-anchor="middle" font-size="12" fill="#59696f">Pin</text>
+    </g>
+
+    <g transform="translate(336 547)">
+      <rect width="318" height="226" rx="14" fill="#ffffff" stroke="#e0e7e9"/>
+      <rect x="18" y="18" width="44" height="44" rx="11" fill="#e4f8fb"/>
+      <rect x="29" y="31" width="22" height="17" rx="3" fill="none" stroke="#1596b2" stroke-width="2"/>
+      <path d="m37 35 8 5-8 5z" fill="#1596b2"/>
+      <text x="76" y="38" font-size="16" font-weight="700" fill="#1f2b2f">Video Trim</text>
+      <text x="76" y="57" font-family="Consolas, monospace" font-size="10" fill="#849297">builtin.video-trim</text>
+      <text x="18" y="91" font-size="12" fill="#637278">Preview, lossless trim, transcode, extract audio.</text>
+      <rect x="18" y="111" width="52" height="24" rx="7" fill="#f0f4f5"/><text x="44" y="127" text-anchor="middle" font-size="10" fill="#617176">Desktop</text>
+      <rect x="76" y="111" width="74" height="24" rx="7" fill="#fff7e8"/><text x="113" y="127" text-anchor="middle" font-size="10" fill="#8a5b08">On demand</text>
+      <text x="18" y="157" font-size="11" fill="#8a6500">Missing codecs prompt first; no silent installs.</text>
+      <rect x="18" y="180" width="68" height="30" rx="8" fill="#1ca7c4"/><text x="52" y="200" text-anchor="middle" font-size="12" font-weight="600" fill="#ffffff">Open</text>
+    </g>
+
+    <g transform="translate(674 547)">
+      <rect width="318" height="226" rx="14" fill="#ffffff" stroke="#e0e7e9"/>
+      <rect x="18" y="18" width="44" height="44" rx="11" fill="#e4f8fb"/>
+      <path d="M30 49V37m8 12V30m8 19V40m8 9V34" stroke="#1596b2" stroke-width="3" stroke-linecap="round"/>
+      <text x="76" y="38" font-size="16" font-weight="700" fill="#1f2b2f">Process Monitor</text>
+      <text x="76" y="57" font-family="Consolas, monospace" font-size="10" fill="#849297">builtin.process-monitor</text>
+      <text x="18" y="91" font-size="12" fill="#637278">CPU, memory, disk, GPU, and network visibility.</text>
+      <rect x="18" y="111" width="47" height="24" rx="7" fill="#f0f4f5"/><text x="41" y="127" text-anchor="middle" font-size="10" fill="#617176">Windows</text>
+      <rect x="71" y="111" width="91" height="24" rx="7" fill="#fff7e8"/><text x="116" y="127" text-anchor="middle" font-size="10" fill="#8a5b08">Explicit access</text>
+      <text x="18" y="157" font-size="11" fill="#7e5c00">Process termination always needs confirmation.</text>
+      <rect x="18" y="180" width="68" height="30" rx="8" fill="#1ca7c4"/><text x="52" y="200" text-anchor="middle" font-size="12" font-weight="600" fill="#ffffff">Open</text>
+    </g>
+
+    <g transform="translate(1012 547)">
+      <rect width="326" height="226" rx="14" fill="#ffffff" stroke="#1ca7c4" stroke-width="2"/>
+      <rect x="18" y="18" width="44" height="44" rx="11" fill="#e4f8fb"/>
+      <path d="M40 27v26M30 36h20M30 45h20" stroke="#1596b2" stroke-width="2" stroke-linecap="round"/>
+      <text x="76" y="38" font-size="16" font-weight="700" fill="#1f2b2f">Media Runtimes</text>
+      <text x="76" y="57" font-family="Consolas, monospace" font-size="10" fill="#849297">Preview / Transcode packs</text>
+      <text x="18" y="91" font-size="12" fill="#637278">Split mpv and ffmpeg / ffprobe by purpose.</text>
+      <rect x="18" y="111" width="72" height="24" rx="7" fill="#dff6fa"/><text x="54" y="127" text-anchor="middle" font-size="10" fill="#13879f">Your choice</text>
+      <rect x="96" y="111" width="70" height="24" rx="7" fill="#fff7e8"/><text x="131" y="127" text-anchor="middle" font-size="10" fill="#8a5b08">Verify first</text>
+      <text x="18" y="157" font-size="11" fill="#7e5c00">Fail closed until production signing is ready.</text>
+      <rect x="18" y="180" width="116" height="30" rx="8" fill="#dff6fa" stroke="#1ca7c4"/><text x="76" y="200" text-anchor="middle" font-size="12" font-weight="600" fill="#13879f">Manage packs</text>
+    </g>
+  </g>
+
+  <text x="720" y="873" text-anchor="middle" font-family="Segoe UI, Microsoft YaHei UI, sans-serif" font-size="12" fill="#718187">Interface overview · drawn from current Vue components, not a released binary or live service</text>
+</svg>

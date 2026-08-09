@@ -1,0 +1,150 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.useful.example/trp/v1/catalog-entry.schema.json",
+  "title": "TRP v1 Catalog Entry",
+  "description": "目录条目：把不可变 package manifest 的引用与可变的商业信息（CatalogOffer）、频道、版本、审核状态组合。商业信息只存在于 offer，不进入 manifest。同名不同发布者不得合并（合并键为 toolIdentity）。",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["identity", "name", "channels", "latest", "offer"],
+  "properties": {
+    "identity": { "$ref": "common.schema.json#/$defs/toolIdentity" },
+    "name": { "type": "string", "minLength": 1, "maxLength": 200 },
+    "summary": { "type": "string", "maxLength": 2000 },
+    "license": { "$ref": "common.schema.json#/$defs/spdxLicenseExpression" },
+    "channels": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 3,
+      "uniqueItems": true,
+      "items": { "$ref": "common.schema.json#/$defs/channel" }
+    },
+    "latest": {
+      "type": "object",
+      "description": "每个频道的最新版本指针。",
+      "additionalProperties": false,
+      "minProperties": 1,
+      "properties": {
+        "stable": { "$ref": "common.schema.json#/$defs/semver" },
+        "beta": { "$ref": "common.schema.json#/$defs/semver" },
+        "nightly": { "$ref": "common.schema.json#/$defs/semver" }
+      }
+    },
+    "artifacts": {
+      "type": "array",
+      "description": "各平台/架构/版本制品的摘要与元信息（供市场展示与固定）。",
+      "maxItems": 4096,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["version", "channel", "platform", "arch", "artifactSha256", "manifestDigest", "size", "permissions"],
+        "properties": {
+          "version": { "$ref": "common.schema.json#/$defs/semver" },
+          "channel": { "$ref": "common.schema.json#/$defs/channel" },
+          "platform": { "$ref": "common.schema.json#/$defs/platform" },
+          "arch": { "$ref": "common.schema.json#/$defs/arch" },
+          "artifactSha256": { "$ref": "common.schema.json#/$defs/sha256" },
+          "manifestDigest": { "$ref": "common.schema.json#/$defs/sha256" },
+          "size": { "type": "integer", "minimum": 0, "maximum": 5368709120 },
+          "permissions": {
+            "type": "array",
+            "maxItems": 128,
+            "items": { "$ref": "common.schema.json#/$defs/permission" }
+          },
+          "publishedAt": { "$ref": "common.schema.json#/$defs/rfc3339" },
+          "withdrawn": { "type": "boolean", "default": false },
+          "publisherSignatureVerified": {
+            "type": "boolean",
+            "default": false,
+            "description": "发布者签名验证状态（与软件源 TUF 验证分离，独立字段）。"
+          },
+          "signatureMethod": {
+            "type": "string",
+            "enum": ["ed25519", "sigstore"],
+            "description": "发布者签名方式；UI 分别展示 Ed25519 与 Sigstore 身份签名，不合并。"
+          },
+          "signatureIdentity": {
+            "type": "string",
+            "maxLength": 512,
+            "description": "Sigstore 身份（issuer + subject）；仅 sigstore 签名时存在。"
+          }
+        }
+      }
+    },
+    "offer": {
+      "type": "object",
+      "description": "CatalogOffer：商业信息载体，可变。绝不写入不可变 manifest。",
+      "additionalProperties": false,
+      "required": ["accessMode"],
+      "properties": {
+        "accessMode": {
+          "type": "string",
+          "enum": ["free", "entitlement", "external-purchase", "private", "unavailable"]
+        },
+        "productId": { "type": ["string", "null"], "maxLength": 200 },
+        "planIds": {
+          "type": "array",
+          "maxItems": 64,
+          "items": { "type": "string", "maxLength": 200 }
+        },
+        "purchaseUrl": {
+          "anyOf": [
+            { "$ref": "common.schema.json#/$defs/httpsUrl" },
+            { "type": "null" }
+          ]
+        }
+      }
+    },
+    "review": {
+      "type": "object",
+      "description": "各独立布尔状态，禁止混成单一 safe 布尔。",
+      "additionalProperties": false,
+      "properties": {
+        "repositorySignatureVerified": { "type": "boolean" },
+        "publisherSignatureVerified": { "type": "boolean" },
+        "officialReviewPassed": { "type": "boolean" },
+        "securityScanPassed": { "type": "boolean" },
+        "sourceAvailable": { "type": "boolean" },
+        "reproducibleBuildVerified": { "type": "boolean" }
+      }
+    },
+    "isNativeWorker": { "type": "boolean", "default": false },
+    "availability": {
+      "type": "object",
+      "description": "源后台健康检查推导的可用性视图（带时间戳；缺失/过期视为 unknown）。可扩展，旧客户端可忽略。",
+      "properties": {
+        "status": { "type": "string", "enum": ["unknown", "healthy", "degraded", "unavailable"] },
+        "checkedAt": { "$ref": "common.schema.json#/$defs/rfc3339" },
+        "source": { "type": "string", "maxLength": 64 }
+      }
+    },
+    "reproducibleBuild": {
+      "type": "object",
+      "description": "复现构建视图：作者声明（claimed）与官方验证（verified）严格分离，UI 不得合并。",
+      "properties": {
+        "status": { "type": "string", "enum": ["unknown", "claimed", "verification-pending", "verified", "failed"] },
+        "strategy": { "type": "string", "enum": ["dual-build", "provenance"] }
+      }
+    },
+    "advisories": {
+      "type": "array",
+      "description": "条目级安全公告轻量视图（已安装用户可见；完整公告见 security-advisory.schema）。",
+      "maxItems": 128,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["severity", "summary"],
+        "properties": {
+          "severity": { "type": "string", "enum": ["low", "medium", "high", "critical"] },
+          "summary": { "type": "string", "minLength": 1, "maxLength": 2000 },
+          "affectedVersions": {
+            "type": "array",
+            "maxItems": 512,
+            "items": { "$ref": "common.schema.json#/$defs/semver" }
+          },
+          "createdAt": { "$ref": "common.schema.json#/$defs/rfc3339" }
+        }
+      }
+    },
+    "updatedAt": { "$ref": "common.schema.json#/$defs/rfc3339" }
+  }
+}

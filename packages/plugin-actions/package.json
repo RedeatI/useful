@@ -1,0 +1,22 @@
+{
+  "name": "@useful/plugin-actions",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Useful signed declarative plugin action schema, verifier and closed-world pipeline evaluator.",
+  "exports": {
+    ".": "./src/index.mjs",
+    "./schema": "./src/useful.plugin-action.v1.schema.json"
+  },
+  "dependencies": {
+    "@useful/action-contract": "workspace:^",
+    "@useful/action-runtime": "workspace:^",
+    "adm-zip": "^0.6.0",
+    "ajv": "^8.17.1"
+  },
+  "scripts": {
+    "test": "node --test",
+    "typecheck": "node --check src/index.mjs && node --check src/pipeline.mjs && node --check src/artifact.mjs"
+  },
+  "license": "Apache-2.0"
+}

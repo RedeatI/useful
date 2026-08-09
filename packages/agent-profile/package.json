@@ -1,0 +1,28 @@
+{
+  "name": "@useful/agent-profile",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Useful Agent profile v1 validation, exposure filtering and safe presets.",
+  "exports": {
+    ".": "./src/index.mjs",
+    "./browser": {
+      "types": "./src/browser.d.ts",
+      "import": "./src/browser.mjs"
+    },
+    "./node": "./src/node.mjs",
+    "./schema": "./src/useful.agent-profile.v1.schema.json"
+  },
+  "dependencies": {
+    "@useful/action-contract": "workspace:^"
+  },
+  "devDependencies": {
+    "@useful/action-runtime": "workspace:^",
+    "ajv": "^8.20.0"
+  },
+  "scripts": {
+    "test": "node --test",
+    "typecheck": "node --check src/browser.mjs && node --check src/node.mjs && node --check src/index.mjs"
+  },
+  "license": "Apache-2.0"
+}

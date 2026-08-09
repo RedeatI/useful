@@ -1,0 +1,1504 @@
+name: Useful Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      channel:
+        description: Release channel encoded by package.json and the selected tag
+        required: true
+        type: choice
+        options:
+          - stable
+          - beta
+          - nightly
+      publish:
+        description: Create the GitHub Release after all build and evidence gates pass
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: useful-release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  identity:
+    name: Validate version, tag, and channel
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      checks: read
+    outputs:
+      version: ${{ steps.identity.outputs.version }}
+      tag: ${{ steps.identity.outputs.tag }}
+      channel: ${{ steps.identity.outputs.channel }}
+      update_root_pubkey: ${{ steps.publish-gate.outputs.update_root_pubkey }}
+      update_root_fingerprint: ${{ steps.publish-gate.outputs.update_root_fingerprint }}
+      update_feed_template: ${{ steps.publish-gate.outputs.update_feed_template }}
+      root_ceremony_sha256: ${{ steps.publish-gate.outputs.root_ceremony_sha256 }}
+      media_source_compliance_status: ${{ steps.publish-gate.outputs.media_source_compliance_status }}
+      media_source_distribution: ${{ steps.publish-gate.outputs.media_source_distribution }}
+      publish_gate_json: ${{ steps.publish-gate.outputs.publish_gate_json }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Verify exact clean source checkout
+        shell: bash
+        env:
+          EXPECTED_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+          test -z "$(git status --porcelain --untracked-files=all)"
+          echo "SOURCE_DATE_EPOCH=$(git show -s --format=%ct "$EXPECTED_SHA")" >> "$GITHUB_ENV"
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 20
+      - name: Require a manually selected existing tag
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "${{ github.event_name }}" = "workflow_dispatch"
+          test "${{ github.ref_type }}" = "tag" || {
+            echo "Release workflow must be dispatched on an existing tag ref." >&2
+            exit 1
+          }
+      - name: Check repository-wide version drift
+        run: node scripts/check-version-drift.mjs --json
+      - name: Validate release identity and stable readiness gate
+        id: identity
+        env:
+          SIGNING_READY: ${{ vars.USEFUL_SIGNING_READY || 'false' }}
+        run: >-
+          node scripts/release-metadata.mjs
+          --package package.json
+          --tag "${{ github.ref_name }}"
+          --channel "${{ inputs.channel }}"
+          --signing-ready "$SIGNING_READY"
+          --identity-only
+          --github-output "$GITHUB_OUTPUT"
+
+      - name: Validate canonical repository, publisher, and production update trust
+        id: publish-gate
+        env:
+          EXPECTED_REPOSITORY: ${{ vars.USEFUL_EXPECTED_REPOSITORY }}
+          RELEASE_ACTORS: ${{ vars.USEFUL_RELEASE_ACTORS }}
+          UPDATE_ROOT_PUBKEY_HEX: ${{ vars.USEFUL_UPDATE_ROOT_PUBKEY_HEX }}
+          UPDATE_FEED_URL_TEMPLATE: ${{ vars.USEFUL_UPDATE_FEED_URL_TEMPLATE }}
+          UPDATE_ROOT_CEREMONY_SHA256: ${{ vars.USEFUL_UPDATE_ROOT_CEREMONY_SHA256 }}
+          STABLE_UPDATE_EVIDENCE_PATH: ${{ vars.USEFUL_STABLE_UPDATE_EVIDENCE_PATH }}
+          STABLE_UPDATE_EVIDENCE_SHA256: ${{ vars.USEFUL_STABLE_UPDATE_EVIDENCE_SHA256 }}
+          MEDIA_SOURCE_EVIDENCE_PATH: ${{ vars.USEFUL_MEDIA_SOURCE_EVIDENCE_PATH }}
+          MEDIA_SOURCE_EVIDENCE_SHA256: ${{ vars.USEFUL_MEDIA_SOURCE_EVIDENCE_SHA256 }}
+        run: >-
+          node scripts/release-publish-gate.mjs
+          --repository "${{ github.repository }}"
+          --expected-repository "$EXPECTED_REPOSITORY"
+          --visibility "${{ github.event.repository.visibility }}"
+          --actor "${{ github.actor }}"
+          --allowed-actors "$RELEASE_ACTORS"
+          --publish "${{ inputs.publish }}"
+          --channel "${{ inputs.channel }}"
+          --update-root-pubkey "$UPDATE_ROOT_PUBKEY_HEX"
+          --update-feed-template "$UPDATE_FEED_URL_TEMPLATE"
+          --root-ceremony-sha256 "$UPDATE_ROOT_CEREMONY_SHA256"
+          --repo-root .
+          --stable-evidence-path "$STABLE_UPDATE_EVIDENCE_PATH"
+          --stable-evidence-sha256 "$STABLE_UPDATE_EVIDENCE_SHA256"
+          --media-source-evidence-path "$MEDIA_SOURCE_EVIDENCE_PATH"
+          --media-source-evidence-sha256 "$MEDIA_SOURCE_EVIDENCE_SHA256"
+          --tag "${{ github.ref_name }}"
+          --github-output "$GITHUB_OUTPUT"
+
+      - name: Require all exact-commit CI and platform-limited checks before publish
+        if: inputs.publish == true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          checks=$(gh api --paginate --slurp "/repos/${{ github.repository }}/commits/${{ github.sha }}/check-runs?filter=all&per_page=100")
+          required=(
+            build-and-test
+            protocol-and-cli
+            source-backend
+            fuzz-smoke
+            compose-e2e
+            'platform-limited-matrix (native-tauri-smoke)'
+            'platform-limited-matrix (large-file-resume)'
+            'platform-limited-matrix (compose-fault-injection)'
+          )
+          for name in "${required[@]}"; do
+            latest=$(jq -c --arg name "$name" \
+              '[.[].check_runs[] | select(.name == $name)] | if length == 0 then null else max_by(.id) end' \
+              <<<"$checks")
+            jq -e '. != null and .status == "completed" and .conclusion == "success"' <<<"$latest" >/dev/null || {
+                echo "Latest required check is missing or unsuccessful for ${{ github.sha }}: $name ($latest)" >&2
+                exit 1
+              }
+          done
+
+  verify:
+    name: Re-run source and workspace release gates
+    needs: identity
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Verify exact clean source checkout
+        shell: bash
+        env:
+          EXPECTED_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+          test -z "$(git status --porcelain --untracked-files=all)"
+          echo "SOURCE_DATE_EPOCH=$(git show -s --format=%ct "$EXPECTED_SHA")" >> "$GITHUB_ENV"
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+        with:
+          version: 9.15.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 20
+          cache: pnpm
+      - uses: dtolnay/rust-toolchain@4cda84d5c5c54efe2404f9d843567869ab1699d4 # 1.97.1
+        with:
+          toolchain: 1.97.1
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
+        with:
+          workspaces: .
+          key: release-verify
+      - name: Install Linux desktop bundling dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential \
+            curl \
+            file \
+            libayatana-appindicator3-dev \
+            librsvg2-dev \
+            libssl-dev \
+            libwebkit2gtk-4.1-dev \
+            libxdo-dev \
+            patchelf \
+            wget
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
+        with:
+          go-version: "1.26"
+          cache-dependency-path: services/go.sum
+      - run: pnpm install --frozen-lockfile
+      - name: Verify public source candidate before generating artifacts
+        run: node scripts/public-source-check.mjs --json
+      - name: Verify Useful identity
+        run: node scripts/check-brand.mjs --json
+      - name: Verify workflow contracts
+        run: node scripts/check-workflows.mjs --json
+      - name: Verify version alignment
+        run: node scripts/check-version-drift.mjs --json
+      - name: Verify translations
+        run: node scripts/check-i18n.mjs --json
+      - name: Verify public release policy fixtures
+        run: pnpm policy:test
+      - name: Enforce source release-readiness hard gates
+        run: node scripts/release-readiness.mjs --json
+      - name: Verify release contracts
+        run: pnpm release:checks
+      - name: Lint Node, CLI, MCP, and frontend workspace
+        run: pnpm -r lint
+      - name: Typecheck Node, CLI, MCP, and frontend workspace
+        run: pnpm -r typecheck
+      - name: Test Node, CLI, MCP, and frontend workspace
+        run: pnpm -r test
+      - name: Build Node, CLI, MCP, and frontend workspace
+        run: pnpm -r build
+      - name: Verify generated-source drift
+        run: node scripts/check-drift.mjs
+      - name: Smoke-test documented commands
+        run: node scripts/doc-smoke.mjs
+      - name: Verify Rust formatting
+        run: cargo fmt --all -- --check
+      - name: Lint Rust workspace
+        run: cargo clippy --workspace --all-targets -- -D warnings
+      - name: Test Rust workspace
+        run: cargo test --workspace
+      - name: Verify Go formatting
+        working-directory: services
+        run: test -z "$(gofmt -l .)"
+      - name: Vet Go backend
+        working-directory: services
+        run: go vet ./...
+      - name: Test Go backend with the race detector
+        working-directory: services
+        run: go test -race ./...
+      - name: Build source server
+        working-directory: services
+        run: go build -o "$RUNNER_TEMP/useful-source-server" ./source-server/cmd/server
+      - name: Build source worker
+        working-directory: services
+        run: go build -o "$RUNNER_TEMP/useful-source-worker" ./source-worker/cmd/worker
+      - name: Ensure verification did not mutate tracked source
+        run: test -z "$(git status --porcelain --untracked-files=all)"
+
+  verify-compose:
+    name: Re-run Compose release integration
+    needs: identity
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Verify exact clean source checkout
+        shell: bash
+        env:
+          EXPECTED_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+          test -z "$(git status --porcelain --untracked-files=all)"
+          echo "SOURCE_DATE_EPOCH=$(git show -s --format=%ct "$EXPECTED_SHA")" >> "$GITHUB_ENV"
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 20
+      - name: Compose E2E
+        working-directory: deploy/docker-compose
+        run: |
+          set -euo pipefail
+          trap 'docker compose --profile e2e down -v --remove-orphans >/dev/null 2>&1 || true' EXIT
+          node e2e/prepare.mjs
+          docker compose --profile e2e down -v --remove-orphans
+          docker compose --profile e2e up --build --abort-on-container-exit --exit-code-from e2e-runner
+
+  sbom:
+    name: Generate release SBOM
+    needs: [identity, verify, verify-compose]
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Verify exact clean source checkout
+        shell: bash
+        env:
+          EXPECTED_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+          test -z "$(git status --porcelain --untracked-files=all)"
+          echo "SOURCE_DATE_EPOCH=$(git show -s --format=%ct "$EXPECTED_SHA")" >> "$GITHUB_ENV"
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+        with:
+          version: 9.15.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 20
+          cache: pnpm
+      - uses: dtolnay/rust-toolchain@4cda84d5c5c54efe2404f9d843567869ab1699d4 # 1.97.1
+        with:
+          toolchain: 1.97.1
+      - run: pnpm install --frozen-lockfile
+      - run: node scripts/gen-sbom.mjs
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: useful-sbom
+          path: dist-sbom/sbom.cdx.json
+          if-no-files-found: error
+          retention-days: 14
+
+  agent-kit:
+    name: Build deterministic Useful Agent Kit
+    needs: [identity, verify, verify-compose]
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Verify exact clean source checkout
+        shell: bash
+        env:
+          EXPECTED_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+          test -z "$(git status --porcelain --untracked-files=all)"
+          echo "SOURCE_DATE_EPOCH=$(git show -s --format=%ct "$EXPECTED_SHA")" >> "$GITHUB_ENV"
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+        with:
+          version: 9.15.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 20
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Build and close-verify Useful Agent Kit assets
+        env:
+          VERSION: ${{ needs.identity.outputs.version }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          out="$RUNNER_TEMP/useful-agent-kit"
+          test ! -e "$out"
+          mkdir "$out"
+          for legal in LICENSE LICENSES.md NOTICE THIRD_PARTY_NOTICES.md TRADEMARKS.md; do test -s "$legal"; done
+          result=$(pnpm --silent agent-kit:build -- --out-dir "$out")
+          RESULT="$result" OUT="$out" REVISION="$GITHUB_SHA" node --input-type=module <<'NODE'
+          import { createHash } from 'node:crypto';
+          import { lstatSync, readFileSync } from 'node:fs';
+          import path from 'node:path';
+          const exact = (value, fields, label) => {
+            if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error(`${label} must be an object`);
+            const actual = Object.keys(value).sort();
+            const expected = [...fields].sort();
+            if (JSON.stringify(actual) !== JSON.stringify(expected)) throw new Error(`${label} is not a closed schema`);
+          };
+          const value = JSON.parse(process.env.RESULT);
+          exact(value, ['schemaVersion', 'ok', 'product', 'source', 'node', 'asset', 'receipt', 'manifest'], 'Agent Kit build result');
+          if (value.schemaVersion !== 'useful.agent-kit.build-result.v1' || value.ok !== true) {
+            throw new Error('Agent Kit build result schema/ok is invalid');
+          }
+          exact(value.product, ['name', 'version'], 'Agent Kit product');
+          exact(value.source, ['revision'], 'Agent Kit source');
+          exact(value.asset, ['name', 'path', 'sha256', 'size'], 'Agent Kit asset');
+          exact(value.receipt, ['name', 'path'], 'Agent Kit receipt');
+          if (value.product.name !== 'Useful' || value.product.version !== process.env.VERSION) throw new Error('Agent Kit product/version binding failed');
+          if (value.source.revision !== process.env.REVISION) throw new Error('Agent Kit source revision binding failed');
+          const zipName = `Useful-${process.env.VERSION}-agent-kit.zip`;
+          const receiptName = `${zipName}.sha256`;
+          const zipPath = path.resolve(process.env.OUT, zipName);
+          const receiptPath = path.resolve(process.env.OUT, receiptName);
+          if (value.asset.name !== zipName || path.resolve(value.asset.path) !== zipPath) throw new Error('Agent Kit asset name/path binding failed');
+          if (value.receipt.name !== receiptName || path.resolve(value.receipt.path) !== receiptPath) throw new Error('Agent Kit receipt name/path binding failed');
+          const zipInfo = lstatSync(zipPath);
+          const receiptInfo = lstatSync(receiptPath);
+          if (!zipInfo.isFile() || zipInfo.isSymbolicLink() || zipInfo.size !== value.asset.size || zipInfo.size <= 0) throw new Error('Agent Kit asset size/type binding failed');
+          if (!receiptInfo.isFile() || receiptInfo.isSymbolicLink()) throw new Error('Agent Kit receipt type binding failed');
+          const digest = createHash('sha256').update(readFileSync(zipPath)).digest('hex');
+          if (digest !== value.asset.sha256 || !/^[0-9a-f]{64}$/.test(digest)) throw new Error('Agent Kit asset digest binding failed');
+          if (readFileSync(receiptPath, 'utf8') !== `${digest}  ${zipName}\n`) throw new Error('Agent Kit receipt bytes binding failed');
+          NODE
+          zip="Useful-$VERSION-agent-kit.zip"
+          receipt="$zip.sha256"
+          mapfile -t actual < <(find "$out" -mindepth 1 -maxdepth 1 -type f -printf '%f\n' | sort)
+          expected=("$zip" "$receipt")
+          diff -u <(printf '%s\n' "${expected[@]}" | sort) <(printf '%s\n' "${actual[@]}")
+          test -z "$(find "$out" -mindepth 1 -maxdepth 1 ! -type f -print -quit)"
+          receipt_line=$(cat "$out/$receipt")
+          RECEIPT_LINE="$receipt_line" ZIP_NAME="$zip" node -e \
+            "if (!/^[0-9a-f]{64}  [^/\\\\]+$/.test(process.env.RECEIPT_LINE) || !process.env.RECEIPT_LINE.endsWith('  ' + process.env.ZIP_NAME)) process.exit(1)"
+          (cd "$out" && sha256sum --check --strict "$receipt")
+          mapfile -t manifests < <(unzip -Z1 "$out/$zip" | grep -E '(^|/)MANIFEST\.json$')
+          test "${#manifests[@]}" -eq 1
+          unzip -p "$out/$zip" "${manifests[0]}" | VERSION="$VERSION" REVISION="$GITHUB_SHA" node --input-type=module -e \
+            "let s=''; process.stdin.setEncoding('utf8'); process.stdin.on('data', c => s += c); process.stdin.on('end', () => { const m=JSON.parse(s); if(m.schemaVersion!=='useful.agent-kit.manifest.v1'||m.product?.name!=='Useful'||m.product?.version!==process.env.VERSION||m.source?.revision!==process.env.REVISION) throw new Error('Agent Kit MANIFEST identity binding failed'); });"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: useful-agent-kit
+          path: ${{ runner.temp }}/useful-agent-kit/*
+          if-no-files-found: error
+          retention-days: 14
+
+  build:
+    name: Build ${{ matrix.platform }} ${{ matrix.arch }}
+    needs: [identity, verify, verify-compose]
+    runs-on: ${{ matrix.runner }}
+    env:
+      USEFUL_UPDATE_ROOT_PUBKEY_HEX: ${{ needs.identity.outputs.update_root_pubkey }}
+      USEFUL_UPDATE_FEED_URL_TEMPLATE: ${{ needs.identity.outputs.update_feed_template }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: windows
+            arch: x64
+            runner: windows-2022
+            target: x86_64-pc-windows-msvc
+          - platform: macos
+            arch: x64
+            runner: macos-15-intel
+            target: x86_64-apple-darwin
+          - platform: macos
+            arch: arm64
+            runner: macos-15
+            target: aarch64-apple-darwin
+          - platform: linux
+            arch: x64
+            runner: ubuntu-22.04
+            target: x86_64-unknown-linux-gnu
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Verify exact clean source checkout
+        shell: bash
+        env:
+          EXPECTED_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+          test -z "$(git status --porcelain --untracked-files=all)"
+          echo "SOURCE_DATE_EPOCH=$(git show -s --format=%ct "$EXPECTED_SHA")" >> "$GITHUB_ENV"
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+        with:
+          version: 9.15.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 20
+          cache: pnpm
+      - uses: dtolnay/rust-toolchain@4cda84d5c5c54efe2404f9d843567869ab1699d4 # 1.97.1
+        with:
+          toolchain: 1.97.1
+          targets: ${{ matrix.target }}
+      - uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
+        with:
+          workspaces: .
+          key: release-${{ matrix.target }}-${{ needs.identity.outputs.update_root_fingerprint }}
+      - name: Install Linux desktop bundling dependencies
+        if: matrix.platform == 'linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential \
+            curl \
+            file \
+            libayatana-appindicator3-dev \
+            librsvg2-dev \
+            libssl-dev \
+            libwebkit2gtk-4.1-dev \
+            libxdo-dev \
+            patchelf \
+            wget
+      - run: pnpm install --frozen-lockfile
+      - run: node scripts/check-version-drift.mjs --json
+      - name: Reject local development update-trust opt-in in official builds
+        shell: bash
+        run: test -z "${USEFUL_ALLOW_DEVELOPMENT_UPDATE_TRUST:-}"
+      - name: Require a clean checkout and the committed matrix platform icon
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -z "$(git status --porcelain --untracked-files=all)"
+          case '${{ matrix.platform }}' in
+            windows) icon='apps/useful/src-tauri/icons/icon.ico' ;;
+            macos) icon='apps/useful/src-tauri/icons/icon.icns' ;;
+            linux) icon='apps/useful/src-tauri/icons/icon.png' ;;
+            *) echo 'Unknown release platform.' >&2; exit 1 ;;
+          esac
+          test -f "$icon"
+          test -s "$icon"
+      - name: Compile native application without a bundle
+        run: pnpm --filter @useful/app tauri build --target ${{ matrix.target }} --no-bundle
+      - name: Compile Windows bootstrap compatibility binary
+        if: matrix.platform == 'windows'
+        run: cargo build -p useful-bootstrap --release --target ${{ matrix.target }}
+      - name: Verify Windows bootstrap update, tamper rejection, and rollback
+        if: matrix.platform == 'windows'
+        run: |
+          cargo build -p useful-bootstrap --release
+          node scripts/e2e-bootstrap.mjs
+      - name: Determine Windows signing availability
+        if: matrix.platform == 'windows'
+        id: windows-signing
+        shell: pwsh
+        env:
+          WINDOWS_CERTIFICATE_BASE64: ${{ secrets.WINDOWS_CERTIFICATE_BASE64 }}
+          WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
+        run: |
+          $configured = -not [string]::IsNullOrWhiteSpace($env:WINDOWS_CERTIFICATE_BASE64) -and
+            -not [string]::IsNullOrWhiteSpace($env:WINDOWS_CERTIFICATE_PASSWORD)
+          if ('${{ inputs.channel }}' -eq 'stable' -and -not $configured) {
+            throw 'Stable is blocked: Windows signing secrets are incomplete.'
+          }
+          "signed=$($configured.ToString().ToLowerInvariant())" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+      - name: Import ephemeral Windows certificate
+        if: matrix.platform == 'windows' && steps.windows-signing.outputs.signed == 'true'
+        id: windows-cert
+        shell: pwsh
+        env:
+          WINDOWS_CERTIFICATE_BASE64: ${{ secrets.WINDOWS_CERTIFICATE_BASE64 }}
+          WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
+        run: |
+          $pfxPath = Join-Path $env:RUNNER_TEMP 'useful-signing.pfx'
+          $configPath = Join-Path $env:RUNNER_TEMP 'tauri.windows.signing.json'
+          $receiptPath = Join-Path $env:RUNNER_TEMP 'useful-signing-thumbprint.txt'
+          "pfx=$pfxPath" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          "config=$configPath" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          "receipt=$receiptPath" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          $cert = $null
+          try {
+            [IO.File]::WriteAllBytes($pfxPath, [Convert]::FromBase64String($env:WINDOWS_CERTIFICATE_BASE64))
+            $password = ConvertTo-SecureString $env:WINDOWS_CERTIFICATE_PASSWORD -AsPlainText -Force
+            $cert = Import-PfxCertificate -FilePath $pfxPath -CertStoreLocation Cert:\CurrentUser\My -Password $password
+            if (-not $cert.Thumbprint) { throw 'Windows certificate import returned no thumbprint.' }
+            $receiptBytes = [Text.Encoding]::ASCII.GetBytes("$($cert.Thumbprint)`n")
+            $receiptStream = [IO.File]::Open($receiptPath, [IO.FileMode]::CreateNew, [IO.FileAccess]::Write, [IO.FileShare]::None)
+            try { $receiptStream.Write($receiptBytes, 0, $receiptBytes.Length) }
+            finally { $receiptStream.Dispose() }
+            "thumbprint=$($cert.Thumbprint)" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+            @{
+              bundle = @{
+                windows = @{
+                  certificateThumbprint = $cert.Thumbprint
+                  digestAlgorithm = 'sha256'
+                  timestampUrl = 'http://timestamp.digicert.com'
+                }
+              }
+            } | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $configPath -Encoding utf8
+          } catch {
+            if ($cert -and $cert.Thumbprint) {
+              Remove-Item -LiteralPath "Cert:\CurrentUser\My\$($cert.Thumbprint)" -ErrorAction SilentlyContinue
+            }
+            throw
+          }
+      - name: Sign Windows bootstrap compatibility binary
+        if: matrix.platform == 'windows' && steps.windows-signing.outputs.signed == 'true'
+        shell: pwsh
+        run: |
+          $bootstrap = Join-Path $PWD 'target\${{ matrix.target }}\release\useful-bootstrap.exe'
+          & signtool.exe sign /sha1 '${{ steps.windows-cert.outputs.thumbprint }}' /fd SHA256 /tr http://timestamp.digicert.com /td SHA256 $bootstrap
+          if ($LASTEXITCODE -ne 0) { throw "signtool failed with exit code $LASTEXITCODE" }
+      - name: Create signed Windows NSIS bundle
+        if: matrix.platform == 'windows' && steps.windows-signing.outputs.signed == 'true'
+        run: >-
+          pnpm --filter @useful/app tauri bundle
+          --target ${{ matrix.target }}
+          --bundles nsis
+          --config "${{ steps.windows-cert.outputs.config }}"
+          --ci
+      - name: Create unsigned Windows NSIS preview bundle
+        if: matrix.platform == 'windows' && steps.windows-signing.outputs.signed != 'true'
+        run: pnpm --filter @useful/app tauri bundle --target ${{ matrix.target }} --bundles nsis --no-sign --ci
+      - name: Fetch and verify locked media runtimes for Windows Portable Full
+        if: matrix.platform == 'windows'
+        shell: pwsh
+        run: powershell -NoProfile -ExecutionPolicy Bypass -File scripts/fetch-binaries.ps1
+      - name: Package Windows Setup Lite and deterministic Portable Lite/Full assets
+        if: matrix.platform == 'windows'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if (Test-Path variable:PSNativeCommandUseErrorActionPreference) {
+            $PSNativeCommandUseErrorActionPreference = $true
+          }
+          Add-Type -AssemblyName System.IO.Compression
+
+          function Assert-NoReparsePath([string]$candidate) {
+            $full = [IO.Path]::GetFullPath($candidate)
+            $pathRoot = [IO.Path]::GetPathRoot($full)
+            $segments = @($full.Substring($pathRoot.Length) -split '[\\/]' | Where-Object { $_ -ne '' })
+            $cursor = $pathRoot
+            for ($index = 0; $index -lt $segments.Count; $index++) {
+              $cursor = Join-Path $cursor $segments[$index]
+              $info = Get-Item -LiteralPath $cursor -Force -ErrorAction Stop
+              if ($info.Attributes -band [IO.FileAttributes]::ReparsePoint) { throw "Path component is a symlink/junction/reparse point: $cursor" }
+              if ($index -lt $segments.Count - 1 -and -not $info.PSIsContainer) { throw "Intermediate path component is not a directory: $cursor" }
+            }
+          }
+          function Assert-OrdinaryFile([string]$file, [string]$label) {
+            Assert-NoReparsePath $file
+            $info = Get-Item -LiteralPath $file -Force -ErrorAction Stop
+            if ($info.PSIsContainer -or $info.Length -le 0) { throw "$label must be a non-empty regular file" }
+          }
+          function Assert-TargetAbsent([string]$target) {
+            Assert-NoReparsePath (Split-Path $target -Parent)
+            if (Test-Path -LiteralPath $target) { throw "Refusing to overwrite release output: $target" }
+          }
+          function Copy-NewFile([string]$source, [string]$destination, [string]$label) {
+            Assert-OrdinaryFile $source $label
+            Assert-TargetAbsent $destination
+            [IO.File]::Copy($source, $destination, $false)
+          }
+          function Write-NewText([string]$file, [string]$text, [Text.Encoding]$encoding) {
+            $stream = [IO.File]::Open($file, [IO.FileMode]::CreateNew, [IO.FileAccess]::Write, [IO.FileShare]::None)
+            try {
+              $bytes = $encoding.GetBytes($text)
+              $stream.Write($bytes, 0, $bytes.Length)
+            } finally { $stream.Dispose() }
+          }
+
+          if ($env:SOURCE_DATE_EPOCH -cnotmatch '^(0|[1-9][0-9]*)$') { throw 'SOURCE_DATE_EPOCH must be non-negative integer seconds.' }
+          $sourceTimestamp = [DateTimeOffset]::FromUnixTimeSeconds([long]$env:SOURCE_DATE_EPOCH).ToUniversalTime()
+          $minimumZipTimestamp = [DateTimeOffset]::Parse('1980-01-01T00:00:00Z')
+          $maximumZipTimestamp = [DateTimeOffset]::Parse('2107-12-31T23:59:58Z')
+          if ($sourceTimestamp -lt $minimumZipTimestamp -or $sourceTimestamp -gt $maximumZipTimestamp) {
+            throw 'SOURCE_DATE_EPOCH is outside the ZIP timestamp range.'
+          }
+
+          Assert-NoReparsePath $PWD.Path
+          $version = '${{ needs.identity.outputs.version }}'
+          $binary = Join-Path $PWD 'target\${{ matrix.target }}\release\Useful.exe'
+          $bootstrap = Join-Path $PWD 'target\${{ matrix.target }}\release\useful-bootstrap.exe'
+          Assert-OrdinaryFile $binary 'Useful.exe'
+          Assert-OrdinaryFile $bootstrap 'useful-bootstrap.exe'
+          $requiredDocs = @('LICENSE', 'LICENSES.md', 'NOTICE', 'THIRD_PARTY_NOTICES.md', 'TRADEMARKS.md')
+          foreach ($doc in $requiredDocs) {
+            $docPath = Join-Path $PWD $doc
+            Assert-OrdinaryFile $docPath "required release document $doc"
+          }
+          $nsisDirectory = Join-Path $PWD 'target\${{ matrix.target }}\release\bundle\nsis'
+          Assert-NoReparsePath $nsisDirectory
+          $installers = @(Get-ChildItem -LiteralPath $nsisDirectory -Filter '*.exe' -Force)
+          if ($installers.Count -ne 1) { throw "Expected exactly one NSIS installer, found $($installers.Count)." }
+          $installer = $installers[0]
+          Assert-OrdinaryFile $installer.FullName 'NSIS Setup Lite'
+          if ('${{ steps.windows-signing.outputs.signed }}' -eq 'true') {
+            foreach ($file in @($binary, $bootstrap, $installer.FullName)) {
+              $signature = Get-AuthenticodeSignature -LiteralPath $file
+              if ($signature.Status -ne 'Valid') { throw "Authenticode verification failed for ${file}: $($signature.Status)" }
+            }
+          }
+          $assetDir = Join-Path $PWD 'release-assets'
+          Assert-TargetAbsent $assetDir
+          New-Item -ItemType Directory -Path $assetDir -ErrorAction Stop | Out-Null
+          Assert-NoReparsePath $assetDir
+          Copy-NewFile $installer.FullName (Join-Path $assetDir "Useful-$version-windows-x64-setup-lite.exe") 'NSIS Setup Lite'
+
+          & node scripts/release-metadata-media.mjs `
+            --lock scripts/media-runtimes.lock.json `
+            --binaries binaries `
+            --output (Join-Path $assetDir 'MEDIA-RUNTIMES.json') | Out-Null
+          if ($LASTEXITCODE -ne 0) { throw 'MEDIA-RUNTIMES.json generation failed.' }
+          Assert-OrdinaryFile (Join-Path $assetDir 'MEDIA-RUNTIMES.json') 'MEDIA-RUNTIMES.json'
+
+          function New-PortableEdition([string]$edition, [bool]$withMedia) {
+            $editionSlug = $edition.ToLowerInvariant()
+            $directory = Join-Path $env:RUNNER_TEMP "Useful-$version-windows-x64-portable-$editionSlug"
+            Assert-TargetAbsent $directory
+            New-Item -ItemType Directory -Path $directory -ErrorAction Stop | Out-Null
+            Assert-NoReparsePath $directory
+            Copy-NewFile $binary (Join-Path $directory 'Useful.exe') 'Useful.exe'
+            Copy-NewFile $bootstrap (Join-Path $directory 'useful-bootstrap.exe') 'useful-bootstrap.exe'
+            Write-NewText (Join-Path $directory 'portable.flag') '' ([Text.UTF8Encoding]::new($false))
+            $updateDir = Join-Path $directory 'update'
+            New-Item -ItemType Directory -Path $updateDir -ErrorAction Stop | Out-Null
+            Write-NewText (Join-Path $updateDir 'current-version.txt') "$version`n" ([Text.Encoding]::ASCII)
+            $compatibility = (@(
+              'Product and release asset name: Useful'
+              "Edition: Portable $edition"
+              'The portable executable and bootstrap use the Useful product name.'
+            ) -join "`n") + "`n"
+            Write-NewText (Join-Path $directory 'COMPATIBILITY.txt') $compatibility ([Text.UTF8Encoding]::new($false))
+            foreach ($doc in $requiredDocs) {
+              Copy-NewFile (Join-Path $PWD $doc) (Join-Path $directory $doc) "required release document $doc"
+            }
+            if ($withMedia) {
+              $binaryDirectory = Join-Path $directory 'binaries'
+              New-Item -ItemType Directory -Path $binaryDirectory -ErrorAction Stop | Out-Null
+              foreach ($name in @('ffmpeg.exe', 'ffprobe.exe', 'mpv.exe', 'CHECKSUMS.txt')) {
+                Copy-NewFile (Join-Path $PWD "binaries\$name") (Join-Path $binaryDirectory $name) "binaries/$name"
+              }
+              Copy-NewFile (Join-Path $assetDir 'MEDIA-RUNTIMES.json') (Join-Path $directory 'MEDIA-RUNTIMES.json') 'MEDIA-RUNTIMES.json'
+            }
+            Assert-NoReparsePath $directory
+            return $directory
+          }
+
+          function New-DeterministicPortableZip([string]$directory, [string]$zipPath) {
+            Assert-NoReparsePath $directory
+            Assert-TargetAbsent $zipPath
+            $fileMap = [Collections.Generic.Dictionary[string, IO.FileInfo]]::new([StringComparer]::Ordinal)
+            foreach ($entryInfo in @(Get-ChildItem -LiteralPath $directory -Recurse -Force)) {
+              Assert-NoReparsePath $entryInfo.FullName
+              if (-not $entryInfo.PSIsContainer) {
+                $relative = [IO.Path]::GetRelativePath($directory, $entryInfo.FullName).Replace('\', '/')
+                if (-not $fileMap.TryAdd($relative, $entryInfo)) { throw "Duplicate portable relative path: $relative" }
+              }
+            }
+            if ($fileMap.Count -eq 0) { throw 'Portable archive input is empty.' }
+            $relativePaths = [string[]]$fileMap.Keys
+            [Array]::Sort($relativePaths, [StringComparer]::Ordinal)
+            $zipFile = [IO.File]::Open($zipPath, [IO.FileMode]::CreateNew, [IO.FileAccess]::Write, [IO.FileShare]::None)
+            $archive = [IO.Compression.ZipArchive]::new($zipFile, [IO.Compression.ZipArchiveMode]::Create, $false)
+            try {
+              $rootName = Split-Path $directory -Leaf
+              foreach ($relative in $relativePaths) {
+                $file = $fileMap[$relative]
+                $entry = $archive.CreateEntry("$rootName/$relative", [IO.Compression.CompressionLevel]::NoCompression)
+                $entry.LastWriteTime = $sourceTimestamp
+                $inputStream = $file.OpenRead()
+                $outputStream = $entry.Open()
+                try { $inputStream.CopyTo($outputStream) }
+                finally { $outputStream.Dispose(); $inputStream.Dispose() }
+              }
+            } finally {
+              $archive.Dispose()
+              $zipFile.Dispose()
+            }
+          }
+
+          $liteDirectory = New-PortableEdition 'Lite' $false
+          if (
+            (Test-Path -LiteralPath (Join-Path $liteDirectory 'binaries')) -or
+            (Test-Path -LiteralPath (Join-Path $liteDirectory 'MEDIA-RUNTIMES.json'))
+          ) { throw 'Portable Lite must not contain media runtimes or MEDIA-RUNTIMES.json.' }
+          New-DeterministicPortableZip $liteDirectory (Join-Path $assetDir "Useful-$version-windows-x64-portable-lite.zip")
+
+          $fullDirectory = New-PortableEdition 'Full' $true
+          $fullBinaryDirectory = Join-Path $fullDirectory 'binaries'
+          Assert-NoReparsePath $fullBinaryDirectory
+          $fullNames = [string[]]@(Get-ChildItem -LiteralPath $fullBinaryDirectory -File -Force | ForEach-Object Name)
+          [Array]::Sort($fullNames, [StringComparer]::Ordinal)
+          $expectedFullNames = [string[]]@('CHECKSUMS.txt', 'ffmpeg.exe', 'ffprobe.exe', 'mpv.exe')
+          [Array]::Sort($expectedFullNames, [StringComparer]::Ordinal)
+          if (($fullNames -join "`n") -ne ($expectedFullNames -join "`n")) { throw 'Portable Full media file set is not closed.' }
+          New-DeterministicPortableZip $fullDirectory (Join-Path $assetDir "Useful-$version-windows-x64-portable-full.zip")
+
+          foreach ($name in @(
+            "Useful-$version-windows-x64-setup-lite.exe",
+            "Useful-$version-windows-x64-portable-lite.zip",
+            "Useful-$version-windows-x64-portable-full.zip",
+            'MEDIA-RUNTIMES.json'
+          )) {
+            $file = Get-Item -LiteralPath (Join-Path $assetDir $name)
+            if ($file.Attributes -band [IO.FileAttributes]::ReparsePoint -or $file.Length -le 0) { throw "Invalid Windows release asset: $name" }
+          }
+          $signingEvidence = @{
+            platform = 'windows'; arch = 'x64';
+            version = $version;
+            signingStatus = $(if ('${{ steps.windows-signing.outputs.signed }}' -eq 'true') { 'verified' } else { 'unsigned' });
+            verification = $(if ('${{ steps.windows-signing.outputs.signed }}' -eq 'true') { 'Get-AuthenticodeSignature=Valid' } else { 'not-performed' })
+          } | ConvertTo-Json -Compress
+          Write-NewText (Join-Path $PWD 'signing-windows-x64.json') "$signingEvidence`n" ([Text.UTF8Encoding]::new($false))
+      - name: Remove ephemeral Windows certificate material
+        if: always() && matrix.platform == 'windows'
+        shell: pwsh
+        run: |
+          $receiptPath = Join-Path $env:RUNNER_TEMP 'useful-signing-thumbprint.txt'
+          try {
+            $thumbprint = '${{ steps.windows-cert.outputs.thumbprint }}'
+            if ([string]::IsNullOrWhiteSpace($thumbprint) -and (Test-Path -LiteralPath $receiptPath -PathType Leaf)) {
+              $thumbprint = (Get-Content -LiteralPath $receiptPath -Raw -Encoding ascii).Trim()
+            }
+            if (-not [string]::IsNullOrWhiteSpace($thumbprint)) {
+              if ($thumbprint -cnotmatch '^[0-9A-Fa-f]{40}$') { throw 'Invalid Windows signing thumbprint cleanup receipt.' }
+              Remove-Item -LiteralPath "Cert:\CurrentUser\My\$thumbprint" -ErrorAction SilentlyContinue
+            }
+          } finally {
+            Remove-Item -LiteralPath $receiptPath -Force -ErrorAction SilentlyContinue
+            Remove-Item -LiteralPath (Join-Path $env:RUNNER_TEMP 'useful-signing.pfx') -Force -ErrorAction SilentlyContinue
+            Remove-Item -LiteralPath (Join-Path $env:RUNNER_TEMP 'tauri.windows.signing.json') -Force -ErrorAction SilentlyContinue
+          }
+
+      - name: Determine macOS signing and notarization availability
+        if: matrix.platform == 'macos'
+        id: macos-signing
+        shell: bash
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_KEYCHAIN_PASSWORD: ${{ secrets.APPLE_KEYCHAIN_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          set -euo pipefail
+          configured=true
+          for name in APPLE_CERTIFICATE APPLE_CERTIFICATE_PASSWORD APPLE_KEYCHAIN_PASSWORD APPLE_ID APPLE_PASSWORD APPLE_TEAM_ID; do
+            test -n "${!name:-}" || configured=false
+          done
+          if test "${{ inputs.channel }}" = stable && test "$configured" != true; then
+            echo 'Stable is blocked: macOS signing/notarization secrets are incomplete.' >&2
+            exit 1
+          fi
+          echo "signed=$configured" >> "$GITHUB_OUTPUT"
+      - name: Import the Apple certificate into an ephemeral keychain
+        if: matrix.platform == 'macos' && steps.macos-signing.outputs.signed == 'true'
+        id: macos-cert
+        shell: bash
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_KEYCHAIN_PASSWORD: ${{ secrets.APPLE_KEYCHAIN_PASSWORD }}
+        run: |
+          set -euo pipefail
+          umask 077
+          p12="$RUNNER_TEMP/useful-signing-${{ matrix.arch }}.p12"
+          keychain="$RUNNER_TEMP/useful-signing-${{ matrix.arch }}.keychain-db"
+          printf '%s' "$APPLE_CERTIFICATE" | /usr/bin/base64 -D > "$p12"
+          test -s "$p12"
+          security create-keychain -p "$APPLE_KEYCHAIN_PASSWORD" "$keychain"
+          security set-keychain-settings -lut 21600 "$keychain"
+          security unlock-keychain -p "$APPLE_KEYCHAIN_PASSWORD" "$keychain"
+          security import "$p12" -k "$keychain" -P "$APPLE_CERTIFICATE_PASSWORD" -T /usr/bin/codesign -T /usr/bin/security >/dev/null
+          security list-keychains -d user -s "$keychain"
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$APPLE_KEYCHAIN_PASSWORD" "$keychain" >/dev/null
+          identities=()
+          while IFS= read -r identity; do identities+=("$identity"); done < <(
+            security find-identity -v -p codesigning "$keychain" |
+              sed -nE 's/^[[:space:]]*[0-9]+\) [0-9A-Fa-f]{40} "(.+)"$/\1/p'
+          )
+          if test "${#identities[@]}" -ne 1; then
+            echo "Expected exactly one valid codesigning identity in the ephemeral keychain; found ${#identities[@]}." >&2
+            exit 1
+          fi
+          identity="${identities[0]}"
+          case "$identity" in *$'\r'*|*$'\n'*) echo 'Codesigning identity contains a newline.' >&2; exit 1 ;; esac
+          printf 'identity=%s\n' "$identity" >> "$GITHUB_OUTPUT"
+      - name: Create signed and notarized macOS DMG
+        if: matrix.platform == 'macos' && steps.macos-signing.outputs.signed == 'true'
+        env:
+          APPLE_SIGNING_IDENTITY: ${{ steps.macos-cert.outputs.identity }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: pnpm --filter @useful/app tauri bundle --target ${{ matrix.target }} --bundles dmg --ci
+      - name: Create unsigned macOS DMG preview
+        if: matrix.platform == 'macos' && steps.macos-signing.outputs.signed != 'true'
+        run: pnpm --filter @useful/app tauri bundle --target ${{ matrix.target }} --bundles dmg --no-sign --ci
+      - name: Package and verify macOS DMG
+        if: matrix.platform == 'macos'
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p release-assets
+          version='${{ needs.identity.outputs.version }}'
+          bundle="target/${{ matrix.target }}/release/bundle"
+          dmgs=()
+          while IFS= read -r file; do dmgs+=("$file"); done < <(find "$bundle/dmg" -maxdepth 1 -type f -name '*.dmg')
+          test "${#dmgs[@]}" -eq 1
+          if test '${{ steps.macos-signing.outputs.signed }}' = true; then
+            apps=()
+            while IFS= read -r directory; do apps+=("$directory"); done < <(find "$bundle/macos" -maxdepth 1 -type d -name '*.app')
+            test "${#apps[@]}" -eq 1
+            codesign --verify --deep --strict --verbose=2 "${apps[0]}"
+            xcrun stapler validate "${dmgs[0]}"
+            status=verified
+            verification='codesign=valid;notarization-ticket=valid'
+          else
+            status=unsigned
+            verification=not-performed
+          fi
+          cp "${dmgs[0]}" "release-assets/Useful-$version-macos-${{ matrix.arch }}.dmg"
+          printf '{"platform":"macos","arch":"%s","version":"%s","signingStatus":"%s","verification":"%s"}\n' \
+            '${{ matrix.arch }}' "$version" "$status" "$verification" > "signing-macos-${{ matrix.arch }}.json"
+      - name: Remove ephemeral macOS certificate material
+        if: always() && matrix.platform == 'macos'
+        shell: bash
+        run: |
+          set -euo pipefail
+          p12="$RUNNER_TEMP/useful-signing-${{ matrix.arch }}.p12"
+          keychain="$RUNNER_TEMP/useful-signing-${{ matrix.arch }}.keychain-db"
+          security delete-keychain "$keychain" >/dev/null 2>&1 || true
+          rm -f -- "$p12" "$keychain"
+
+      - name: Create unsigned Linux AppImage and deb bundles
+        if: matrix.platform == 'linux'
+        run: pnpm --filter @useful/app tauri bundle --target ${{ matrix.target }} --bundles appimage deb --no-sign --ci
+      - name: Package Linux assets
+        if: matrix.platform == 'linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p release-assets
+          version='${{ needs.identity.outputs.version }}'
+          bundle="target/${{ matrix.target }}/release/bundle"
+          mapfile -t appimages < <(find "$bundle/appimage" -maxdepth 1 -type f -name '*.AppImage')
+          mapfile -t debs < <(find "$bundle/deb" -maxdepth 1 -type f -name '*.deb')
+          test "${#appimages[@]}" -eq 1
+          test "${#debs[@]}" -eq 1
+          cp "${appimages[0]}" "release-assets/Useful-$version-linux-x64.AppImage"
+          cp "${debs[0]}" "release-assets/Useful-$version-linux-x64.deb"
+          printf '{"platform":"linux","arch":"x64","version":"%s","signingStatus":"not-applicable","verification":"not-applicable"}\n' \
+            "$version" > signing-linux-x64.json
+
+      - name: Upload build output for release assembly
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: useful-build-${{ matrix.platform }}-${{ matrix.arch }}
+          path: |
+            release-assets/*
+            signing-${{ matrix.platform }}-${{ matrix.arch }}.json
+          if-no-files-found: error
+          retention-days: 14
+
+  assemble:
+    name: Assemble checksums and release metadata
+    needs: [identity, build, sbom, agent-kit]
+    runs-on: ubuntu-24.04
+    outputs:
+      release_name: ${{ steps.metadata.outputs.release_name }}
+      prerelease: ${{ steps.metadata.outputs.prerelease }}
+      make_latest: ${{ steps.metadata.outputs.make_latest }}
+      signed: ${{ steps.metadata.outputs.signed }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Verify exact clean source checkout
+        shell: bash
+        env:
+          EXPECTED_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+          test -z "$(git status --porcelain --untracked-files=all)"
+          echo "SOURCE_DATE_EPOCH=$(git show -s --format=%ct "$EXPECTED_SHA")" >> "$GITHUB_ENV"
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+        with:
+          version: 9.15.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 20
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Capture public source evidence from the clean checkout
+        run: node scripts/public-source-check.mjs --json > "$RUNNER_TEMP/SOURCE-CHECK.json"
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          pattern: useful-*
+          path: _downloads
+          merge-multiple: false
+      - name: Collect immutable release candidate files
+        env:
+          PUBLISH_GATE_JSON: ${{ needs.identity.outputs.publish_gate_json }}
+          VERSION: ${{ needs.identity.outputs.version }}
+          TAG: ${{ needs.identity.outputs.tag }}
+          CHANNEL: ${{ needs.identity.outputs.channel }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test ! -e release-candidate
+          node --input-type=module <<'NODE'
+          import { execFileSync } from 'node:child_process';
+          import { createHash } from 'node:crypto';
+          import {
+            constants, copyFileSync, lstatSync, mkdirSync, readFileSync, readdirSync, writeFileSync,
+          } from 'node:fs';
+          import path from 'node:path';
+          const gate = JSON.parse(process.env.PUBLISH_GATE_JSON);
+          const media = gate.mediaSourceCompliance;
+          if (!media || !['pending', 'verified'].includes(media.status)) throw new Error('media source compliance status is invalid');
+          if (media.status === 'pending' && media.distribution !== 'NOT-FOR-PUBLIC-DISTRIBUTION') {
+            throw new Error('pending Full candidate is missing the public-distribution prohibition');
+          }
+          const planned = new Map();
+          const generatedNames = new Set([
+            'SOURCE-MANIFEST.json', 'SIGNING-STATUS.json', 'RELEASE-METADATA.json', 'RELEASE-NOTES.md',
+            'RELEASE-ASSETS.txt', 'BUILD-PROVENANCE.json', 'SHA256SUMS.txt',
+          ]);
+          const assertPathChain = (candidate, leafType = 'file') => {
+            const absolute = path.resolve(candidate);
+            const parsed = path.parse(absolute);
+            let cursor = parsed.root;
+            const rootInfo = lstatSync(cursor);
+            if (!rootInfo.isDirectory() || rootInfo.isSymbolicLink()) throw new Error(`unsafe path root: ${cursor}`);
+            const segments = absolute.slice(parsed.root.length).split(path.sep).filter(Boolean);
+            for (const [index, segment] of segments.entries()) {
+              cursor = path.join(cursor, segment);
+              const info = lstatSync(cursor);
+              if (info.isSymbolicLink()) throw new Error(`linked candidate input rejected: ${cursor}`);
+              const leaf = index === segments.length - 1;
+              if (!leaf && !info.isDirectory()) throw new Error(`candidate input parent is not a directory: ${cursor}`);
+              if (leaf && leafType === 'file' && (!info.isFile() || info.size <= 0)) throw new Error(`candidate input is not a non-empty regular file: ${cursor}`);
+              if (leaf && leafType === 'directory' && !info.isDirectory()) throw new Error(`candidate input is not a directory: ${cursor}`);
+            }
+            return absolute;
+          };
+          const reserve = (name, entry) => {
+            if (!name || name !== path.basename(name) || /[\\/]/.test(name)) throw new Error(`candidate name is not a basename: ${name}`);
+            if (generatedNames.has(name)) throw new Error(`release candidate input collides with reserved generated name: ${name}`);
+            if (planned.has(name)) throw new Error(`duplicate release candidate basename: ${name}`);
+            planned.set(name, entry);
+          };
+          const reserveFile = (name, source, expected = null) => {
+            const absolute = assertPathChain(source);
+            const info = lstatSync(absolute);
+            const bytes = readFileSync(absolute);
+            if (expected && (info.size !== expected.sizeBytes || createHash('sha256').update(bytes).digest('hex') !== expected.sha256)) {
+              throw new Error(`candidate input digest/size drift: ${source}`);
+            }
+            reserve(name, { source: absolute });
+          };
+
+          const downloadRoot = assertPathChain('_downloads', 'directory');
+          for (const artifactName of readdirSync(downloadRoot).sort()) {
+            const artifactRoot = assertPathChain(path.join(downloadRoot, artifactName), 'directory');
+            const releaseAssetRoot = path.join(artifactRoot, 'release-assets');
+            if (!readdirSync(artifactRoot).includes('release-assets')) continue;
+            assertPathChain(releaseAssetRoot, 'directory');
+            for (const entry of readdirSync(releaseAssetRoot, { withFileTypes: true })) {
+              if (!entry.isFile() || entry.isSymbolicLink()) throw new Error(`release-assets must contain only ordinary files: ${entry.name}`);
+              reserveFile(entry.name, path.join(releaseAssetRoot, entry.name));
+            }
+          }
+          reserveFile(`Useful-${process.env.VERSION}-SBOM.cdx.json`, '_downloads/useful-sbom/sbom.cdx.json');
+          const agentZip = `Useful-${process.env.VERSION}-agent-kit.zip`;
+          reserveFile(agentZip, `_downloads/useful-agent-kit/${agentZip}`);
+          reserveFile(`${agentZip}.sha256`, `_downloads/useful-agent-kit/${agentZip}.sha256`);
+          for (const legal of ['LICENSE', 'LICENSES.md', 'NOTICE', 'THIRD_PARTY_NOTICES.md', 'TRADEMARKS.md']) reserveFile(legal, legal);
+          reserveFile('SOURCE-CHECK.json', path.join(process.env.RUNNER_TEMP, 'SOURCE-CHECK.json'));
+          reserve('PUBLISH-GATE.json', { bytes: Buffer.from(`${JSON.stringify(gate)}\n`) });
+          if (media.status === 'verified') {
+            const entries = [media.evidence, ...media.releaseAssets];
+            for (const entry of entries) {
+              const name = entry.releaseAssetName;
+              reserveFile(name, entry.path, entry);
+            }
+          }
+          mkdirSync('release-candidate');
+          for (const name of [...planned.keys()].sort()) {
+            const entry = planned.get(name);
+            const destination = path.join('release-candidate', name);
+            if (entry.source) copyFileSync(entry.source, destination, constants.COPYFILE_EXCL);
+            else writeFileSync(destination, entry.bytes, { flag: 'wx' });
+          }
+          const sourceRevision = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
+          if (sourceRevision !== process.env.GITHUB_SHA) throw new Error('checkout revision drifted before source manifest generation');
+          const sourceTree = execFileSync('git', ['rev-parse', 'HEAD^{tree}'], { encoding: 'utf8' }).trim();
+          const raw = execFileSync('git', ['ls-tree', '-r', '-z', '--full-tree', 'HEAD']);
+          const files = raw.toString('utf8').split('\0').filter(Boolean).map((entry) => {
+            const tab = entry.indexOf('\t');
+            if (tab < 0) throw new Error('unexpected git ls-tree entry');
+            const [mode, type, object] = entry.slice(0, tab).split(' ');
+            return { path: entry.slice(tab + 1), mode, type, object };
+          });
+          const sourceManifest = {
+            schemaVersion: 'useful.source-manifest.v1',
+            repository: process.env.GITHUB_REPOSITORY,
+            sourceRevision,
+            sourceTree,
+            version: process.env.VERSION,
+            tag: process.env.TAG,
+            channel: process.env.CHANNEL,
+            files,
+          };
+          writeFileSync('release-candidate/SOURCE-MANIFEST.json', `${JSON.stringify(sourceManifest)}\n`, { flag: 'wx' });
+          NODE
+      - name: Aggregate signing verification evidence
+        id: signing
+        env:
+          VERSION: ${{ needs.identity.outputs.version }}
+        run: >-
+          node scripts/release-signing-status.mjs
+          --root _downloads
+          --version "$VERSION"
+          --output release-candidate/SIGNING-STATUS.json
+          --github-output "$GITHUB_OUTPUT"
+      - name: Produce final channel-aware release metadata
+        id: metadata
+        env:
+          SIGNING_READY: ${{ vars.USEFUL_SIGNING_READY || 'false' }}
+        run: |
+          set -euo pipefail
+          set -o noclobber
+          node scripts/release-metadata.mjs \
+            --package package.json \
+            --tag "${{ needs.identity.outputs.tag }}" \
+            --channel "${{ needs.identity.outputs.channel }}" \
+            --signing-ready "$SIGNING_READY" \
+            --signing-status "${{ steps.signing.outputs.signed == 'true' && 'signed' || 'unsigned' }}" \
+            --github-output "$GITHUB_OUTPUT" \
+            > release-candidate/RELEASE-METADATA.json
+      - name: Write deterministic release notes and exact public asset allowlist
+        shell: bash
+        env:
+          RELEASE_NAME: ${{ steps.metadata.outputs.release_name }}
+          SIGNED: ${{ steps.metadata.outputs.signed }}
+          UNSIGNED_PREVIEW: ${{ steps.metadata.outputs.unsigned_preview }}
+          VERSION: ${{ needs.identity.outputs.version }}
+          PUBLISH_GATE_JSON: ${{ needs.identity.outputs.publish_gate_json }}
+        run: |
+          set -euo pipefail
+          set -o noclobber
+          {
+            echo "# $RELEASE_NAME"
+            echo
+            echo "Channel: ${{ needs.identity.outputs.channel }}"
+            echo "Version/tag: ${{ needs.identity.outputs.version }} / ${{ needs.identity.outputs.tag }}"
+            echo "Windows and macOS signing verification complete: $SIGNED"
+            if test "$UNSIGNED_PREVIEW" = true; then
+              echo
+              echo '> **UNSIGNED PREVIEW:** Windows code signing and macOS notarization were not both verified. Do not treat these assets as a formally signed stable release.'
+            fi
+            echo
+            echo 'Release assets and internal executables use the Useful product name. Windows publishes Setup Lite, Portable Lite, and Portable Full as distinct editions.'
+            echo 'Portable Full contains the locked ffmpeg, ffprobe, and mpv Windows runtimes described by `MEDIA-RUNTIMES.json`; Portable Lite and Setup Lite do not include those media runtimes.'
+            echo 'The macOS and Linux packages do not claim bundled mpv or ffmpeg runtimes.'
+            if test '${{ needs.identity.outputs.media_source_compliance_status }}' != verified; then
+              echo
+              echo '> **NOT FOR PUBLIC DISTRIBUTION:** media source compliance is pending for the exact GPL ffmpeg/ffprobe/mpv binaries. This candidate may be built and verified internally, but publishing is blocked until committed source/build/license evidence and its release assets pass the Owner Gate.'
+            fi
+            echo
+            echo 'Verify downloaded files against `SHA256SUMS.txt`; supply-chain inventory and source/build provenance are provided as separate assets.'
+            echo 'License and third-party notice files are included in the release asset set.'
+          } > release-candidate/RELEASE-NOTES.md
+
+          cat > release-candidate/RELEASE-ASSETS.txt <<EOF
+          Useful-$VERSION-windows-x64-setup-lite.exe
+          Useful-$VERSION-windows-x64-portable-lite.zip
+          Useful-$VERSION-windows-x64-portable-full.zip
+          Useful-$VERSION-macos-x64.dmg
+          Useful-$VERSION-macos-arm64.dmg
+          Useful-$VERSION-linux-x64.AppImage
+          Useful-$VERSION-linux-x64.deb
+          Useful-$VERSION-SBOM.cdx.json
+          Useful-$VERSION-agent-kit.zip
+          Useful-$VERSION-agent-kit.zip.sha256
+          MEDIA-RUNTIMES.json
+          SIGNING-STATUS.json
+          RELEASE-METADATA.json
+          PUBLISH-GATE.json
+          BUILD-PROVENANCE.json
+          SOURCE-MANIFEST.json
+          SOURCE-CHECK.json
+          LICENSE
+          LICENSES.md
+          NOTICE
+          THIRD_PARTY_NOTICES.md
+          TRADEMARKS.md
+          RELEASE-ASSETS.txt
+          EOF
+          node --input-type=module <<'NODE'
+          import { appendFileSync } from 'node:fs';
+          const media = JSON.parse(process.env.PUBLISH_GATE_JSON).mediaSourceCompliance;
+          if (media.status === 'verified') {
+            const names = [media.evidence.releaseAssetName, ...media.releaseAssets.map(({ releaseAssetName }) => releaseAssetName)].sort();
+            if (names.length !== new Set(names).size) throw new Error('media compliance release asset names are duplicated');
+            appendFileSync('release-candidate/RELEASE-ASSETS.txt', `${names.join('\n')}\n`);
+          } else if (media.status !== 'pending' || media.distribution !== 'NOT-FOR-PUBLIC-DISTRIBUTION') {
+            throw new Error('media source compliance owner gate is not closed');
+          }
+          NODE
+          (
+            cd release-candidate
+            mapfile -t expected < <(grep -v '^BUILD-PROVENANCE\.json$' RELEASE-ASSETS.txt | sort)
+            mapfile -t actual < <(find . -maxdepth 1 -type f ! -name RELEASE-NOTES.md -printf '%f\n' | sort)
+            diff -u <(printf '%s\n' "${expected[@]}") <(printf '%s\n' "${actual[@]}")
+          )
+      - name: Write build provenance with exact non-self subjects
+        env:
+          VERSION: ${{ needs.identity.outputs.version }}
+          TAG: ${{ needs.identity.outputs.tag }}
+          CHANNEL: ${{ needs.identity.outputs.channel }}
+          UPDATE_ROOT_FINGERPRINT: ${{ needs.identity.outputs.update_root_fingerprint }}
+          ROOT_CEREMONY_SHA256: ${{ needs.identity.outputs.root_ceremony_sha256 }}
+        run: |
+          node --input-type=module <<'NODE'
+          import { createHash } from 'node:crypto';
+          import { lstatSync, readFileSync, writeFileSync } from 'node:fs';
+          import path from 'node:path';
+          const root = 'release-candidate';
+          const assetManifestText = readFileSync(path.join(root, 'RELEASE-ASSETS.txt'), 'utf8');
+          if (!assetManifestText.endsWith('\n') || assetManifestText.includes('\r')) {
+            throw new Error('RELEASE-ASSETS.txt must be LF-terminated without CR bytes');
+          }
+          const names = assetManifestText.slice(0, -1).split('\n');
+          if (
+            names.length === 0
+            || names.length !== new Set(names).size
+            || names.some((name) => !name || /[\\/]/.test(name) || name !== path.basename(name))
+          ) {
+            throw new Error('RELEASE-ASSETS.txt is not a unique basename allowlist');
+          }
+          const subjectNames = names.filter((name) => name !== 'BUILD-PROVENANCE.json' && name !== 'SHA256SUMS.txt');
+          const subjects = subjectNames.map((name) => {
+            const file = path.join(root, name);
+            const info = lstatSync(file);
+            if (!info.isFile() || info.isSymbolicLink()) throw new Error(`provenance subject is not a regular file: ${name}`);
+            const bytes = readFileSync(file);
+            if (bytes.length === 0) throw new Error(`provenance subject is empty: ${name}`);
+            return { name, sha256: createHash('sha256').update(bytes).digest('hex'), sizeBytes: bytes.length };
+          });
+          const sourceManifest = JSON.parse(readFileSync(path.join(root, 'SOURCE-MANIFEST.json'), 'utf8'));
+          if (sourceManifest.sourceRevision !== process.env.GITHUB_SHA || sourceManifest.version !== process.env.VERSION) {
+            throw new Error('source manifest identity drifted before provenance generation');
+          }
+          const provenance = {
+            schemaVersion: 'useful.build-provenance.v1',
+            repository: process.env.GITHUB_REPOSITORY,
+            sourceRevision: process.env.GITHUB_SHA,
+            sourceTree: sourceManifest.sourceTree,
+            sourceTimestamp: Number(process.env.SOURCE_DATE_EPOCH),
+            ref: process.env.GITHUB_REF,
+            workflowRef: process.env.GITHUB_WORKFLOW_REF,
+            runId: process.env.GITHUB_RUN_ID,
+            runAttempt: process.env.GITHUB_RUN_ATTEMPT,
+            version: process.env.VERSION,
+            tag: process.env.TAG,
+            channel: process.env.CHANNEL,
+            updateRootFingerprint: process.env.UPDATE_ROOT_FINGERPRINT,
+            rootCeremonyReceiptSha256: process.env.ROOT_CEREMONY_SHA256,
+            subjects,
+          };
+          if (!Number.isSafeInteger(provenance.sourceTimestamp) || provenance.sourceTimestamp <= 0) {
+            throw new Error('SOURCE_DATE_EPOCH is invalid');
+          }
+          writeFileSync(path.join(root, 'BUILD-PROVENANCE.json'), `${JSON.stringify(provenance, null, 2)}\n`, { flag: 'wx' });
+          NODE
+      - name: Produce and verify final SHA256SUMS over every listed asset
+        shell: bash
+        run: |
+          set -euo pipefail
+          set -o noclobber
+          export LC_ALL=C
+          cd release-candidate
+          mapfile -t expected < <(sort RELEASE-ASSETS.txt)
+          mapfile -t actual < <(find . -maxdepth 1 -type f ! -name RELEASE-NOTES.md ! -name SHA256SUMS.txt -printf '%f\n' | sort)
+          diff -u <(printf '%s\n' "${expected[@]}") <(printf '%s\n' "${actual[@]}")
+          : > SHA256SUMS.txt
+          for asset in "${expected[@]}"; do
+            sha256sum "$asset" >> SHA256SUMS.txt
+          done
+          sha256sum --check SHA256SUMS.txt
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: useful-release-candidate-${{ needs.identity.outputs.version }}
+          path: release-candidate/*
+          if-no-files-found: error
+          retention-days: 14
+
+  publish:
+    name: Publish guarded GitHub Release
+    if: inputs.publish == true
+    needs: [identity, assemble]
+    runs-on: ubuntu-24.04
+    environment: release
+    permissions:
+      contents: write
+      checks: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Verify exact clean source checkout
+        shell: bash
+        env:
+          EXPECTED_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+          test -z "$(git status --porcelain --untracked-files=all)"
+          echo "SOURCE_DATE_EPOCH=$(git show -s --format=%ct "$EXPECTED_SHA")" >> "$GITHUB_ENV"
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+        with:
+          version: 9.15.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 20
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Capture public source evidence before downloading candidate files
+        run: node scripts/public-source-check.mjs --json > "$RUNNER_TEMP/SOURCE-CHECK.json"
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: useful-release-candidate-${{ needs.identity.outputs.version }}
+          path: release-candidate
+      - name: Revalidate publish authorization and candidate metadata
+        env:
+          SIGNING_READY: ${{ vars.USEFUL_SIGNING_READY || 'false' }}
+          VERSION: ${{ needs.identity.outputs.version }}
+          TAG: ${{ needs.identity.outputs.tag }}
+          CHANNEL: ${{ needs.identity.outputs.channel }}
+          EXPECTED_REPOSITORY: ${{ vars.USEFUL_EXPECTED_REPOSITORY }}
+          RELEASE_ACTORS: ${{ vars.USEFUL_RELEASE_ACTORS }}
+          UPDATE_ROOT_PUBKEY_HEX: ${{ vars.USEFUL_UPDATE_ROOT_PUBKEY_HEX }}
+          UPDATE_ROOT_FINGERPRINT: ${{ needs.identity.outputs.update_root_fingerprint }}
+          UPDATE_FEED_URL_TEMPLATE: ${{ vars.USEFUL_UPDATE_FEED_URL_TEMPLATE }}
+          UPDATE_ROOT_CEREMONY_SHA256: ${{ vars.USEFUL_UPDATE_ROOT_CEREMONY_SHA256 }}
+          ROOT_CEREMONY_SHA256: ${{ needs.identity.outputs.root_ceremony_sha256 }}
+          STABLE_UPDATE_EVIDENCE_PATH: ${{ vars.USEFUL_STABLE_UPDATE_EVIDENCE_PATH }}
+          STABLE_UPDATE_EVIDENCE_SHA256: ${{ vars.USEFUL_STABLE_UPDATE_EVIDENCE_SHA256 }}
+          MEDIA_SOURCE_EVIDENCE_PATH: ${{ vars.USEFUL_MEDIA_SOURCE_EVIDENCE_PATH }}
+          MEDIA_SOURCE_EVIDENCE_SHA256: ${{ vars.USEFUL_MEDIA_SOURCE_EVIDENCE_SHA256 }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "${{ github.event_name }}" = workflow_dispatch
+          test "${{ github.ref_type }}" = tag
+          test "${{ github.ref_name }}" = "${{ needs.identity.outputs.tag }}"
+          test "${{ inputs.publish }}" = true
+          node scripts/release-publish-gate.mjs \
+            --repository "${{ github.repository }}" \
+            --expected-repository "$EXPECTED_REPOSITORY" \
+            --visibility "${{ github.event.repository.visibility }}" \
+            --actor "${{ github.actor }}" \
+            --allowed-actors "$RELEASE_ACTORS" \
+            --publish true \
+            --channel "${{ inputs.channel }}" \
+            --update-root-pubkey "$UPDATE_ROOT_PUBKEY_HEX" \
+            --update-feed-template "$UPDATE_FEED_URL_TEMPLATE" \
+            --root-ceremony-sha256 "$UPDATE_ROOT_CEREMONY_SHA256" \
+            --repo-root . \
+            --stable-evidence-path "$STABLE_UPDATE_EVIDENCE_PATH" \
+            --stable-evidence-sha256 "$STABLE_UPDATE_EVIDENCE_SHA256" \
+            --media-source-evidence-path "$MEDIA_SOURCE_EVIDENCE_PATH" \
+            --media-source-evidence-sha256 "$MEDIA_SOURCE_EVIDENCE_SHA256" \
+            --tag "${{ github.ref_name }}" \
+            > /tmp/PUBLISH-GATE.json
+          diff -u /tmp/PUBLISH-GATE.json release-candidate/PUBLISH-GATE.json
+          node scripts/release-signing-status.mjs \
+            --status release-candidate/SIGNING-STATUS.json \
+            --asset-root release-candidate \
+            --version "$VERSION" \
+            > /tmp/SIGNING-STATUS.validated.json
+          node scripts/release-metadata-media.mjs \
+            --lock scripts/media-runtimes.lock.json \
+            --manifest release-candidate/MEDIA-RUNTIMES.json \
+            > /tmp/MEDIA-RUNTIMES.validated.json
+          signed=$(node -e "const x=require('./release-candidate/SIGNING-STATUS.json'); process.stdout.write(String(x.signed))")
+          node scripts/release-metadata.mjs \
+            --package package.json \
+            --tag "${{ github.ref_name }}" \
+            --channel "${{ inputs.channel }}" \
+            --signing-ready "$SIGNING_READY" \
+            --signing-status "$(test "$signed" = true && echo signed || echo unsigned)" \
+            > /tmp/RELEASE-METADATA.json
+          diff -u /tmp/RELEASE-METADATA.json release-candidate/RELEASE-METADATA.json
+          diff -u "$RUNNER_TEMP/SOURCE-CHECK.json" release-candidate/SOURCE-CHECK.json
+          node --input-type=module <<'NODE'
+          import { createHash } from 'node:crypto';
+          import { execFileSync } from 'node:child_process';
+          import { lstatSync, readFileSync } from 'node:fs';
+          import path from 'node:path';
+          const root = 'release-candidate';
+          const raw = execFileSync('git', ['ls-tree', '-r', '-z', '--full-tree', 'HEAD']);
+          const files = raw.toString('utf8').split('\0').filter(Boolean).map((entry) => {
+            const tab = entry.indexOf('\t');
+            if (tab < 0) throw new Error('unexpected git ls-tree entry');
+            const [mode, type, object] = entry.slice(0, tab).split(' ');
+            return { path: entry.slice(tab + 1), mode, type, object };
+          });
+          const expectedSource = {
+            schemaVersion: 'useful.source-manifest.v1',
+            repository: process.env.GITHUB_REPOSITORY,
+            sourceRevision: process.env.GITHUB_SHA,
+            sourceTree: execFileSync('git', ['rev-parse', 'HEAD^{tree}'], { encoding: 'utf8' }).trim(),
+            version: process.env.VERSION,
+            tag: process.env.TAG,
+            channel: process.env.CHANNEL,
+            files,
+          };
+          const source = JSON.parse(readFileSync(path.join(root, 'SOURCE-MANIFEST.json'), 'utf8'));
+          if (JSON.stringify(source) !== JSON.stringify(expectedSource)) throw new Error('SOURCE-MANIFEST.json does not match the exact release checkout');
+
+          const assetManifestText = readFileSync(path.join(root, 'RELEASE-ASSETS.txt'), 'utf8');
+          if (!assetManifestText.endsWith('\n') || assetManifestText.includes('\r')) {
+            throw new Error('RELEASE-ASSETS.txt must be LF-terminated without CR bytes');
+          }
+          const names = assetManifestText.slice(0, -1).split('\n');
+          if (
+            names.length === 0
+            || names.length !== new Set(names).size
+            || names.some((name) => !name || /[\\/]/.test(name) || name !== path.basename(name))
+          ) {
+            throw new Error('RELEASE-ASSETS.txt is not a unique basename allowlist');
+          }
+          const subjects = names.filter((name) => name !== 'BUILD-PROVENANCE.json' && name !== 'SHA256SUMS.txt').map((name) => {
+            const file = path.join(root, name);
+            const info = lstatSync(file);
+            if (!info.isFile() || info.isSymbolicLink()) throw new Error(`provenance subject is not a regular file: ${name}`);
+            const bytes = readFileSync(file);
+            if (bytes.length === 0) throw new Error(`provenance subject is empty: ${name}`);
+            return { name, sha256: createHash('sha256').update(bytes).digest('hex'), sizeBytes: bytes.length };
+          });
+          const expectedProvenance = {
+            schemaVersion: 'useful.build-provenance.v1',
+            repository: process.env.GITHUB_REPOSITORY,
+            sourceRevision: process.env.GITHUB_SHA,
+            sourceTree: expectedSource.sourceTree,
+            sourceTimestamp: Number(process.env.SOURCE_DATE_EPOCH),
+            ref: process.env.GITHUB_REF,
+            workflowRef: process.env.GITHUB_WORKFLOW_REF,
+            runId: process.env.GITHUB_RUN_ID,
+            runAttempt: process.env.GITHUB_RUN_ATTEMPT,
+            version: process.env.VERSION,
+            tag: process.env.TAG,
+            channel: process.env.CHANNEL,
+            updateRootFingerprint: process.env.UPDATE_ROOT_FINGERPRINT,
+            rootCeremonyReceiptSha256: process.env.ROOT_CEREMONY_SHA256,
+            subjects,
+          };
+          const provenance = JSON.parse(readFileSync(path.join(root, 'BUILD-PROVENANCE.json'), 'utf8'));
+          if (JSON.stringify(provenance) !== JSON.stringify(expectedProvenance)) throw new Error('BUILD-PROVENANCE.json is not the exact closed release statement');
+
+          const checksumText = readFileSync(path.join(root, 'SHA256SUMS.txt'), 'utf8');
+          if (!checksumText.endsWith('\n') || checksumText.includes('\r')) {
+            throw new Error('SHA256SUMS.txt must be LF-terminated without CR bytes');
+          }
+          const checksumLines = checksumText.slice(0, -1).split('\n');
+          const checksumNames = checksumLines.map((line) => {
+            const match = /^([0-9a-f]{64})  ([^\\/\r\n]+)$/.exec(line);
+            if (!match || match[2] !== path.basename(match[2])) {
+              throw new Error(`Invalid SHA256SUMS entry format: ${JSON.stringify(line)}`);
+            }
+            return match[2];
+          });
+          if (checksumNames.length !== new Set(checksumNames).size) {
+            throw new Error('SHA256SUMS.txt contains duplicate asset entries');
+          }
+          if (JSON.stringify([...checksumNames].sort()) !== JSON.stringify([...names].sort())) {
+            throw new Error('SHA256SUMS entry set does not exactly match RELEASE-ASSETS.txt');
+          }
+          NODE
+          (cd release-candidate && sha256sum --check SHA256SUMS.txt)
+          agent_zip="Useful-$VERSION-agent-kit.zip"
+          agent_receipt_hash=$(awk -v name="$agent_zip" '$2 == name { print $1 }' "release-candidate/$agent_zip.sha256")
+          final_agent_hash=$(awk -v name="$agent_zip" '$2 == name { print $1 }' release-candidate/SHA256SUMS.txt)
+          test -n "$agent_receipt_hash"
+          test "$agent_receipt_hash" = "$final_agent_hash"
+          mapfile -t expected < <(sort release-candidate/RELEASE-ASSETS.txt)
+          mapfile -t actual < <(find release-candidate -maxdepth 1 -type f ! -name RELEASE-NOTES.md ! -name SHA256SUMS.txt -printf '%f\n' | sort)
+          diff -u <(printf '%s\n' "${expected[@]}") <(printf '%s\n' "${actual[@]}")
+          test -f release-candidate/SHA256SUMS.txt
+          for asset in "${expected[@]}"; do
+            test "$asset" = "$(basename "$asset")"
+            test -f "release-candidate/$asset"
+          done
+      - name: Revalidate exact-commit CI checks
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          checks=$(gh api --paginate --slurp "/repos/${{ github.repository }}/commits/${{ github.sha }}/check-runs?filter=all&per_page=100")
+          required=(
+            build-and-test
+            protocol-and-cli
+            source-backend
+            fuzz-smoke
+            compose-e2e
+            'platform-limited-matrix (native-tauri-smoke)'
+            'platform-limited-matrix (large-file-resume)'
+            'platform-limited-matrix (compose-fault-injection)'
+          )
+          for name in "${required[@]}"; do
+            latest=$(jq -c --arg name "$name" \
+              '[.[].check_runs[] | select(.name == $name)] | if length == 0 then null else max_by(.id) end' \
+              <<<"$checks")
+            jq -e '. != null and .status == "completed" and .conclusion == "success"' <<<"$latest" >/dev/null || {
+                echo "Latest required check is missing or unsuccessful for ${{ github.sha }}: $name ($latest)" >&2
+                exit 1
+              }
+          done
+      - name: Create GitHub Release without replacing existing evidence
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mapfile -t names < release-candidate/RELEASE-ASSETS.txt
+          assets=()
+          for name in "${names[@]}"; do
+            test "$name" = "$(basename "$name")"
+            test -f "release-candidate/$name"
+            assets+=("release-candidate/$name")
+          done
+          test -f release-candidate/SHA256SUMS.txt
+          assets+=(release-candidate/SHA256SUMS.txt)
+          args=(
+            release create "${{ needs.identity.outputs.tag }}"
+            "${assets[@]}"
+            --verify-tag
+            --title "${{ needs.assemble.outputs.release_name }}"
+            --notes-file release-candidate/RELEASE-NOTES.md
+          )
+          if test "${{ needs.assemble.outputs.prerelease }}" = true; then
+            args+=(--prerelease --latest=false)
+          else
+            args+=(--latest)
+          fi
+          gh "${args[@]}"

@@ -1,0 +1,80 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.useful.example/trp/v1/common.schema.json",
+  "title": "TRP v1 Common Definitions",
+  "description": "Useful 联邦软件源协议 TRP v1（兼容历史名称 Useful Repository Protocol）的共享类型定义。时间用 RFC3339 UTC，版本用 SemVer，许可证用 SPDX，摘要首版用 SHA-256，ID 用小写规范格式。",
+  "$defs": {
+    "lowercaseId": {
+      "type": "string",
+      "description": "小写规范 ID：小写字母、数字、点、连字符、下划线；反向域名式。",
+      "pattern": "^[a-z0-9]([a-z0-9._-]*[a-z0-9])?$",
+      "minLength": 1,
+      "maxLength": 200
+    },
+    "sha256": {
+      "type": "string",
+      "description": "SHA-256 十六进制摘要（64 个小写十六进制字符）。",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "semver": {
+      "type": "string",
+      "description": "SemVer 2.0.0 版本号。",
+      "pattern": "^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)(?:-((?:0|[1-9]\\d*|\\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\\.(?:0|[1-9]\\d*|\\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\\+([0-9a-zA-Z-]+(?:\\.[0-9a-zA-Z-]+)*))?$",
+      "maxLength": 256
+    },
+    "spdxLicenseExpression": {
+      "type": "string",
+      "description": "SPDX License Expression，如 MPL-2.0、Apache-2.0、AGPL-3.0-or-later。",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "rfc3339": {
+      "type": "string",
+      "description": "RFC3339 UTC 时间戳。",
+      "format": "date-time",
+      "maxLength": 64
+    },
+    "httpsUrl": {
+      "type": "string",
+      "description": "HTTPS URL；协议层禁止降级到 HTTP。",
+      "format": "uri",
+      "pattern": "^https://",
+      "maxLength": 2048
+    },
+    "publisherKeyId": {
+      "type": "string",
+      "description": "发布者公钥 ID，算法前缀 + base 编码，如 ed25519:base64url...",
+      "pattern": "^(ed25519|sigstore):[A-Za-z0-9._:+/=-]{16,512}$",
+      "maxLength": 560
+    },
+    "channel": {
+      "type": "string",
+      "description": "发布频道。",
+      "enum": ["stable", "beta", "nightly"]
+    },
+    "platform": {
+      "type": "string",
+      "enum": ["windows", "macos", "linux"]
+    },
+    "arch": {
+      "type": "string",
+      "enum": ["x86_64", "aarch64"]
+    },
+    "permission": {
+      "type": "string",
+      "description": "工具声明的权限字符串（与客户端 permissions 模型一致）。",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "toolIdentity": {
+      "type": "object",
+      "description": "工具全局身份 = PublisherKeyId + ToolId。禁止仅用 ToolId 作为全局身份。",
+      "additionalProperties": false,
+      "required": ["publisherKeyId", "toolId"],
+      "properties": {
+        "publisherKeyId": { "$ref": "#/$defs/publisherKeyId" },
+        "toolId": { "$ref": "#/$defs/lowercaseId" }
+      }
+    }
+  }
+}

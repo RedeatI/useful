@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Base64 Pro</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main>
+      <h1>Base64 Pro</h1>
+      <p class="privacy">零权限、完全离线，输入不会离开插件沙箱。</p>
+      <div class="toolbar">
+        <button id="encode" class="active">编码</button>
+        <button id="decode">解码</button>
+        <button id="swap" class="secondary">交换</button>
+        <button id="clear" class="secondary">清空</button>
+      </div>
+      <section class="columns">
+        <textarea id="input" aria-label="输入" placeholder="输入文本或 Base64" spellcheck="false"></textarea>
+        <pre id="output" aria-label="输出"></pre>
+      </section>
+      <p id="status" role="status"></p>
+    </main>
+    <script src="main.js"></script>
+  </body>
+</html>

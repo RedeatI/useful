@@ -1,0 +1,65 @@
+{
+  "schemaVersion": "useful.media-runtimes-lock.v2",
+  "platform": "windows",
+  "arch": "x64",
+  "packs": [
+    {
+      "id": "preview",
+      "minimumUsefulVersion": "0.1.0-beta.1",
+      "components": [
+        "mpv"
+      ]
+    },
+    {
+      "id": "transcode",
+      "minimumUsefulVersion": "0.1.0-beta.1",
+      "components": [
+        "ffmpeg",
+        "ffprobe"
+      ]
+    }
+  ],
+  "archives": [
+    {
+      "id": "ffmpeg-full-build",
+      "name": "ffmpeg 8.1.2 full_build (GPLv3)",
+      "version": "8.1.2",
+      "license": "GPLv3",
+      "sourceUrl": "https://www.gyan.dev/ffmpeg/builds/packages/ffmpeg-8.1.2-full_build.7z",
+      "archiveSha256": "0fff188997a499b5382e0f66e845d4556c48c54f0113ebed4853d556dbdd7059",
+      "extracts": [
+        {
+          "component": "ffmpeg",
+          "sourcePath": "ffmpeg-8.1.2-full_build/bin/ffmpeg.exe",
+          "targetName": "ffmpeg.exe",
+          "extractedSha256": "ad8f211bc894755e0061c55ab280ae00e8d3d4f15a8cc4372b24cfa247b5942e",
+          "sizeBytes": 242496512
+        },
+        {
+          "component": "ffprobe",
+          "sourcePath": "ffmpeg-8.1.2-full_build/bin/ffprobe.exe",
+          "targetName": "ffprobe.exe",
+          "extractedSha256": "9df3b0b5275e830961df6d94e1f7a71121a7abd5ff708e9fec8a0b6084a55015",
+          "sizeBytes": 242291712
+        }
+      ]
+    },
+    {
+      "id": "mpv",
+      "name": "mpv 20260610-git-304426c (GPLv2+)",
+      "version": "20260610-git-304426c",
+      "license": "GPLv2+",
+      "sourceUrl": "https://github.com/shinchiro/mpv-winbuild-cmake/releases/download/20260610/mpv-x86_64-20260610-git-304426c.7z",
+      "archiveSha256": "facac536baa73c7b925771af5e39a3c9cb16b8d75b59a6e9800de89799dffca7",
+      "extracts": [
+        {
+          "component": "mpv",
+          "sourcePath": "mpv.exe",
+          "targetName": "mpv.exe",
+          "extractedSha256": "b0bb2dc1928e6d86cc26d950815c80c977440081e814c6a46e93f6e9e99c276d",
+          "sizeBytes": 117537280
+        }
+      ]
+    }
+  ]
+}

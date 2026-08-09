@@ -1,0 +1,45 @@
+{
+  "schemaVersion": "useful.agent-profile.test-vectors.v1",
+  "baseProfile": {
+    "schemaVersion": "useful.agent-profile.v1",
+    "profileId": "default",
+    "name": "默认 Agent 配置",
+    "actions": [
+      {
+        "actionId": "builtin.utilities.base64",
+        "expectedContractVersion": "1.0",
+        "expectedActionVersion": "1.0.0",
+        "expectedSourceKind": "builtin",
+        "expectedPublisherId": "useful.project",
+        "enabled": { "cli": true, "mcp": true },
+        "aliases": ["b64-encode"],
+        "presets": [
+          { "presetId": "encode", "name": "UTF-8 编码", "defaults": { "operation": "encode" } }
+        ]
+      }
+    ]
+  },
+  "vectors": [
+    { "name": "valid baseline", "mutation": "none", "schemaValid": true, "semantic": "valid" },
+    { "name": "schema rejects unknown top key", "mutation": "unknown-top-key", "schemaValid": false, "semantic": "AGENT_PROFILE_INVALID" },
+    { "name": "manual layer rejects dangerous key", "mutation": "dangerous-key", "schemaValid": true, "semantic": "AGENT_PROFILE_INVALID", "issue": "DANGEROUS_KEY" },
+    { "name": "manual layer rejects constructor key", "mutation": "dangerous-constructor", "schemaValid": true, "semantic": "AGENT_PROFILE_INVALID", "issue": "DANGEROUS_KEY" },
+    { "name": "manual layer rejects prototype key", "mutation": "dangerous-prototype", "schemaValid": true, "semantic": "AGENT_PROFILE_INVALID", "issue": "DANGEROUS_KEY" },
+    { "name": "manual layer rejects expression marker", "mutation": "expression", "schemaValid": true, "semantic": "AGENT_PROFILE_INVALID", "issue": "EXPRESSION_FORBIDDEN" },
+    { "name": "manual layer rejects duplicate action", "mutation": "duplicate-action", "schemaValid": true, "semantic": "AGENT_PROFILE_COLLISION", "issue": "ACTION_DUPLICATE" },
+    { "name": "manual layer rejects global alias collision", "mutation": "global-alias-collision", "schemaValid": true, "semantic": "AGENT_PROFILE_COLLISION", "issue": "ALIAS_COLLISION" },
+    { "name": "registry layer rejects alias collision", "mutation": "registry-alias-collision", "schemaValid": true, "semantic": "AGENT_PROFILE_COLLISION", "issue": "ALIAS_REGISTRY_COLLISION" },
+    { "name": "schema rejects action count limit", "mutation": "action-count-limit", "schemaValid": false, "semantic": "AGENT_PROFILE_INVALID" },
+    { "name": "schema rejects per-action alias count", "mutation": "alias-item-limit", "schemaValid": false, "semantic": "AGENT_PROFILE_INVALID" },
+    { "name": "schema rejects per-action preset count", "mutation": "preset-item-limit", "schemaValid": false, "semantic": "AGENT_PROFILE_INVALID" },
+    { "name": "manual layer rejects total alias count", "mutation": "alias-total-limit", "schemaValid": true, "semantic": "AGENT_PROFILE_INVALID", "issue": "ALIAS_TOTAL_LIMIT" },
+    { "name": "manual layer rejects total preset count", "mutation": "preset-total-limit", "schemaValid": true, "semantic": "AGENT_PROFILE_INVALID", "issue": "PRESET_TOTAL_LIMIT" },
+    { "name": "tree layer rejects depth limit", "mutation": "depth-limit", "schemaValid": true, "semantic": "AGENT_PROFILE_INVALID", "issue": "DEPTH_LIMIT" },
+    { "name": "tree layer rejects node limit", "mutation": "node-limit", "schemaValid": true, "semantic": "AGENT_PROFILE_INVALID", "issue": "NODE_LIMIT" },
+    { "name": "byte layer rejects profile limit", "mutation": "byte-limit", "schemaValid": true, "semantic": "AGENT_PROFILE_TOO_LARGE" },
+    { "name": "preset layer rejects per-defaults byte limit", "mutation": "defaults-byte-limit", "schemaValid": true, "semantic": "AGENT_PROFILE_PRESET_INVALID", "issue": "DEFAULTS_TOO_LARGE" },
+    { "name": "preset rejects unknown property", "mutation": "preset-unknown", "schemaValid": true, "semantic": "AGENT_PROFILE_PRESET_INVALID", "issue": "DEFAULT_UNKNOWN_FIELD" },
+    { "name": "preset rejects wrong type", "mutation": "preset-wrong-type", "schemaValid": true, "semantic": "AGENT_PROFILE_PRESET_INVALID", "issue": "DEFAULT_VALUE_INVALID" },
+    { "name": "preset rejects sensitive property", "mutation": "preset-sensitive", "schemaValid": true, "semantic": "AGENT_PROFILE_PRESET_INVALID", "issue": "DEFAULT_SENSITIVE_FIELD" }
+  ]
+}

@@ -1,0 +1,52 @@
+{
+  "valid": {
+    "schemaVersion": "useful.plugin-action.v1",
+    "title": "Base64 then SHA-256",
+    "description": "Two closed-world utility steps.",
+    "keywords": ["base64", "sha256"],
+    "aliases": [],
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": { "text": { "type": "string", "maxLength": 1024 } },
+      "required": ["text"]
+    },
+    "outputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "algorithm": { "type": "string", "const": "SHA-256" },
+        "digest": { "type": "string", "minLength": 64, "maxLength": 64 },
+        "encoding": { "type": "string", "const": "hex" }
+      },
+      "required": ["algorithm", "digest", "encoding"]
+    },
+    "examples": [{
+      "name": "abc",
+      "input": { "text": "abc" },
+      "output": { "algorithm": "SHA-256", "digest": "35d95694d3f160215db293c7899daa5907837838fb4b8119ed713e32446c1266", "encoding": "hex" }
+    }],
+    "testVectors": [{
+      "name": "abc",
+      "input": { "text": "abc" },
+      "expectedOutput": { "algorithm": "SHA-256", "digest": "35d95694d3f160215db293c7899daa5907837838fb4b8119ed713e32446c1266", "encoding": "hex" }
+    }],
+    "execution": { "timeoutMs": 2000, "maxInputBytes": 4096, "maxOutputBytes": 1024 },
+    "pipeline": {
+      "steps": [
+        { "id": "encode", "actionId": "builtin.utilities.base64", "input": { "operation": "encode", "text": { "$ref": "/input/text" } } },
+        { "id": "hash", "actionId": "builtin.utilities.hash", "input": { "algorithm": "SHA-256", "text": { "$ref": "/steps/encode/output/text" } } }
+      ],
+      "output": { "$ref": "/steps/hash/output" }
+    }
+  },
+  "invalidMutations": [
+    { "name": "unknown top field", "path": ["trustedSource"], "value": {} },
+    { "name": "missing test vectors", "path": ["testVectors"], "delete": true },
+    { "name": "timeout above limit", "path": ["execution", "timeoutMs"], "value": 5001 },
+    { "name": "unknown builtin", "path": ["pipeline", "steps", 0, "actionId"], "value": "plugin.other.action" },
+    { "name": "step code-shaped field", "path": ["pipeline", "steps", 0, "command"], "value": "calc.exe" }
+  ]
+}

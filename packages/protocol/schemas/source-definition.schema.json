@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.useful.example/trp/v1/source-definition.schema.json",
+  "title": "TRP v1 Source Definition (ToolSource)",
+  "description": "客户端本地保存的工具源定义。kind 仅允许 tool 或 mirror——绝不允许 app-update；capabilities 复用 discovery 定义（结构上不含任何客户端更新能力）。这从类型层面保证普通工具源无法更新 Useful 客户端主程序。客户端更新由独立的 app-update-source.schema.json 承载。",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["sourceId", "kind", "discoveryUrl", "trustRoot", "enabled", "priority"],
+  "properties": {
+    "sourceId": { "$ref": "common.schema.json#/$defs/lowercaseId" },
+    "kind": {
+      "type": "string",
+      "description": "工具源类别。仅 tool 或 mirror。不存在 app-update 取值——客户端更新源是独立类型。",
+      "enum": ["tool", "mirror"]
+    },
+    "discoveryUrl": {
+      "type": "string",
+      "format": "uri",
+      "maxLength": 2048,
+      "description": "discovery 地址。https 为正式源；http://127.0.0.1 与 file:// 必须显式标记 local=true。"
+    },
+    "local": {
+      "type": "boolean",
+      "default": false,
+      "description": "localhost/file 本地或开发源标记。"
+    },
+    "trustRoot": {
+      "type": "object",
+      "description": "用户确认后保存的信任根。官方身份仅由 rootKeyFingerprint 与预置官方根指纹匹配确认，绝不由 name/id/url 确认。",
+      "additionalProperties": false,
+      "required": ["profile", "rootKeyFingerprint", "confirmedAt"],
+      "properties": {
+        "profile": { "type": "string", "enum": ["tuf-v1"] },
+        "rootKeyFingerprint": { "$ref": "common.schema.json#/$defs/sha256" },
+        "confirmedAt": { "$ref": "common.schema.json#/$defs/rfc3339" }
+      }
+    },
+    "capabilities": {
+      "$ref": "repository-discovery.schema.json#/properties/capabilities"
+    },
+    "enabled": { "type": "boolean" },
+    "priority": { "type": "integer", "minimum": 0, "maximum": 1000 },
+    "displayName": { "type": "string", "maxLength": 200 },
+    "operator": { "type": "string", "maxLength": 200 }
+  }
+}

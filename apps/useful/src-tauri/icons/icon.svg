@@ -1,0 +1,43 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <!-- 深石墨到深蓝的轻微渐变底 -->
+    <linearGradient id="bg" x1="0" y1="0" x2="1024" y2="1024" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#22272E"/>
+      <stop offset="1" stop-color="#16324F"/>
+    </linearGradient>
+    <linearGradient id="cyan" x1="0" y1="0" x2="0" y2="1" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#38E1D6"/>
+      <stop offset="1" stop-color="#1CA7C4"/>
+    </linearGradient>
+    <linearGradient id="module" x1="0" y1="0" x2="0" y2="1" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#3A4451"/>
+      <stop offset="1" stop-color="#2A323D"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Windows 11 风格圆角方形底 -->
+  <rect x="64" y="64" width="896" height="896" rx="200" fill="url(#bg)"/>
+
+  <!-- 四块圆角模块拼成的 Useful 立方体，中心留十字缝隙 -->
+  <!-- 左上：常规模块 -->
+  <rect x="248" y="248" width="238" height="238" rx="44" fill="url(#module)" stroke="#4A5666" stroke-width="4"/>
+  <!-- 右上：进程资源条模块（三条高度不同的竖条） -->
+  <rect x="538" y="248" width="238" height="238" rx="44" fill="url(#module)" stroke="#4A5666" stroke-width="4"/>
+  <rect x="576" y="386" width="34" height="64" rx="10" fill="url(#cyan)"/>
+  <rect x="623" y="346" width="34" height="104" rx="10" fill="#8A94A3"/>
+  <rect x="670" y="312" width="34" height="138" rx="10" fill="#8A94A3"/>
+
+  <!-- 左下：视频时间轴模块（一条轨道 + 播放头 + 刻度） -->
+  <rect x="248" y="538" width="238" height="238" rx="44" fill="url(#module)" stroke="#4A5666" stroke-width="4"/>
+  <rect x="286" y="640" width="162" height="34" rx="12" fill="#8A94A3"/>
+  <rect x="286" y="640" width="70" height="34" rx="12" fill="url(#cyan)"/>
+  <circle cx="356" cy="657" r="26" fill="#EAF6F8"/>
+  <rect x="300" y="596" width="6" height="22" rx="3" fill="#5A6675"/>
+  <rect x="340" y="596" width="6" height="22" rx="3" fill="#5A6675"/>
+  <rect x="380" y="596" width="6" height="22" rx="3" fill="#5A6675"/>
+  <rect x="420" y="596" width="6" height="22" rx="3" fill="#5A6675"/>
+
+  <!-- 右下：青蓝高亮模块（立方体高光角） -->
+  <rect x="538" y="538" width="238" height="238" rx="44" fill="url(#cyan)"/>
+  <path d="M598 598 L716 598 L716 716 Z" fill="#0E2A3A" fill-opacity="0.25"/>
+</svg>

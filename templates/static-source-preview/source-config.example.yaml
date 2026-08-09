@@ -1,0 +1,6 @@
+schemaVersion: 1
+id: com.example.my-source
+name: My Useful Source
+operator: My Team
+baseUrl: https://tools.example.com
+# publisherKeyId、TUF role keyId 与私钥由 `useful source init` 生成，禁止在模板中预置。

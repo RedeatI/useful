@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "id": "com.useful.hello-web",
+  "name": "示例 Web 工具",
+  "version": "1.0.0",
+  "description": "演示 Useful 零 native 权限 web 插件：获取宿主主题并报告就绪。",
+  "icon": "assets/icon.png",
+  "entry": {
+    "type": "web",
+    "path": "index.html"
+  },
+  "contributes": {
+    "sidebar": [
+      {
+        "id": "main",
+        "title": "示例 Web 工具",
+        "group": "installed",
+        "order": 100
+      }
+    ]
+  },
+  "permissions": [],
+  "platforms": ["windows-x64"],
+  "minHostVersion": "0.1.0-beta.1"
+}

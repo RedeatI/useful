@@ -1,0 +1,64 @@
+name: Bug report
+description: Report a reproducible problem in Useful.
+title: "[Bug]: "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Do not include credentials, private keys, personal data, or unredacted logs. Never report an unpatched security issue in a public issue.
+        GitHub Private Vulnerability Reporting may be used at [Report a vulnerability](https://github.com/RedeatI/useful/security/advisories/new) only after the repository owner has enabled and tested it.
+        Until that gate is closed, Issues and public contribution intake must remain disabled; no fallback email is asserted here.
+  - type: input
+    id: version
+    attributes:
+      label: Version or commit
+      description: Provide the Useful version or full commit hash you tested.
+    validations:
+      required: true
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Platform
+      options:
+        - Windows 11
+        - Windows 10
+        - macOS
+        - Linux
+        - Web frontend only
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: Use the smallest reliable sequence, including input shape but no sensitive data.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Sanitized evidence
+      description: Add relevant error text or screenshots after removing private information.
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before submitting
+      options:
+        - label: I searched existing issues for the same problem.
+          required: true
+        - label: This report does not disclose an unpatched security issue or sensitive data.
+          required: true

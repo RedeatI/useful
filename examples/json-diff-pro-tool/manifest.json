@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "id": "com.useful.json-diff-pro",
+  "name": "JSON Diff Pro",
+  "version": "1.0.0",
+  "description": "离线结构化比较 JSON，按路径定位新增、删除、值变化和类型变化。",
+  "entry": {
+    "type": "web",
+    "path": "index.html"
+  },
+  "contributes": {
+    "sidebar": [
+      {
+        "id": "main",
+        "title": "JSON Diff Pro",
+        "group": "installed",
+        "order": 40
+      }
+    ]
+  },
+  "permissions": [],
+  "platforms": ["windows-x64"],
+  "minHostVersion": "0.1.0-beta.1"
+}

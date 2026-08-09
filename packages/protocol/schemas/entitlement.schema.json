@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.useful.example/trp/v1/entitlement.schema.json",
+  "title": "TRP v1 Source Entitlement",
+  "description": "SourceEntitlement：权益属于特定源。客户端可缓存用于 UI，但实际付费下载必须向所属源申请 DownloadGrant，不得仅凭本地缓存授权新的付费下载。",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "sourceId",
+    "subjectId",
+    "entitlementId",
+    "status",
+    "updatedAt"
+  ],
+  "properties": {
+    "sourceId": { "$ref": "common.schema.json#/$defs/lowercaseId" },
+    "subjectId": { "type": "string", "minLength": 1, "maxLength": 200 },
+    "entitlementId": { "type": "string", "minLength": 1, "maxLength": 200 },
+    "productId": { "type": ["string", "null"], "maxLength": 200 },
+    "planId": { "type": ["string", "null"], "maxLength": 200 },
+    "toolScope": {
+      "type": "array",
+      "description": "适用工具身份范围；空数组表示计划级别（由服务端解释）。",
+      "maxItems": 1024,
+      "items": { "$ref": "common.schema.json#/$defs/toolIdentity" }
+    },
+    "versionScope": { "type": ["string", "null"], "maxLength": 128 },
+    "channelScope": {
+      "type": "array",
+      "maxItems": 3,
+      "items": { "$ref": "common.schema.json#/$defs/channel" }
+    },
+    "status": {
+      "type": "string",
+      "enum": ["active", "trialing", "grace", "past_due", "canceled", "expired", "revoked"]
+    },
+    "startsAt": { "$ref": "common.schema.json#/$defs/rfc3339" },
+    "expiresAt": { "anyOf": [{ "$ref": "common.schema.json#/$defs/rfc3339" }, { "type": "null" }] },
+    "graceUntil": { "anyOf": [{ "$ref": "common.schema.json#/$defs/rfc3339" }, { "type": "null" }] },
+    "updatedAt": { "$ref": "common.schema.json#/$defs/rfc3339" }
+  }
+}

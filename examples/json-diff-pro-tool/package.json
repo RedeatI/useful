@@ -1,0 +1,14 @@
+{
+  "name": "@useful-pro/json-diff",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "build": "node ../../scripts/build-plugin-example.mjs . ../../artifacts/plugin-build/json-diff-pro",
+    "test": "node --test src/diff-core.test.mjs"
+  },
+  "dependencies": {
+    "@useful/sdk": "workspace:*"
+  },
+  "license": "Apache-2.0"
+}

@@ -1,0 +1,36 @@
+Useful
+Copyright (c) 2026 RedeatI
+
+Useful is the public product name and the runtime/package identity across this repository. Executables, application IDs, data directories, CLI commands, package names, schemas, and plugin package extensions use Useful identifiers (Useful.exe, io.github.redeati.useful, %APPDATA%\\Useful, useful.db, useful/*, .useful).
+
+This repository is a multi-license project. The owner-approved component map is:
+
+- Desktop client, client crates, built-in Action implementations, native host actions, and Office
+  processing (`apps/useful`, `crates/useful-*`, `packages/action-runtime`,
+  `packages/host-actions`, `packages/office-core`): MPL-2.0
+- Source service, administration UI, shared implementation, migrations, and deployment
+  (`services/source-server`, `services/source-worker`, `services/internal`, `services/migrations`,
+  the build files directly under `services/`, `apps/source-admin`, `deploy/*`): AGPL-3.0-or-later
+- Protocols, JSON Schema, SDK, CLI, Agent integration interfaces, repository fixtures, examples,
+  and remaining first-party repository automation/configuration: Apache-2.0
+- Project documentation under `docs/*` and the root documentation/community files listed in
+  `LICENSES.md`: CC-BY-4.0
+
+The authoritative component mapping is in the root LICENSE. LICENSES.md explains that mapping and
+records the 2026-08-09 Owner decision. New package or service roots require an explicit mapping
+update. This notice does not modify either document or any existing copyright declaration.
+
+The root LICENSE is present and records the owner-approved multi-license map for Useful.
+Public repository opening, public contribution intake, and source or binary release still require
+candidate-specific legal and third-party review, the canonical remote, sanitized public snapshot
+authorization, and explicit push authorization. This notice is not legal advice and does not
+replace counsel review.
+
+THIRD_PARTY_NOTICES.md summarizes major third-party components. The complete inventory and actual
+license/notice files must be generated and verified for the exact SBOM or distributable artifact.
+
+The Useful name, logo, and official certification marks are governed separately from the open-source
+licenses. See TRADEMARKS.md. Official source or release identity must be established by configured
+cryptographic trust, not by a name, URL, icon, or this notice.
+
+This file, LICENSES.md, and TRADEMARKS.md are not legal advice.

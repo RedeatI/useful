@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.useful.example/trp/v1/security-advisory.schema.json",
+  "title": "TRP v1 Security Advisory",
+  "description": "安全公告。撤回版本不删除记录，用 withdrawn 状态；已安装用户应能看到安全通知。不实现远程删除本地工具。",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["advisoryId", "identity", "severity", "affectedVersions", "summary", "publishedAt"],
+  "properties": {
+    "advisoryId": {
+      "type": "string",
+      "pattern": "^USEFUL-[0-9]{4}-[0-9]{4,6}$",
+      "description": "如 USEFUL-2026-0001。"
+    },
+    "identity": { "$ref": "common.schema.json#/$defs/toolIdentity" },
+    "severity": { "type": "string", "enum": ["low", "medium", "high", "critical"] },
+    "affectedVersions": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 512,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["version"],
+        "properties": {
+          "version": { "$ref": "common.schema.json#/$defs/semver" },
+          "withdrawn": { "type": "boolean", "default": false }
+        }
+      }
+    },
+    "fixedIn": { "anyOf": [{ "$ref": "common.schema.json#/$defs/semver" }, { "type": "null" }] },
+    "summary": { "type": "string", "minLength": 1, "maxLength": 2000 },
+    "references": {
+      "type": "array",
+      "maxItems": 32,
+      "items": { "$ref": "common.schema.json#/$defs/httpsUrl" }
+    },
+    "cve": { "type": ["string", "null"], "pattern": "^CVE-[0-9]{4}-[0-9]{4,}$" },
+    "publishedAt": { "$ref": "common.schema.json#/$defs/rfc3339" }
+  }
+}

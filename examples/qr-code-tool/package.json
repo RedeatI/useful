@@ -1,0 +1,14 @@
+{
+  "name": "@useful-example/qr-code",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "build": "node ../../scripts/build-plugin-example.mjs . ../../artifacts/plugin-build/qr-code"
+  },
+  "dependencies": {
+    "@useful/sdk": "workspace:*",
+    "qrcode-generator": "1.4.4"
+  },
+  "license": "Apache-2.0"
+}

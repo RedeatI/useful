@@ -1,0 +1,21 @@
+{
+  "name": "@useful/runtime-cli",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Useful headless runtime CLI；与开发/签名/发布 CLI 分离。",
+  "bin": {
+    "useful-runtime": "bin/useful-runtime.mjs"
+  },
+  "dependencies": {
+    "@useful/action-runtime": "workspace:^",
+    "@useful/agent-profile": "workspace:^",
+    "@useful/host-actions": "workspace:^",
+    "@useful/plugin-actions": "workspace:^"
+  },
+  "scripts": {
+    "test": "node --test",
+    "typecheck": "node --check bin/useful-runtime.mjs"
+  },
+  "license": "Apache-2.0"
+}

@@ -1,0 +1,19 @@
+[package]
+name = "useful-repository-client"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "TRP v1 客户端逻辑：discovery 校验、官方信任根匹配、目录缓存合并、来源/发布者固定"
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+semver = { workspace = true }
+thiserror = { workspace = true }
+ed25519-dalek = { workspace = true }
+sha2 = { workspace = true }
+hex = { workspace = true }
+url = { workspace = true }
+
+[dev-dependencies]
+proptest = { workspace = true }

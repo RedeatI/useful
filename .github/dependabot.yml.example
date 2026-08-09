@@ -1,0 +1,44 @@
+# Inactive template: GitHub does not activate Dependabot version updates from this path.
+# An owner must review PR limits and workflow fan-out, then explicitly copy this file to
+# `.github/dependabot.yml` in a separately authorized change.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    groups:
+      javascript-production:
+        dependency-type: production
+      javascript-development:
+        dependency-type: development
+
+  - package-ecosystem: cargo
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+
+  - package-ecosystem: gomod
+    directory: /services
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+
+  - package-ecosystem: docker
+    directory: /deploy/docker-compose
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5

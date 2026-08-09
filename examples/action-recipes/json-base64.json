@@ -1,0 +1,33 @@
+{
+  "schemaVersion": "useful.action-recipe.v1",
+  "input": {
+    "source": "{ \"a\": 1 }"
+  },
+  "steps": [
+    {
+      "id": "minify",
+      "actionId": "builtin.utilities.json",
+      "input": {
+        "operation": "minify",
+        "text": {
+          "$ref": "/input/source"
+        }
+      }
+    },
+    {
+      "id": "encode",
+      "actionId": "builtin.utilities.base64",
+      "input": {
+        "operation": "encode",
+        "text": {
+          "$ref": "/steps/minify/output/text"
+        }
+      }
+    }
+  ],
+  "output": {
+    "encoded": {
+      "$ref": "/steps/encode/output/text"
+    }
+  }
+}

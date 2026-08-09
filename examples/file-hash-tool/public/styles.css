@@ -1,0 +1,5 @@
+:root { color-scheme: light dark; font-family: "Segoe UI", "Microsoft YaHei", sans-serif; }
+body { margin: 0; background: Canvas; color: CanvasText; } main { max-width: 820px; padding: 24px; } h1 { margin-top: 0; }
+.toolbar { display: flex; gap: 8px; margin: 18px 0; } button { padding: 8px 14px; border-radius: 7px; border: 1px solid #168ca4; background: #168ca4; color: white; } button:disabled { opacity: .5; }
+progress { width: min(620px, 80%); margin-right: 10px; } label { display: block; margin-top: 18px; } textarea { box-sizing: border-box; width: 100%; min-height: 90px; margin-top: 8px; padding: 10px; font-family: Consolas, monospace; }
+#status { color: GrayText; }

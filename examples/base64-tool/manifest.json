@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "id": "com.useful.base64-pro",
+  "name": "Base64 Pro",
+  "version": "1.0.0",
+  "description": "完全离线且零权限的 Base64 编解码插件示例。",
+  "icon": "assets/icon.png",
+  "entry": {
+    "type": "web",
+    "path": "index.html"
+  },
+  "contributes": {
+    "sidebar": [
+      {
+        "id": "main",
+        "title": "Base64 Pro",
+        "group": "installed",
+        "order": 50
+      }
+    ]
+  },
+  "permissions": [],
+  "platforms": ["windows-x64"],
+  "minHostVersion": "0.1.0-beta.1"
+}

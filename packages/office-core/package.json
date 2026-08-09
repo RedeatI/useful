@@ -1,0 +1,22 @@
+{
+  "name": "@useful/office-core",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Browser/Node-safe local office document composition, extraction and bounded OOXML/PDF processing.",
+  "exports": {
+    ".": {
+      "types": "./src/index.d.ts",
+      "import": "./src/index.mjs"
+    }
+  },
+  "dependencies": {
+    "fflate": "0.8.3",
+    "pdf-lib": "1.17.1"
+  },
+  "scripts": {
+    "test": "node --test",
+    "typecheck": "node --check src/index.mjs && node --check src/errors.mjs && node --check src/limits.mjs && node --check src/xml.mjs && node --check src/zip.mjs && node --check src/docx.mjs && node --check src/pptx.mjs && node --check src/xlsx.mjs && node --check src/csv.mjs && node --check src/table-markdown.mjs && node --check src/markdown.mjs && node --check src/pdf.mjs"
+  },
+  "license": "MPL-2.0"
+}

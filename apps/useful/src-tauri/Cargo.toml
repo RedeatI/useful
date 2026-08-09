@@ -1,0 +1,83 @@
+[package]
+name = "useful-app"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Useful - 轻量便携插件化桌面工具平台"
+default-run = "useful-app"
+
+[lib]
+name = "useful_app_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+useful-core = { path = "../../../crates/useful-core" }
+useful-plugin = { path = "../../../crates/useful-plugin" }
+useful-repository-client = { path = "../../../crates/useful-repository-client" }
+useful-source-accounts = { path = "../../../crates/useful-source-accounts" }
+useful-bootstrap = { path = "../../../crates/useful-bootstrap" }
+useful-shortcuts = { path = "../../../crates/useful-shortcuts" }
+# Optional: Standard edition links these; Core builds omit them for a smaller binary.
+useful-procmon = { path = "../../../crates/useful-procmon", optional = true }
+useful-media = { path = "../../../crates/useful-media", optional = true }
+
+tauri = { version = "2", features = [] }
+tauri-plugin-dialog = "2"
+tauri-plugin-single-instance = "2"
+tauri-plugin-opener = "2"
+
+serde = { workspace = true }
+serde_json = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+tracing-appender = { workspace = true }
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+rusqlite = { workspace = true }
+dunce = { workspace = true }
+sha2 = { workspace = true }
+hex = { workspace = true }
+uuid = { workspace = true }
+semver = { workspace = true }
+zip = { workspace = true }
+reqwest = { version = "0.12", default-features = false, features = ["native-tls", "gzip"] }
+
+[target.'cfg(windows)'.dependencies]
+# App-local Win32 surface only. Process/network/ETW APIs live in useful-procmon;
+# Shell/COM shortcut APIs live in useful-shortcuts.
+windows = { workspace = true, features = [
+    "Win32_Foundation",
+    "Win32_System_DataExchange",
+    "Win32_System_Memory",
+    "Win32_System_LibraryLoader",
+    "Win32_System_Diagnostics_ToolHelp",
+    "Win32_System_Threading",
+    "Win32_Security",
+    "Win32_Security_Cryptography",
+    "Win32_UI_WindowsAndMessaging",
+    # Required for RegisterClassW / WNDCLASSW (mpv host child window).
+    "Win32_Graphics_Gdi",
+    "Win32_Graphics_Dwm",
+] }
+
+[dev-dependencies]
+tempfile = { workspace = true }
+
+[features]
+# 生产构建必须启用 custom-protocol：嵌入 frontendDist。
+# 默认 Standard = procmon + media（Lite/Full 共用同一 exe，差异在打包层媒体 sidecar）。
+# 内部 Core 测量/故障隔离：
+#   cargo build --release -p useful-app --no-default-features --features custom-protocol
+default = ["custom-protocol", "standard"]
+custom-protocol = ["tauri/custom-protocol"]
+standard = ["procmon", "media"]
+procmon = ["dep:useful-procmon"]
+media = ["dep:useful-media"]
+# Full 版可捆绑媒体运行时；Lite 版使用系统 WebView2。打包层开关，不控制 Rust 依赖。
+full-media = []
+# 仅用于真实 Tauri Release smoke；生产构建不得启用。
+native-test = []

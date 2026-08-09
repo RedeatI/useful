@@ -1,0 +1,4 @@
+# Rust 工具链固定到与 CI 相同的精确版本，避免 stable 通道随时间漂移。
+[toolchain]
+channel = "1.97.1"
+components = ["rustfmt", "clippy"]

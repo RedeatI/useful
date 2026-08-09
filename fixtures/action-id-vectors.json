@@ -1,0 +1,15 @@
+{
+  "valid": [
+    "com.example.action",
+    "com.example.2fa",
+    "a.b_2"
+  ],
+  "invalid": [
+    "Com.example.action",
+    "com.Example.action",
+    "com.example.Action",
+    "com..action",
+    "com.-bad",
+    "no-dots"
+  ]
+}

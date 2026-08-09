@@ -1,0 +1,34 @@
+{
+  "name": "@useful/sdk",
+  "version": "0.1.0-beta.1",
+  "description": "Useful 插件开发 SDK：web 工具通过一次性 MessageChannel 与宿主通信，无需编写 Rust。",
+  "type": "module",
+  "main": "dist/index.js",
+  "module": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "src"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "lint": "eslint src --ext .ts --max-warnings 0"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.3",
+    "vitest": "^2.1.8",
+    "jsdom": "^25.0.1",
+    "eslint": "^8.57.1",
+    "@typescript-eslint/eslint-plugin": "^8.21.0",
+    "@typescript-eslint/parser": "^8.21.0"
+  },
+  "license": "Apache-2.0"
+}

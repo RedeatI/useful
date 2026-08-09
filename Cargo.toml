@@ -1,0 +1,68 @@
+﻿[workspace]
+resolver = "2"
+members = [
+    "apps/useful/src-tauri",
+    "crates/useful-core",
+    "crates/useful-plugin",
+    "crates/useful-repository-client",
+    "crates/useful-source-accounts",
+    "crates/useful-bootstrap",
+    "crates/useful-shortcuts",
+    "crates/useful-procmon",
+    "crates/useful-media",
+]
+
+[workspace.package]
+version = "0.1.0-beta.1"
+edition = "2021"
+license = "MPL-2.0"
+authors = ["Useful Team"]
+
+[workspace.dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "process", "sync", "time", "io-util", "fs"] }
+thiserror = "2"
+anyhow = "1"
+tracing = "0.1"
+# GUI logs use EnvFilter + text fmt only; do not enable json subscriber by default.
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+tracing-appender = "0.2"
+rusqlite = { version = "0.32", features = ["bundled"] }
+sha2 = "0.10"
+hex = "0.4"
+zip = { version = "2", default-features = false, features = ["deflate"] }
+ed25519-dalek = { version = "2", features = ["rand_core"] }
+jsonschema = "0.28"
+semver = { version = "1", features = ["serde"] }
+sysinfo = "0.33"
+uuid = { version = "1", features = ["v4"] }
+tempfile = "3"
+dunce = "1"
+proptest = "1"
+url = "2"
+
+# Minimal base pin only. Each crate opts into the Win32 features it actually calls.
+# Keep default `std` (required by the windows crate); do not re-add a kitchen-sink Win32 list here.
+[workspace.dependencies.windows]
+version = "0.59"
+default-features = false
+features = ["std"]
+
+[profile.release]
+codegen-units = 1
+lto = true
+strip = true
+opt-level = "s"
+
+# Disk-constrained developer builds (see scripts/dev-cache.ps1 -Mode Compact).
+# Do not use for day-to-day crash debugging — native stacks lose fidelity.
+[profile.dev-compact]
+inherits = "dev"
+debug = 0
+incremental = false
+
+[profile.test-compact]
+inherits = "test"
+debug = 0
+incremental = false

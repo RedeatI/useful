@@ -1,0 +1,38 @@
+{
+  "schemaVersion": "1.0",
+  "source": {
+    "id": "org.useful.official",
+    "name": "Useful Official Source",
+    "description": "官方维护的软件源",
+    "operator": "Useful Project",
+    "homepage": "https://source.example",
+    "supportUrl": "https://source.example/support"
+  },
+  "repository": {
+    "profile": "tuf-v1",
+    "metadataBaseUrl": "https://source.example/metadata/",
+    "targetsBaseUrl": "https://cdn.source.example/targets/",
+    "rootUrl": "https://source.example/metadata/1.root.json",
+    "rootSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "api": {
+    "baseUrl": "https://api.source.example/v1"
+  },
+  "capabilities": {
+    "catalog": true,
+    "remoteSearch": true,
+    "authentication": true,
+    "entitlements": true,
+    "paidDownloads": true,
+    "publisherPortal": true,
+    "privateTools": false,
+    "staticMirror": true,
+    "nativeWorkers": false
+  },
+  "auth": {
+    "type": "oauth2-pkce",
+    "issuer": "https://auth.source.example",
+    "clientId": "useful-desktop",
+    "scopes": ["profile", "entitlements", "downloads"]
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "name": "@useful/action-contract",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Useful 版本化 Action Contract、JSON Schema 与 fail-closed 校验器。",
+  "exports": {
+    ".": {
+      "types": "./src/index.d.ts",
+      "import": "./src/index.mjs"
+    },
+    "./schema": "./src/action-descriptor.schema.json"
+  },
+  "dependencies": {
+    "ajv": "^8.17.1"
+  },
+  "scripts": {
+    "test": "node --test",
+    "typecheck": "node --check src/index.mjs"
+  },
+  "license": "Apache-2.0"
+}

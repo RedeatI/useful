@@ -1,0 +1,36 @@
+{
+  "signatures": [
+    {
+      "keyid": "8e079d9a71e0a8d1855f826be39938d6b87ede8cafe825a2c99ae97c9f422916",
+      "sig": "a659eb18d22aab28deb82c4d5be4af9bdb5a836ed701f2317d0deea0240044ce95990af27028c933d3a9c754d866854b26d579da91da53d5284f3fc04851a107"
+    }
+  ],
+  "signed": {
+    "_type": "targets",
+    "spec_version": "1.0.0",
+    "version": 1,
+    "expires": "2036-08-06T08:11:22Z",
+    "targets": {
+      "com.useful.hello-web-1.0.0-stable-windows-x86_64.useful": {
+        "length": 6032,
+        "hashes": {
+          "sha256": "af7f0b0d8166a4de3cbda0cb60e9fe5204ae2953af6256f6b516320c5d70e47d"
+        },
+        "custom": {
+          "publisherKeyId": "ed25519:fe7fc9912d9807705bd80897d21bfdee9b8e4b30aeddd2ba717c47e75d50b7b1",
+          "toolId": "com.useful.hello-web",
+          "version": "1.0.0",
+          "channel": "stable",
+          "platform": "windows",
+          "arch": "x86_64",
+          "artifactSha256": "af7f0b0d8166a4de3cbda0cb60e9fe5204ae2953af6256f6b516320c5d70e47d",
+          "publisherSignatureVerified": true,
+          "publisherSignatureMethod": "ed25519",
+          "publisherSignaturePayloadVersion": "useful-artifact-v1",
+          "publisherSignature": "15fe3c0af2c44f0fc1e83ee1e541b7c7382a63607e3f2c7cdde6ef68bb4ed74c50e43bab273b0230c0a6654b45316b55e194bae3f81e04e58bf972374763ca0a",
+          "signatureIdentity": "ed25519:fe7fc9912d9807705bd80897d21bfdee9b8e4b30aeddd2ba717c47e75d50b7b1"
+        }
+      }
+    }
+  }
+}

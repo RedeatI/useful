@@ -1,0 +1,98 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.useful.example/trp/v1/repository-discovery.schema.json",
+  "title": "TRP v1 Repository Discovery",
+  "description": "GET /.well-known/useful-repository.json 的响应。注意：discovery 文件本身不构成信任根；服务器自报 source.id 不构成官方身份；官方身份仅由客户端预置根公钥指纹匹配确认。capabilities 不包含、也不能包含任何更新 Useful 客户端主程序的能力。",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "source", "repository", "capabilities"],
+  "properties": {
+    "schemaVersion": {
+      "type": "string",
+      "const": "1.0"
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "name", "operator"],
+      "properties": {
+        "id": {
+          "$ref": "common.schema.json#/$defs/lowercaseId",
+          "description": "源自报 ID。仅用于展示与本地键，绝不用于确认官方身份。"
+        },
+        "name": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "description": { "type": "string", "maxLength": 2000 },
+        "operator": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "homepage": { "$ref": "common.schema.json#/$defs/httpsUrl" },
+        "supportUrl": { "$ref": "common.schema.json#/$defs/httpsUrl" }
+      }
+    },
+    "repository": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["profile", "metadataBaseUrl", "targetsBaseUrl", "rootUrl", "rootSha256"],
+      "properties": {
+        "profile": {
+          "type": "string",
+          "description": "元数据信任模型。首版仅 tuf-v1。",
+          "enum": ["tuf-v1"]
+        },
+        "metadataBaseUrl": { "$ref": "common.schema.json#/$defs/httpsUrl" },
+        "targetsBaseUrl": { "$ref": "common.schema.json#/$defs/httpsUrl" },
+        "rootUrl": {
+          "$ref": "common.schema.json#/$defs/httpsUrl",
+          "description": "候选 root metadata 地址；只能用于获取候选 root，不构成信任。"
+        },
+        "rootSha256": { "$ref": "common.schema.json#/$defs/sha256" }
+      }
+    },
+    "api": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["baseUrl"],
+      "properties": {
+        "baseUrl": { "$ref": "common.schema.json#/$defs/httpsUrl" }
+      }
+    },
+    "capabilities": {
+      "type": "object",
+      "description": "源能力协商。此对象禁止出现任何客户端主程序更新相关能力键（如 appUpdate/clientUpdate）——additionalProperties=false 从结构上保证普通工具源无法声明更新客户端。",
+      "additionalProperties": false,
+      "required": ["catalog"],
+      "properties": {
+        "catalog": { "type": "boolean" },
+        "remoteSearch": { "type": "boolean" },
+        "authentication": { "type": "boolean" },
+        "entitlements": { "type": "boolean" },
+        "paidDownloads": { "type": "boolean" },
+        "publisherPortal": { "type": "boolean" },
+        "privateTools": { "type": "boolean" },
+        "staticMirror": { "type": "boolean" },
+        "nativeWorkers": {
+          "type": "boolean",
+          "description": "是否允许分发原生 worker 工具。公开源默认 false。"
+        }
+      }
+    },
+    "auth": {
+      "type": "object",
+      "description": "OAuth 配置。仅 authorization-code + PKCE S256；禁止 implicit/password flow。",
+      "additionalProperties": false,
+      "required": ["type", "issuer", "clientId", "scopes"],
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["oauth2-pkce"]
+        },
+        "issuer": { "$ref": "common.schema.json#/$defs/httpsUrl" },
+        "clientId": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "scopes": {
+          "type": "array",
+          "minItems": 0,
+          "maxItems": 32,
+          "items": { "type": "string", "minLength": 1, "maxLength": 64 }
+        }
+      }
+    }
+  }
+}

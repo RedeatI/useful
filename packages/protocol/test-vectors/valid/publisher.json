@@ -1,0 +1,14 @@
+{
+  "publisherId": "com.example.community",
+  "displayName": "Example Community",
+  "homepage": "https://tools.example.com",
+  "keys": [
+    {
+      "keyId": "ed25519:9f8e7d6c5b4a39281706f5e4d3c2b1a09f8e7d6c5b4a3928",
+      "algorithm": "ed25519",
+      "publicKey": "MCowBQYDK2VwAyEAexampleexampleexampleexampleexampleexampleex",
+      "status": "active",
+      "createdAt": "2026-01-01T00:00:00Z"
+    }
+  ]
+}

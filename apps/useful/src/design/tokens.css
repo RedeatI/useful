@@ -1,0 +1,127 @@
+/* 轻量设计系统：Fluent 风格 token。深浅主题通过 data-theme 切换。 */
+:root {
+  /* 品牌色 */
+  --useful-accent: #1ca7c4;
+  --useful-accent-hover: #38e1d6;
+  --useful-accent-fg: #ffffff;
+
+  /* 圆角 */
+  --useful-radius-sm: 4px;
+  --useful-radius-md: 8px;
+  --useful-radius-lg: 12px;
+
+  /* 间距 */
+  --useful-space-1: 4px;
+  --useful-space-2: 8px;
+  --useful-space-3: 12px;
+  --useful-space-4: 16px;
+  --useful-space-5: 24px;
+  --useful-space-6: 32px;
+
+  /* 阴影 */
+  --useful-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.12);
+  --useful-shadow-md: 0 4px 12px rgba(0, 0, 0, 0.16);
+  --useful-shadow-lg: 0 8px 28px rgba(0, 0, 0, 0.24);
+
+  /* 字体 */
+  --useful-font: "Segoe UI", "Microsoft YaHei UI", "Microsoft YaHei", system-ui, sans-serif;
+  --useful-font-mono: "Cascadia Mono", "Consolas", monospace;
+  --useful-text-xs: 12px;
+  --useful-text-sm: 13px;
+  --useful-text-md: 14px;
+  --useful-text-lg: 16px;
+  --useful-text-xl: 20px;
+  --useful-text-2xl: 28px;
+
+  --useful-sidebar-width: 240px;
+  --useful-sidebar-width-collapsed: 56px;
+  --useful-transition: 160ms cubic-bezier(0.33, 0, 0.2, 1);
+}
+
+/* 浅色主题（默认） */
+:root,
+[data-theme="light"] {
+  color-scheme: light;
+  --useful-bg: #f3f3f3;
+  --useful-bg-layer: #ffffff;
+  --useful-bg-elevated: #ffffff;
+  --useful-bg-hover: rgba(0, 0, 0, 0.04);
+  --useful-bg-active: rgba(0, 0, 0, 0.08);
+  --useful-bg-selected: rgba(28, 167, 196, 0.12);
+  --useful-border: rgba(0, 0, 0, 0.08);
+  --useful-border-strong: rgba(0, 0, 0, 0.16);
+  --useful-text: #1a1a1a;
+  --useful-text-secondary: #5a5a5a;
+  --useful-text-tertiary: #8a8a8a;
+  --useful-danger: #c42b1c;
+  --useful-success: #0f7b0f;
+  --useful-warning: #9d5d00;
+}
+
+/* 深色主题 */
+[data-theme="dark"] {
+  color-scheme: dark;
+  --useful-bg: #202020;
+  --useful-bg-layer: #2b2b2b;
+  --useful-bg-elevated: #323232;
+  --useful-bg-hover: rgba(255, 255, 255, 0.06);
+  --useful-bg-active: rgba(255, 255, 255, 0.1);
+  --useful-bg-selected: rgba(56, 225, 214, 0.16);
+  --useful-border: rgba(255, 255, 255, 0.08);
+  --useful-border-strong: rgba(255, 255, 255, 0.16);
+  --useful-text: #f5f5f5;
+  --useful-text-secondary: #c8c8c8;
+  --useful-text-tertiary: #9a9a9a;
+  --useful-danger: #ff99a4;
+  --useful-success: #6ccb5f;
+  --useful-warning: #fce100;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#app {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  font-family: var(--useful-font);
+  font-size: var(--useful-text-md);
+  color: var(--useful-text);
+  background: var(--useful-bg);
+  -webkit-font-smoothing: antialiased;
+  overflow: hidden;
+}
+
+/* 无障碍：可见焦点环 */
+:focus-visible {
+  outline: 2px solid var(--useful-accent);
+  outline-offset: 2px;
+  border-radius: var(--useful-radius-sm);
+}
+
+/* 尊重降低动态效果偏好 */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition: none !important;
+    animation: none !important;
+  }
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--useful-border-strong);
+  border-radius: 6px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}

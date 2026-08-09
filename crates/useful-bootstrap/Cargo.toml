@@ -1,0 +1,35 @@
+[package]
+name = "useful-bootstrap"
+version.workspace = true
+edition.workspace = true
+license = "MPL-2.0"
+description = "Useful 便携客户端更新引导器：独立信任域，验证-备份-原子替换-回滚"
+
+[target.'cfg(windows)'.build-dependencies]
+tauri-winres = "0.3.6"
+
+[lib]
+name = "useful_bootstrap"
+path = "src/lib.rs"
+
+[[bin]]
+name = "useful-bootstrap"
+path = "src/main.rs"
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+sha2.workspace = true
+hex.workspace = true
+ed25519-dalek = { workspace = true }
+semver.workspace = true
+zip.workspace = true
+# 更新源 feed 拉取（阻塞式小客户端；bootstrap 不引入 tokio 运行时）
+reqwest = { version = "0.12", default-features = false, features = ["native-tls", "blocking"] }
+
+[dev-dependencies]
+tempfile.workspace = true
+ed25519-dalek = { workspace = true, features = ["rand_core"] }
+rand = "0.8"
+proptest = { workspace = true }

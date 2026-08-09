@@ -1,0 +1,13 @@
+{
+  "schemaVersion": "useful.license-mapping-approval.v1",
+  "approved": false,
+  "legalReviewer": "REPLACE_WITH_LEGAL_REVIEWER_NAME",
+  "reviewedOn": "YYYY-MM-DD",
+  "mapping": {
+    "desktopRust": "MPL-2.0",
+    "backend": "AGPL-3.0-or-later",
+    "protocolSdkCliExamples": "Apache-2.0",
+    "docs": "CC-BY-4.0"
+  },
+  "notes": "Set approved=true only after counsel review. generate-root-license refuses generic holders and will not overwrite an existing LICENSE."
+}

@@ -1,0 +1,111 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="820" viewBox="0 0 1440 820" role="img" aria-labelledby="title desc">
+  <title id="title">Useful 中文使用旅程</title>
+  <desc id="desc">从搜索工具、本地处理、权限确认到获得可复现结果的四步中文使用流程。</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#effcff"/>
+      <stop offset="0.52" stop-color="#f7fafc"/>
+      <stop offset="1" stop-color="#fff8ec"/>
+    </linearGradient>
+    <linearGradient id="cyan" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#168faa"/>
+      <stop offset="1" stop-color="#35d6cc"/>
+    </linearGradient>
+    <linearGradient id="warm" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#ffca67"/>
+      <stop offset="1" stop-color="#ff986a"/>
+    </linearGradient>
+    <filter id="shadow" x="-14%" y="-16%" width="128%" height="140%">
+      <feDropShadow dx="0" dy="12" stdDeviation="18" flood-color="#173c47" flood-opacity="0.11"/>
+    </filter>
+    <marker id="arrow" markerWidth="11" markerHeight="11" refX="9" refY="5.5" orient="auto">
+      <path d="M0 0 11 5.5 0 11z" fill="#77a9b3"/>
+    </marker>
+  </defs>
+
+  <rect width="1440" height="820" rx="28" fill="url(#bg)"/>
+  <circle cx="1288" cy="104" r="205" fill="#31d4cb" opacity="0.08"/>
+  <circle cx="116" cy="760" r="230" fill="#ffb462" opacity="0.08"/>
+
+  <g font-family="Segoe UI, Microsoft YaHei UI, PingFang SC, sans-serif">
+    <rect x="64" y="56" width="124" height="30" rx="15" fill="#dff7fa"/>
+    <text x="126" y="77" text-anchor="middle" font-size="12" font-weight="700" letter-spacing="1.4" fill="#147f94">中文使用旅程</text>
+    <text x="64" y="132" font-size="34" font-weight="750" fill="#17333c">搜得到 · 看得懂 · 控得住 · 可复现</text>
+    <text x="64" y="170" font-size="16" fill="#5d747c">Useful 把常用工具与受控 Action 放进同一条清晰路径，默认在本机完成。</text>
+
+    <path d="M340 403H394M676 403H730M1012 403H1066" stroke="#77a9b3" stroke-width="3" stroke-linecap="round" marker-end="url(#arrow)"/>
+
+    <g filter="url(#shadow)">
+      <rect x="64" y="232" width="276" height="342" rx="22" fill="#ffffff" stroke="#d8e7ea"/>
+      <rect x="88" y="256" width="56" height="56" rx="16" fill="#e0f7fa"/>
+      <circle cx="111" cy="279" r="10" fill="none" stroke="#168faa" stroke-width="3"/>
+      <path d="m119 287 10 10" stroke="#168faa" stroke-width="3" stroke-linecap="round"/>
+      <text x="88" y="345" font-size="12" font-weight="700" letter-spacing="1.4" fill="#168faa">01 · 找到能力</text>
+      <text x="88" y="382" font-size="23" font-weight="700" fill="#18343d">搜索、筛选、固定</text>
+      <text x="88" y="417" font-size="14" fill="#647980">内置工具、已安装工具与</text>
+      <text x="88" y="441" font-size="14" fill="#647980">Agent Action 共用一个入口。</text>
+      <g font-size="12" fill="#496068">
+        <rect x="88" y="477" width="68" height="28" rx="9" fill="#eef7f8"/><text x="122" y="496" text-anchor="middle">Base64</text>
+        <rect x="164" y="477" width="58" height="28" rx="9" fill="#eef7f8"/><text x="193" y="496" text-anchor="middle">JSON</text>
+        <rect x="230" y="477" width="64" height="28" rx="9" fill="#eef7f8"/><text x="262" y="496" text-anchor="middle">Hash</text>
+      </g>
+      <circle cx="94" cy="540" r="4" fill="#35b7b0"/><text x="108" y="545" font-size="12" fill="#6b7d83">来源与权限数量始终可见</text>
+    </g>
+
+    <g filter="url(#shadow)">
+      <rect x="400" y="232" width="276" height="342" rx="22" fill="#ffffff" stroke="#d8e7ea"/>
+      <rect x="424" y="256" width="56" height="56" rx="16" fill="#e8f8ed"/>
+      <path d="M438 284h28M442 274h20M446 294h12" stroke="#3a8750" stroke-width="3" stroke-linecap="round"/>
+      <text x="424" y="345" font-size="12" font-weight="700" letter-spacing="1.4" fill="#3a8750">02 · 本地处理</text>
+      <text x="424" y="382" font-size="23" font-weight="700" fill="#18343d">数据默认留在本机</text>
+      <text x="424" y="417" font-size="14" fill="#647980">纯函数工具直接执行；Useful</text>
+      <text x="424" y="441" font-size="14" fill="#647980">不内置模型，也不自动联网。</text>
+      <rect x="424" y="477" width="214" height="44" rx="12" fill="#f1faf4" stroke="#cfe9d6"/>
+      <circle cx="449" cy="499" r="8" fill="#4ba460"/>
+      <path d="m445 499 3 3 6-7" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      <text x="467" y="504" font-size="13" font-weight="600" fill="#397447">Local execution</text>
+      <text x="424" y="550" font-size="12" fill="#6b7d83">输入不会因 Agent 接入而外发</text>
+    </g>
+
+    <g filter="url(#shadow)">
+      <rect x="736" y="232" width="276" height="342" rx="22" fill="#ffffff" stroke="#eadfca"/>
+      <rect x="760" y="256" width="56" height="56" rx="16" fill="#fff3dc"/>
+      <path d="M775 281v-6a13 13 0 0 1 26 0v6M771 281h34v25h-34z" fill="none" stroke="#ad7200" stroke-width="3" stroke-linejoin="round"/>
+      <circle cx="788" cy="293" r="3" fill="#ad7200"/>
+      <text x="760" y="345" font-size="12" font-weight="700" letter-spacing="1.4" fill="#9b6907">03 · 明确边界</text>
+      <text x="760" y="382" font-size="23" font-weight="700" fill="#18343d">需要权限时再询问</text>
+      <text x="760" y="417" font-size="14" fill="#647980">文件、网络、进程控制与安装</text>
+      <text x="760" y="441" font-size="14" fill="#647980">都必须声明、检查并确认。</text>
+      <g font-size="12">
+        <rect x="760" y="477" width="214" height="44" rx="12" fill="#fff9ee" stroke="#f0dbb3"/>
+        <text x="776" y="496" font-weight="700" fill="#77500a">导入视频需要解码器</text>
+        <text x="776" y="513" fill="#8b7449">现在打开组件页面？</text>
+      </g>
+      <text x="760" y="550" font-size="12" fill="#6b7d83">不会静默下载或绕过确认</text>
+    </g>
+
+    <g filter="url(#shadow)">
+      <rect x="1072" y="232" width="304" height="342" rx="22" fill="#ffffff" stroke="#d8e7ea"/>
+      <rect x="1096" y="256" width="56" height="56" rx="16" fill="url(#cyan)"/>
+      <path d="m1111 283 9 9 18-21" fill="none" stroke="#ffffff" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
+      <text x="1096" y="345" font-size="12" font-weight="700" letter-spacing="1.4" fill="#168faa">04 · 得到结果</text>
+      <text x="1096" y="382" font-size="23" font-weight="700" fill="#18343d">输出清楚、可复现</text>
+      <text x="1096" y="417" font-size="14" fill="#647980">GUI、JSON CLI 与本地 MCP</text>
+      <text x="1096" y="441" font-size="14" fill="#647980">共享同一 Action 契约。</text>
+      <rect x="1096" y="477" width="248" height="48" rx="12" fill="#f3f8f9"/>
+      <text x="1112" y="498" font-family="Consolas, monospace" font-size="11" fill="#39707c">{ "ok": true,</text>
+      <text x="1112" y="514" font-family="Consolas, monospace" font-size="11" fill="#39707c">  "action": "hash.sha256" }</text>
+      <text x="1096" y="550" font-size="12" fill="#6b7d83">稳定退出码 · 可取消 · 可审计</text>
+    </g>
+
+    <rect x="64" y="632" width="1312" height="124" rx="20" fill="#17343d"/>
+    <text x="96" y="675" font-size="14" font-weight="700" fill="#8de7e0">同一个能力模型</text>
+    <text x="96" y="711" font-size="22" font-weight="700" fill="#ffffff">桌面操作与 Agent 调用遵守同一套权限规则</text>
+    <g font-size="13" font-weight="600">
+      <rect x="906" y="665" width="116" height="42" rx="13" fill="#244c56"/><text x="964" y="691" text-anchor="middle" fill="#d9f4f5">Desktop GUI</text>
+      <rect x="1034" y="665" width="116" height="42" rx="13" fill="#244c56"/><text x="1092" y="691" text-anchor="middle" fill="#d9f4f5">JSON CLI</text>
+      <rect x="1162" y="665" width="166" height="42" rx="13" fill="#244c56"/><text x="1245" y="691" text-anchor="middle" fill="#d9f4f5">Local stdio MCP</text>
+      <rect x="1138" y="716" width="190" height="24" rx="12" fill="#2d695f"/><text x="1233" y="733" text-anchor="middle" font-size="11" fill="#bff5dc">默认本地 · 权限不升级</text>
+    </g>
+  </g>
+</svg>

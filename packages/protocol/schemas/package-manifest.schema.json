@@ -1,0 +1,117 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.useful.example/trp/v1/package-manifest.schema.json",
+  "title": "TRP v1 Package Manifest",
+  "description": ".useful 包内 manifest.json。不可变：价格、订阅、商品信息禁止写入此处（放 CatalogOffer）。工具全局身份 = publisher.keyId + toolId。",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "toolId",
+    "name",
+    "version",
+    "publisher",
+    "entry",
+    "platforms",
+    "architectures",
+    "permissions",
+    "minHostVersion",
+    "license",
+    "build",
+    "files"
+  ],
+  "properties": {
+    "schemaVersion": { "type": "string", "const": "1.0" },
+    "toolId": { "$ref": "common.schema.json#/$defs/lowercaseId" },
+    "name": { "type": "string", "minLength": 1, "maxLength": 200 },
+    "version": { "$ref": "common.schema.json#/$defs/semver" },
+    "publisher": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["keyId", "name"],
+      "properties": {
+        "keyId": { "$ref": "common.schema.json#/$defs/publisherKeyId" },
+        "name": { "type": "string", "minLength": 1, "maxLength": 200 }
+      }
+    },
+    "description": { "type": "string", "maxLength": 4000 },
+    "entry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "path"],
+      "properties": {
+        "type": { "type": "string", "enum": ["web", "launcher", "worker"] },
+        "path": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024,
+          "description": "相对路径；禁止绝对路径、.. 与符号链接逃逸（安装期二次校验）。",
+          "not": { "pattern": "(^([a-zA-Z]:)?[\\\\/])|(\\.\\.)" }
+        },
+        "args": {
+          "type": "array",
+          "maxItems": 64,
+          "items": { "type": "string", "maxLength": 1024 }
+        }
+      }
+    },
+    "platforms": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 8,
+      "uniqueItems": true,
+      "items": { "$ref": "common.schema.json#/$defs/platform" }
+    },
+    "architectures": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 4,
+      "uniqueItems": true,
+      "items": { "$ref": "common.schema.json#/$defs/arch" }
+    },
+    "permissions": {
+      "type": "array",
+      "maxItems": 128,
+      "uniqueItems": true,
+      "items": { "$ref": "common.schema.json#/$defs/permission" }
+    },
+    "minHostVersion": { "$ref": "common.schema.json#/$defs/semver" },
+    "license": { "$ref": "common.schema.json#/$defs/spdxLicenseExpression" },
+    "sourceCode": { "$ref": "common.schema.json#/$defs/httpsUrl" },
+    "homepage": { "$ref": "common.schema.json#/$defs/httpsUrl" },
+    "changelog": { "type": "string", "maxLength": 20000 },
+    "build": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sourceCommit", "buildTimestamp", "builder", "reproducible"],
+      "properties": {
+        "sourceCommit": { "type": "string", "minLength": 7, "maxLength": 64 },
+        "buildTimestamp": { "$ref": "common.schema.json#/$defs/rfc3339" },
+        "builder": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "reproducible": { "type": "boolean" },
+        "provenanceReference": { "type": "string", "maxLength": 1024 }
+      }
+    },
+    "files": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 100000,
+      "description": "包内文件清单，每项含相对路径与 SHA-256。",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["path", "sha256", "size"],
+        "properties": {
+          "path": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1024,
+            "not": { "pattern": "(^([a-zA-Z]:)?[\\\\/])|(\\.\\.)" }
+          },
+          "sha256": { "$ref": "common.schema.json#/$defs/sha256" },
+          "size": { "type": "integer", "minimum": 0, "maximum": 5368709120 }
+        }
+      }
+    }
+  }
+}

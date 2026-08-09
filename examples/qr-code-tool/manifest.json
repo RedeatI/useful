@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "id": "com.useful.qr-code",
+  "name": "离线二维码",
+  "version": "1.0.0",
+  "description": "使用固定版本 MIT 依赖在本地离线生成二维码。",
+  "entry": { "type": "web", "path": "index.html" },
+  "contributes": { "sidebar": [{ "id": "main", "title": "离线二维码", "group": "installed", "order": 52 }] },
+  "permissions": [],
+  "platforms": ["windows-x64"],
+  "minHostVersion": "0.1.0-beta.1"
+}

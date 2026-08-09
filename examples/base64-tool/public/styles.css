@@ -1,0 +1,11 @@
+:root { color-scheme: light dark; font-family: "Segoe UI", "Microsoft YaHei", sans-serif; }
+body { margin: 0; background: Canvas; color: CanvasText; }
+main { padding: 24px; }
+h1 { margin-top: 0; }
+.privacy, #status { color: GrayText; }
+.toolbar { display: flex; gap: 8px; margin: 16px 0; }
+button { border: 1px solid #168ca4; border-radius: 7px; padding: 7px 14px; background: #168ca4; color: white; cursor: pointer; }
+button.secondary { background: transparent; color: CanvasText; }
+.columns { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+textarea, pre { box-sizing: border-box; min-height: 260px; margin: 0; padding: 12px; border: 1px solid GrayText; border-radius: 8px; background: Field; color: FieldText; overflow: auto; white-space: pre-wrap; word-break: break-all; }
+@media (max-width: 680px) { .columns { grid-template-columns: 1fr; } }

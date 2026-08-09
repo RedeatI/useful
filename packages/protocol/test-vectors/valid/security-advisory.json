@@ -1,0 +1,17 @@
+{
+  "advisoryId": "USEFUL-2026-0001",
+  "identity": {
+    "publisherKeyId": "ed25519:1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f",
+    "toolId": "com.useful.video-pro"
+  },
+  "severity": "high",
+  "affectedVersions": [
+    { "version": "1.4.0", "withdrawn": true },
+    { "version": "1.4.1", "withdrawn": true }
+  ],
+  "fixedIn": "1.4.2",
+  "summary": "1.4.0 与 1.4.1 存在处理超长文件名时的越界读取，建议升级到 1.4.2。",
+  "references": ["https://tools.example.com/advisories/USEFUL-2026-0001"],
+  "cve": null,
+  "publishedAt": "2026-07-25T10:00:00Z"
+}

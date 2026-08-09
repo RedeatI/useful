@@ -1,0 +1,16 @@
+{
+  "description": "有效测试向量到其 schema 文件的映射。每个 valid/ 文件都必须通过对应 schema。",
+  "valid": [
+    { "file": "repository-discovery.official.json", "schema": "repository-discovery.schema.json" },
+    { "file": "repository-discovery.thirdparty-static.json", "schema": "repository-discovery.schema.json" },
+    { "file": "package-manifest.json", "schema": "package-manifest.schema.json" },
+    { "file": "catalog-entry.free.json", "schema": "catalog-entry.schema.json" },
+    { "file": "publisher.json", "schema": "publisher.schema.json" },
+    { "file": "download-grant.json", "schema": "download-grant.schema.json" },
+    { "file": "entitlement.json", "schema": "entitlement.schema.json" },
+    { "file": "security-advisory.json", "schema": "security-advisory.schema.json" },
+    { "file": "source-definition.json", "schema": "source-definition.schema.json" },
+    { "file": "app-update-source.json", "schema": "app-update-source.schema.json" },
+    { "file": "installed-origin.json", "schema": "installed-origin.schema.json" }
+  ]
+}

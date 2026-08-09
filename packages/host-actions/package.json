@@ -1,0 +1,23 @@
+{
+  "name": "@useful/host-actions",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Useful built-in native host actions with explicit local policy and fail-closed process boundaries.",
+  "exports": {
+    ".": {
+      "types": "./src/index.d.ts",
+      "import": "./src/index.mjs"
+    },
+    "./schema": "./src/useful.host-actions.v1.schema.json"
+  },
+  "scripts": {
+    "test": "node --test",
+    "typecheck": "node --check src/index.mjs"
+  },
+  "devDependencies": {
+    "@useful/action-runtime": "workspace:^",
+    "ajv": "^8.17.1"
+  },
+  "license": "MPL-2.0"
+}

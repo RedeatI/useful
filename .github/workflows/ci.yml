@@ -1,0 +1,215 @@
+name: CI
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+on:
+  workflow_dispatch:
+
+# 第三方 Action 固定到解析过的 commit SHA；尾注保留对应主版本便于审计更新。
+
+jobs:
+  # ---- 桌面端 / 前端 / Rust ----
+  build-and-test:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: 安装 pnpm
+        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+        with:
+          version: 9.15.0
+      - name: 安装 Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 20
+          cache: pnpm
+      - name: 安装 Rust（固定 rust-toolchain.toml）
+        uses: dtolnay/rust-toolchain@4cda84d5c5c54efe2404f9d843567869ab1699d4 # 1.97.1
+        with:
+          toolchain: 1.97.1
+          components: rustfmt, clippy
+          targets: x86_64-pc-windows-msvc
+      - name: 缓存 Cargo
+        uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
+        with:
+          workspaces: "."
+      - name: 安装前端依赖
+        run: pnpm install --frozen-lockfile
+      - name: 产品版本与发布通道漂移检查
+        run: node scripts/check-version-drift.mjs --json
+      - name: Useful 品牌标识一致性检查
+        run: node scripts/check-brand.mjs --json
+      - name: GitHub Actions 权限与固定版本检查
+        run: node scripts/check-workflows.mjs --json
+      - name: 双语界面硬编码检查
+        run: node scripts/check-i18n.mjs --json
+      - name: 公开源码必要文件、链接与敏感内容检查
+        run: node scripts/public-source-check.mjs --json
+      - name: 公开发布策略回归测试
+        run: pnpm policy:test
+      - name: 公开发布源码就绪硬门禁
+        run: node scripts/release-readiness.mjs --json
+      - name: 生成图标与测试夹具
+        run: |
+          node scripts/gen-icons.mjs
+          node scripts/make-fixtures.mjs
+      - name: 前端 Lint
+        run: pnpm -r lint
+      - name: TypeScript 类型检查
+        run: pnpm -r typecheck
+      - name: 前端测试
+        run: pnpm -r test
+      - name: 前端构建
+        run: pnpm -r build
+      - name: cargo fmt 检查
+        run: cargo fmt --all -- --check
+      - name: cargo clippy
+        run: cargo clippy --workspace --all-targets -- -D warnings
+      - name: cargo test
+        run: cargo test --workspace
+      - name: Tauri + bootstrap development-trust unsigned preview Portable Lite 构建
+        env:
+          USEFUL_ALLOW_DEVELOPMENT_UPDATE_TRUST: "1"
+        run: |
+          pnpm --filter @useful/app tauri build --no-bundle
+          cargo build -p useful-bootstrap --release
+      - name: 生成 SBOM (CycloneDX)
+        run: node scripts/gen-sbom.mjs
+      - name: 打包 Useful Portable Lite development-trust unsigned preview
+        shell: pwsh
+        run: powershell -ExecutionPolicy Bypass -File scripts/package-release.ps1 -Edition Lite
+      - name: 上传 Useful Portable Lite development-trust unsigned preview
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: useful-portable-lite-x64-development-trust-unsigned-preview
+          path: |
+            dist-release/Useful-Portable-Lite-x64.zip
+            dist-release/SHA256SUMS.txt
+          if-no-files-found: error
+      - name: 上传 SBOM 与第三方声明
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: useful-sbom
+          path: |
+            dist-sbom/sbom.cdx.json
+            THIRD_PARTY_NOTICES.md
+          if-no-files-found: error
+
+  # ---- 协议 + CLI（密钥工具链）门禁 ----
+  protocol-and-cli:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+        with:
+          version: 9.15.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 20
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: 协议 schema + 测试向量 + 兼容性
+        run: node --test
+        working-directory: packages/protocol
+      - name: CLI（source + key/app-update）测试
+        run: npx vitest run
+        working-directory: packages/useful-cli
+      - name: 漂移检查（迁移/schema/生成类型）
+        run: node scripts/check-drift.mjs
+      - name: 文档命令冒烟（DEVELOPER-GUIDE Quick Start）
+        run: node scripts/doc-smoke.mjs
+
+  # ---- Go 后端：门禁 + 迁移（全量）+ 供应链 ----
+  source-backend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: services
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: 安装 Go
+        uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
+        with:
+          go-version: "1.26"
+          cache-dependency-path: services/go.sum
+      - name: go fmt 检查
+        run: test -z "$(gofmt -l .)"
+      - name: go vet
+        run: go vet ./...
+      - name: go test -race
+        run: go test -race ./...
+      - name: 构建 server 与 worker
+        run: |
+          go build -o "$RUNNER_TEMP/useful-source-server" ./source-server/cmd/server
+          go build -o "$RUNNER_TEMP/useful-source-worker" ./source-worker/cmd/worker
+      - name: govulncheck（Go 漏洞扫描）
+        run: |
+          go install golang.org/x/vuln/cmd/govulncheck@v1.6.0
+          $(go env GOPATH)/bin/govulncheck ./...
+      - name: 迁移全量应用（0001-0006，按序）+ 真实幂等重放
+        run: |
+          set -euo pipefail
+          docker run --rm -e POSTGRES_PASSWORD=ci -d --name pg -p 5432:5432 postgres:16-alpine
+          trap 'docker rm -f pg >/dev/null 2>&1 || true' EXIT
+          for i in $(seq 1 30); do docker exec pg pg_isready -U postgres && break; sleep 2; done
+          TEST_DATABASE_URL='postgres://postgres:ci@127.0.0.1:5432/postgres?sslmode=disable' \
+            go test -count=1 -tags pgintegration ./internal/repository/postgres
+          docker exec pg psql -U postgres -c "SELECT version, name FROM migrations ORDER BY version;"
+
+  # ---- Go 原生 fuzz 冒烟（短时；发现崩溃即失败）----
+  fuzz-smoke:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: services
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
+        with:
+          go-version: "1.26"
+          cache-dependency-path: services/go.sum
+      - name: fuzz 域校验器
+        run: go test ./internal/domain/ -run='^$' -fuzz=FuzzIsLowercaseID -fuzztime=20s
+      - name: fuzz Sigstore bundle
+        run: go test ./internal/publishers/ -run='^$' -fuzz=FuzzVerifySigstoreBundle -fuzztime=20s
+      - name: fuzz TUF metadata
+        run: go test ./internal/tufmeta/ -run='^$' -fuzz=FuzzVerify -fuzztime=20s
+      - name: fuzz HTTP 路径校验（防穿越）
+        run: go test ./internal/httpapi/ -run='^$' -fuzz=FuzzMetadataName -fuzztime=20s
+
+  # ---- Compose 端到端（发布/认证/可用性/撤回/公告/metrics）----
+  compose-e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 20
+      - name: Compose E2E
+        working-directory: deploy/docker-compose
+        run: |
+          node e2e/prepare.mjs
+          docker compose --profile e2e down -v --remove-orphans
+          docker compose --profile e2e up --build --abort-on-container-exit --exit-code-from e2e-runner
+
+  # ---- 平台受限验证矩阵（仅显式手动运行）----
+  # 对应退出条件 11（Compose 故障注入）/12（原生 Tauri smoke）/14（大文件续传+回滚）。
+  platform-limited-matrix:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        scenario:
+          - native-tauri-smoke      # 退出条件 12：真实 IPC smoke（UI Automation）
+          - large-file-resume       # 退出条件 14：1GB/10GB 断点续传 + 安装回滚
+          - compose-fault-injection # 退出条件 11：PostgreSQL/对象存储/worker 中断
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: 运行平台受限场景 ${{ matrix.scenario }}
+        shell: pwsh
+        run: powershell -ExecutionPolicy Bypass -File scripts/platform-matrix.ps1 -Scenario ${{ matrix.scenario }}
