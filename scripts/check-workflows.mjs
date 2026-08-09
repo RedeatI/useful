@@ -565,8 +565,37 @@ function inspectReleaseWorkflow(file, workflow) {
   ]) {
     if (!sourcePublishRun.includes(required)) violations.push({ file, code: "release-source-publish-revalidation-missing", details: required });
   }
+  const sourceCheckoutIndex = stepIndex(sourcePublish, (step) => (
+    runnableStep(step) && String(step?.uses ?? "").startsWith("actions/checkout@")
+  ));
+  const sourcePnpmSetupIndex = stepIndex(sourcePublish, (step) => (
+    runnableStep(step)
+    && String(step?.uses ?? "").startsWith("pnpm/action-setup@")
+    && String(step?.with?.version ?? "") === "9.15.0"
+  ));
+  const sourceNodeSetupIndex = stepIndex(sourcePublish, (step) => (
+    runnableStep(step)
+    && String(step?.uses ?? "").startsWith("actions/setup-node@")
+    && String(step?.with?.["node-version"] ?? "") === "20"
+    && String(step?.with?.cache ?? "") === "pnpm"
+  ));
+  const sourceInstallIndex = stepIndex(sourcePublish, (step) => (
+    stepRunsExact(step, "pnpm install --frozen-lockfile")
+  ));
   const sourceCheckIndex = stepIndex(sourcePublish, (step) => String(step?.run ?? "").includes("public-source-check.mjs --json"));
   const sourceDownloadIndex = stepIndex(sourcePublish, (step) => String(step?.uses ?? "").startsWith("actions/download-artifact@"));
+  if (
+    sourceCheckoutIndex < 0
+    || sourcePnpmSetupIndex < 0
+    || sourceNodeSetupIndex < 0
+    || sourceInstallIndex < 0
+    || sourceCheckoutIndex >= sourcePnpmSetupIndex
+    || sourcePnpmSetupIndex >= sourceNodeSetupIndex
+    || sourceNodeSetupIndex >= sourceInstallIndex
+    || sourceInstallIndex >= sourceCheckIndex
+  ) {
+    violations.push({ file, code: "release-source-publish-dependencies-missing" });
+  }
   if (sourceCheckIndex < 0 || sourceDownloadIndex < 0 || sourceCheckIndex >= sourceDownloadIndex) {
     violations.push({ file, code: "release-source-check-not-clean", details: "publish-source-agent-kit" });
   }

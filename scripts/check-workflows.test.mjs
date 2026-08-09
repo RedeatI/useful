@@ -305,6 +305,82 @@ test("release Agent Kit invocation does not forward a literal option separator",
   );
 });
 
+test("source publish installs dependencies before revalidating public source", async (t) => {
+  const root = await createFixture(t);
+  await mutateWorkflow(root, "release.yml", (workflow) => {
+    workflow.jobs["publish-source-agent-kit"].steps = workflow.jobs["publish-source-agent-kit"].steps
+      .filter((step) => !String(step.run ?? "").includes("pnpm install --frozen-lockfile"));
+  });
+  assertViolation(
+    runChecker(root),
+    "release.yml",
+    "release-source-publish-dependencies-missing",
+  );
+});
+
+test("source publish cannot defer dependency installation until after public-source revalidation", async (t) => {
+  const root = await createFixture(t);
+  await mutateWorkflow(root, "release.yml", (workflow) => {
+    const steps = workflow.jobs["publish-source-agent-kit"].steps;
+    const installIndex = steps.findIndex((step) => String(step.run ?? "").includes("pnpm install --frozen-lockfile"));
+    const [install] = steps.splice(installIndex, 1);
+    const sourceCheckIndex = steps.findIndex((step) => String(step.run ?? "").includes("public-source-check.mjs --json"));
+    steps.splice(sourceCheckIndex + 1, 0, install);
+  });
+  assertViolation(
+    runChecker(root),
+    "release.yml",
+    "release-source-publish-dependencies-missing",
+  );
+});
+
+test("source publish requires one exact frozen dependency installation command", async (t) => {
+  const root = await createFixture(t);
+  await mutateWorkflow(root, "release.yml", (workflow) => {
+    const steps = workflow.jobs["publish-source-agent-kit"].steps;
+    const install = steps.find((step) => String(step.run ?? "").includes("pnpm install --frozen-lockfile"));
+    install.run = "pnpm install --frozen-lockfile || true";
+  });
+  assertViolation(
+    runChecker(root),
+    "release.yml",
+    "release-source-publish-dependencies-missing",
+  );
+});
+
+test("source publish requires pnpm setup before setup-node", async (t) => {
+  const root = await createFixture(t);
+  await mutateWorkflow(root, "release.yml", (workflow) => {
+    const steps = workflow.jobs["publish-source-agent-kit"].steps;
+    const pnpm = steps.find((step) => String(step.uses ?? "").startsWith("pnpm/action-setup@"));
+    const node = steps.find((step) => String(step.uses ?? "").startsWith("actions/setup-node@"));
+    const pnpmIndex = steps.indexOf(pnpm);
+    const nodeIndex = steps.indexOf(node);
+    [steps[pnpmIndex], steps[nodeIndex]] = [steps[nodeIndex], steps[pnpmIndex]];
+  });
+  assertViolation(
+    runChecker(root),
+    "release.yml",
+    "release-source-publish-dependencies-missing",
+  );
+});
+
+test("source publish requires exact package-manager setup configuration", async (t) => {
+  const root = await createFixture(t);
+  await mutateWorkflow(root, "release.yml", (workflow) => {
+    const steps = workflow.jobs["publish-source-agent-kit"].steps;
+    const pnpm = steps.find((step) => String(step.uses ?? "").startsWith("pnpm/action-setup@"));
+    const node = steps.find((step) => String(step.uses ?? "").startsWith("actions/setup-node@"));
+    pnpm.with.version = "9.14.0";
+    node.with.cache = "npm";
+  });
+  assertViolation(
+    runChecker(root),
+    "release.yml",
+    "release-source-publish-dependencies-missing",
+  );
+});
+
 test("release shell rejects inline github context interpolation", async (t) => {
   const root = await createFixture(t);
   await mutateWorkflow(root, "release.yml", (workflow) => {
