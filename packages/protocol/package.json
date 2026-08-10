@@ -11,6 +11,10 @@
     "src"
   ],
   "exports": {
+    "./agent-connection": {
+      "types": "./src/agent-connection.d.ts",
+      "import": "./src/agent-connection.mjs"
+    },
     "./agent-integration": {
       "types": "./src/agent-integration.d.ts",
       "import": "./src/agent-integration.mjs"
@@ -21,6 +25,7 @@
   },
   "typesVersions": {
     "*": {
+      "agent-connection": ["src/agent-connection.d.ts"],
       "agent-integration": ["src/agent-integration.d.ts"]
     }
   },

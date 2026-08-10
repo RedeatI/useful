@@ -1,8 +1,11 @@
 import type {
+  AgentIntegrationEnvironment,
+  AgentIntegrationOutput,
   AgentIntegrationPlan,
   AgentIntegrationScope,
   AgentIntegrationTarget,
 } from "@useful/protocol/agent-integration";
+import type { AgentConnection } from "@useful/protocol/agent-connection";
 
 export type { AgentIntegrationPlan, AgentIntegrationScope, AgentIntegrationTarget };
 
@@ -15,28 +18,18 @@ export interface AgentIntegrationInput {
   projectDirectory?: string;
 }
 
-export interface HostCommandOutput {
-  kind: "host-command";
-  commandArgv: string[];
-  powershellCommand: string;
-  requiredWorkingDirectory?: string;
-  writesHostConfigWhenExecuted: true;
-}
+export type { AgentIntegrationEnvironment, AgentIntegrationOutput };
 
-export interface MergeFragmentOutput {
-  kind: "merge-fragment";
-  format: "json" | "toml";
-  configPath?: string;
-  mergeFragment: string | { mcpServers: Record<string, { command: string; args: string[]; env?: Record<string, string> }> };
-  writesHostConfigWhenExecuted: false;
-}
+/** @deprecated Prefer AgentIntegrationOutput narrowed by kind. */
+export type HostCommandOutput = Extract<AgentIntegrationOutput, { kind: "host-command" }>;
 
-export type AgentIntegrationOutput = HostCommandOutput | MergeFragmentOutput;
+/** @deprecated Prefer AgentIntegrationOutput narrowed by kind. */
+export type MergeFragmentOutput = Extract<AgentIntegrationOutput, { kind: "merge-fragment" }>;
 
 export interface AgentIntegrationPlanResult {
   schemaVersion: "useful.agent-integration.v1";
-  plan: AgentIntegrationPlan;
-  output: AgentIntegrationOutput;
+  readonly plan: AgentIntegrationPlan;
+  readonly output: AgentIntegrationOutput;
 }
 
 export interface AgentIntegrationDoctorResult extends AgentIntegrationPlanResult {
@@ -50,14 +43,15 @@ export const AGENT_INTEGRATION_SCOPES: readonly AgentIntegrationScope[];
 
 export class AgentIntegrationError extends Error {
   code: string;
-  details: Record<string, unknown>;
+  details: Readonly<Record<string, unknown>>;
 }
 
-export function validateEnvironment(environment?: Record<string, string>): Record<string, string>;
-export function parseEnvironmentAssignments(assignments?: string[]): Record<string, string>;
-export function quotePowerShellLiteral(value: unknown): string;
+export function validateEnvironment(environment?: Record<string, string>): AgentIntegrationEnvironment;
+export function parseEnvironmentAssignments(assignments?: string[]): AgentIntegrationEnvironment;
+export function quotePowerShellLiteral(value: string): string;
 export function toPowerShellInvocation(commandArgv: string[]): string;
 export function buildAgentIntegrationPlan(input: AgentIntegrationInput): AgentIntegrationPlan;
 export function renderAgentIntegration(plan: AgentIntegrationPlan): AgentIntegrationOutput;
 export function doctorAgentIntegration(input: AgentIntegrationInput): AgentIntegrationDoctorResult;
 export function planAgentIntegration(input: AgentIntegrationInput): AgentIntegrationPlanResult;
+export function exportAgentIntegration(input: AgentIntegrationInput): AgentConnection;

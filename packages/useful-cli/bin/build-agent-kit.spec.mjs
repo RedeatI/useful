@@ -337,6 +337,10 @@ describe("Useful Agent Kit builder", () => {
       "lib/regex-worker-thread.mjs",
       "lib/provenance/agent-integrations/integration.d.ts",
       "lib/provenance/agent-integrations/integration.mjs",
+      "lib/provenance/protocol/agent-connection.d.ts",
+      "lib/provenance/protocol/agent-connection.mjs",
+      "lib/provenance/protocol/agent-integration.d.ts",
+      "lib/provenance/protocol/agent-integration.mjs",
       "lib/provenance/action-runtime/action-suggest.mjs",
       "lib/provenance/action-runtime/builtins.mjs",
       "lib/provenance/action-runtime/office-worker-thread.mjs",
@@ -348,6 +352,7 @@ describe("Useful Agent Kit builder", () => {
       "lib/provenance/office-core/pdf.mjs",
       "lib/provenance/office-core/table-markdown.mjs",
       "lib/useful.plugin-action.v1.schema.json",
+      "schemas/agent-connection.schema.json",
       "schemas/agent-integration.schema.json",
       "schemas/package-manifest.schema.json",
     ]));
@@ -414,6 +419,21 @@ describe("Useful Agent Kit builder", () => {
       process.execPath, agentMcpLauncher,
     ]);
     expect(integrationPlan.output.writesHostConfigWhenExecuted).toBe(true);
+    const integrationExport = expectJsonSuccess(runLauncher(kitRoot, "useful", [
+      "agent", "export",
+      "--target", "codex",
+      "--launcher", agentMcpLauncher,
+      "--env", "NO_COLOR=1",
+      "--json",
+    ]));
+    expect(integrationExport).toMatchObject({
+      schemaVersion: "useful.agent-connection.v1",
+      kind: "mcp-stdio-connection",
+      writePolicy: "manual-review-only",
+      secretPolicy: "no-secrets",
+      plan: { target: "codex", transport: "stdio" },
+    });
+    expect(integrationExport.output.commandArgv).toEqual(integrationPlan.output.commandArgv);
     const integrationDoctor = expectJsonSuccess(runLauncher(kitRoot, "useful", [
       "agent", "doctor",
       "--target", "mcp-servers-json",

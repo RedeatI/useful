@@ -223,7 +223,8 @@ MCP host 推荐绕过 shell launcher，直接配置 `node <ABS_KIT>/lib/useful-m
 
 归档包含 5 个自包含 bundle：3 个命令入口 `useful.mjs`、`useful-runtime.mjs`、`useful-mcp.mjs`，以及
 `regex-worker-thread.mjs`、`office-worker-thread.mjs` 两个固定 worker。descriptor/source digest 使用
-`lib/provenance/action-runtime`、`lib/provenance/office-core` 和 `lib/provenance/host-actions` 中随包保存的
+`lib/provenance/action-runtime`、`lib/provenance/office-core`、`lib/provenance/host-actions` 和
+`lib/provenance/protocol` 中随包保存的
 规范化源码字节，不对压缩后的 bundle 自身或本机路径取摘要。构建器还会根据实际 bundle 输入生成
 `THIRD_PARTY-LICENSES.json`，并把每个依赖包的许可证/notice 原文放在
 `third-party/<package>/<version>/`；缺少包名、版本、license metadata 或许可证文件会 fail closed。
@@ -232,15 +233,27 @@ MCP host 推荐绕过 shell launcher，直接配置 `node <ABS_KIT>/lib/useful-m
 只有受控发布工作流附加到匹配 GitHub Release 的 ZIP 才是官方可用资产。源码/Agent Kit Release 仍不
 表示桌面平台已验证；现有显式 trust config、fail-closed 验证和 profile allowlist 边界全部不变。
 
-## 跨 Agent 配置计划 V1（只生成，不写入）
+## 跨 Agent 连接描述 V1（只生成，不写入）
 
-`useful agent plan` 为 Codex、Claude Code、Claude Desktop 与通用 MCP 宿主生成一个
-`useful.agent-integration.v1` 配置计划。V1 的 target 是固定集合 `codex`、`claude-code`、
-`claude-desktop`、`mcp-servers-json`，transport 固定为本地 `stdio`；不会启动 launcher、主动联网、安装依赖、
+`useful agent export` 只向 stdout 生成 `useful.agent-connection.v1` 的人工复核连接描述。它是
+manual-review-only、no-secrets、current-host-only 的候选配置，不是安装器、授权文件、远程连接凭据或 MCP 握手结果。导出物不包含
+token、密码、私钥、输入历史、会话内容或宿主现有配置；构建/导出过程不写入宿主配置、不启动 launcher、不联网，
+也不会验证 MCP handshake、工具发现或工具调用。调用方必须在对应 Agent 的官方设置界面或命令行中复核并手动应用。
+
+`useful agent plan` 仍生成内部 `useful.agent-integration.v1` 配置计划；`useful agent export` 将该计划及其唯一
+审阅渲染封装为 `useful.agent-connection.v1`。两者都为 Codex、Claude Code、Claude Desktop 与通用 MCP 宿主生成
+本地 stdio 候选：target 固定集合为 `codex`、`claude-code`、`claude-desktop`、`mcp-servers-json`，transport 固定为
+本地 `stdio`，并且只能在生成它的当前主机上人工复核；不会启动 launcher、主动联网、安装依赖、
 读取宿主配置或向宿主写入配置。`--launcher` 必须是实际 MCP stdio 启动脚本的本地绝对路径，例如 Agent Kit 中的
 `lib/useful-mcp.mjs`。计划的 `nodePath` 固定为启动当前 CLI 的 `process.execPath`，并记录 launcher、固定 server
 name `useful`、空的 V1 扩展 args、安全闭集 env 与 scope。严格 JSON Schema 位于
-`packages/protocol/schemas/agent-integration.schema.json`。
+`packages/protocol/schemas/agent-integration.schema.json`；导出的外层连接描述使用
+`packages/protocol/schemas/agent-connection.schema.json`。
+
+这里的 Claude Desktop 输出只适用于本机 `mcpServers` 合并片段。它不代表 Claude Desktop 的远程/托管
+连接配置，也不把本地 JSON 当作远程传输协议；远程场景必须使用 Claude Desktop 的官方 Connectors 或其他
+官方支持的连接方式，Useful 当前不
+生成远程 URL、OAuth、账户或凭据配置。
 
 ```powershell
 & "<ABS_KIT>\bin\useful.cmd" agent plan `
@@ -248,6 +261,11 @@ name `useful`、空的 V1 扩展 args、安全闭集 env 与 scope。严格 JSON
   --launcher "<ABS_KIT>\lib\useful-mcp.mjs" `
   --scope user `
   --env NO_COLOR=1 `
+  --json
+
+& "<ABS_KIT>\bin\useful.cmd" agent export `
+  --target codex `
+  --launcher "<ABS_KIT>\lib\useful-mcp.mjs" `
   --json
 
 & "<ABS_KIT>\bin\useful.cmd" agent doctor `

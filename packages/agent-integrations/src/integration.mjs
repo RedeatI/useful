@@ -1,34 +1,62 @@
 import fs from "node:fs";
 import path from "node:path";
 import process from "node:process";
+import { createAgentConnection } from "@useful/protocol/agent-connection";
+import {
+  AGENT_INTEGRATION_SCHEMA_VERSION,
+  AGENT_INTEGRATION_SCOPES,
+  AGENT_INTEGRATION_TARGETS,
+  AgentIntegrationProtocolError,
+  deepFreezeAgentIntegrationData,
+  parseAgentIntegrationPlan,
+  renderAgentIntegrationOutput,
+  snapshotAgentIntegrationData,
+} from "@useful/protocol/agent-integration";
 
-export const AGENT_INTEGRATION_SCHEMA_VERSION = "useful.agent-integration.v1";
-export const AGENT_INTEGRATION_TARGETS = Object.freeze([
-  "codex",
-  "claude-code",
-  "claude-desktop",
-  "mcp-servers-json",
-]);
-export const AGENT_INTEGRATION_SCOPES = Object.freeze(["user", "project"]);
+export { AGENT_INTEGRATION_SCHEMA_VERSION, AGENT_INTEGRATION_SCOPES, AGENT_INTEGRATION_TARGETS };
 
 const ALLOWED_ENVIRONMENT = Object.freeze({
   NO_COLOR: new Set(["1"]),
   USEFUL_LOG_LEVEL: new Set(["error", "warn", "info"]),
 });
+const SECRET_ENVIRONMENT_NAMES = new Set([
+  "ACCESS_TOKEN",
+  "ANTHROPIC_API_KEY",
+  "API_KEY",
+  "AWS_SECRET_ACCESS_KEY",
+  "OPENAI_API_KEY",
+  "PASSWORD",
+  "PRIVATE_KEY",
+]);
 const PROFILE_VALUE = /^[a-z0-9][a-z0-9._-]{0,63}$/i;
-const SECRET_NAME = /(?:api[-_]?key|token|secret|password|credential|private[-_]?key|bearer)/i;
 
 export class AgentIntegrationError extends Error {
   constructor(code, message, details = {}) {
     super(message);
     this.name = "AgentIntegrationError";
     this.code = code;
-    this.details = details;
+    this.details = Object.freeze({ ...details });
   }
 }
 
 function fail(code, message, details = {}) {
   throw new AgentIntegrationError(code, message, details);
+}
+
+function asAgentIntegrationError(error) {
+  if (error instanceof AgentIntegrationError) return error;
+  if (error instanceof AgentIntegrationProtocolError) {
+    return new AgentIntegrationError(error.code, error.message, error.details);
+  }
+  return error;
+}
+
+function capture(value, field) {
+  try {
+    return snapshotAgentIntegrationData(value, field);
+  } catch (error) {
+    throw asAgentIntegrationError(error);
+  }
 }
 
 function compareCodePoints(left, right) {
@@ -43,15 +71,6 @@ function isPlainRecord(value) {
   if (!value || Array.isArray(value) || typeof value !== "object") return false;
   const prototype = Object.getPrototypeOf(value);
   return prototype === Object.prototype || prototype === null;
-}
-
-function assertExactKeys(value, expected, field) {
-  if (!isPlainRecord(value)) fail("INVALID_PLAN", `${field} 必须是普通对象`, { field });
-  const actual = Object.keys(value).sort(compareCodePoints);
-  const wanted = [...expected].sort(compareCodePoints);
-  if (actual.length !== wanted.length || actual.some((key, index) => key !== wanted[index])) {
-    fail("INVALID_PLAN", `${field} 字段集合无效`, { field, keys: actual });
-  }
 }
 
 function assertAbsoluteLocalPath(value, field) {
@@ -103,12 +122,13 @@ function assertTargetScope(target, scope) {
 }
 
 export function validateEnvironment(environment = {}) {
-  if (!isPlainRecord(environment)) {
+  const captured = capture(environment, "environment");
+  if (!isPlainRecord(captured)) {
     fail("INVALID_ENVIRONMENT", "env 必须是普通键值对象");
   }
   const normalized = {};
-  for (const [name, value] of Object.entries(environment)) {
-    if (SECRET_NAME.test(name)) {
+  for (const [name, value] of Object.entries(captured)) {
+    if (SECRET_ENVIRONMENT_NAMES.has(name.toUpperCase())) {
       fail("SECRET_ENVIRONMENT_FORBIDDEN", "集成配置不接受秘密环境变量", { name });
     }
     if (typeof value !== "string") {
@@ -126,14 +146,15 @@ export function validateEnvironment(environment = {}) {
     }
     normalized[name] = value;
   }
-  return stableObject(normalized);
+  return deepFreezeAgentIntegrationData(stableObject(normalized));
 }
 
 export function parseEnvironmentAssignments(assignments = []) {
-  if (!Array.isArray(assignments)) fail("INVALID_ENVIRONMENT_ASSIGNMENT", "env assignments 必须是数组");
-  const environment = {};
-  for (let index = 0; index < assignments.length; index += 1) {
-    const assignment = assignments[index];
+  const captured = capture(assignments, "environmentAssignments");
+  if (!Array.isArray(captured)) fail("INVALID_ENVIRONMENT_ASSIGNMENT", "env assignments 必须是数组");
+  const environment = Object.create(null);
+  for (let index = 0; index < captured.length; index += 1) {
+    const assignment = captured[index];
     if (typeof assignment !== "string") {
       fail("INVALID_ENVIRONMENT_ASSIGNMENT", "--env 必须使用 NAME=VALUE", { index });
     }
@@ -152,40 +173,33 @@ export function parseEnvironmentAssignments(assignments = []) {
 }
 
 export function quotePowerShellLiteral(value) {
-  return `'${String(value).replaceAll("'", "''")}'`;
+  if (typeof value !== "string") fail("INVALID_COMMAND_ARGUMENT", "PowerShell 参数必须是字符串");
+  return `'${value.replaceAll("'", "''")}'`;
 }
 
 export function toPowerShellInvocation(commandArgv) {
-  if (!Array.isArray(commandArgv) || commandArgv.length === 0 || commandArgv.some((value) => typeof value !== "string")) {
+  const captured = capture(commandArgv, "commandArgv");
+  if (!Array.isArray(captured) || captured.length === 0 || captured.some((value) => typeof value !== "string")) {
     fail("INVALID_COMMAND_ARGV", "commandArgv 必须是非空字符串数组");
   }
-  return `& ${commandArgv.map(quotePowerShellLiteral).join(" ")}`;
+  return `& ${captured.map(quotePowerShellLiteral).join(" ")}`;
 }
 
 function validatePlan(plan) {
-  const scope = assertScope(plan?.scope);
-  const expectedKeys = ["schemaVersion", "target", "transport", "scope", "server"];
-  if (scope === "project") expectedKeys.push("projectDirectory");
-  assertExactKeys(plan, expectedKeys, "plan");
-  if (plan.schemaVersion !== AGENT_INTEGRATION_SCHEMA_VERSION) {
-    fail("INVALID_PLAN", "plan schemaVersion 无效", { schemaVersion: plan.schemaVersion });
+  let canonical;
+  try {
+    canonical = parseAgentIntegrationPlan(plan, { hostPlatform: process.platform });
+  } catch (error) {
+    throw asAgentIntegrationError(error);
   }
-  const target = assertTarget(plan.target);
-  assertTargetScope(target, scope);
-  if (plan.transport !== "stdio") fail("INVALID_PLAN", "V1 transport 只能是 stdio", { transport: plan.transport });
-  assertExactKeys(plan.server, ["name", "nodePath", "launcherPath", "args", "env"], "plan.server");
-  if (plan.server.name !== "useful") fail("INVALID_PLAN", "server name 必须是 useful");
-  const nodePath = assertAbsoluteLocalPath(plan.server.nodePath, "nodePath");
+  const nodePath = assertAbsoluteLocalPath(canonical.server.nodePath, "nodePath");
   if (!samePath(nodePath, process.execPath)) {
     fail("NODE_PATH_MISMATCH", "nodePath 必须是当前进程的 process.execPath", { field: "nodePath" });
   }
-  const launcherPath = assertAbsoluteLocalPath(plan.server.launcherPath, "launcher");
-  if (!Array.isArray(plan.server.args) || plan.server.args.length !== 0) {
-    fail("INVALID_PLAN", "V1 server.args 必须为空数组", { field: "server.args" });
-  }
-  const environment = validateEnvironment(plan.server.env);
-  const projectDirectory = scope === "project"
-    ? assertAbsoluteLocalPath(plan.projectDirectory, "projectDirectory")
+  const launcherPath = assertAbsoluteLocalPath(canonical.server.launcherPath, "launcher");
+  const environment = validateEnvironment(canonical.server.env);
+  const projectDirectory = canonical.scope === "project"
+    ? assertAbsoluteLocalPath(canonical.projectDirectory, "projectDirectory")
     : undefined;
   if (projectDirectory) {
     const projectChecks = [];
@@ -195,17 +209,21 @@ function validatePlan(plan) {
       });
     }
   }
-  return { target, scope, nodePath, launcherPath, environment, projectDirectory };
+  return { plan: canonical, target: canonical.target, scope: canonical.scope, nodePath, launcherPath, environment, projectDirectory };
 }
 
-export function buildAgentIntegrationPlan({
-  target,
-  launcher,
-  scope = "user",
-  environment = {},
-  nodePath = process.execPath,
-  projectDirectory,
-} = {}) {
+export function buildAgentIntegrationPlan(input = {}) {
+  const captured = capture(input, "AgentIntegrationInput");
+  if (!isPlainRecord(captured)) fail("INVALID_PLAN", "AgentIntegrationInput 必须是普通对象");
+  const allowed = ["target", "launcher", "scope", "environment", "nodePath", "projectDirectory"];
+  const unknown = Object.keys(captured).filter((key) => !allowed.includes(key));
+  if (unknown.length > 0) fail("INVALID_PLAN", "AgentIntegrationInput 包含未知字段", { keys: unknown.sort(compareCodePoints) });
+  const target = captured.target;
+  const launcher = captured.launcher;
+  const scope = Object.hasOwn(captured, "scope") ? captured.scope : "user";
+  const environment = Object.hasOwn(captured, "environment") ? captured.environment : {};
+  const nodePath = Object.hasOwn(captured, "nodePath") ? captured.nodePath : process.execPath;
+  const projectDirectory = captured.projectDirectory;
   const normalizedTarget = assertTarget(target);
   const normalizedScope = assertScope(scope);
   assertTargetScope(normalizedTarget, normalizedScope);
@@ -234,90 +252,16 @@ export function buildAgentIntegrationPlan({
       env: validateEnvironment(environment),
     },
   };
-  validatePlan(plan);
-  Object.freeze(plan.server.args);
-  Object.freeze(plan.server.env);
-  Object.freeze(plan.server);
-  return Object.freeze(plan);
-}
-
-function asMcpServer(validated) {
-  return {
-    command: validated.nodePath,
-    args: [validated.launcherPath],
-    ...(Object.keys(validated.environment).length > 0 ? { env: validated.environment } : {}),
-  };
-}
-
-function environmentArgv(environment) {
-  return Object.entries(environment).flatMap(([name, value]) => ["--env", `${name}=${value}`]);
-}
-
-function toTomlString(value) {
-  return JSON.stringify(value);
-}
-
-function renderCodexToml(validated) {
-  const server = asMcpServer(validated);
-  const lines = [
-    "[mcp_servers.useful]",
-    `command = ${toTomlString(server.command)}`,
-    `args = [${server.args.map(toTomlString).join(", ")}]`,
-  ];
-  if (server.env) {
-    lines.push(`env = { ${Object.entries(server.env).map(([key, value]) => `${key} = ${toTomlString(value)}`).join(", ")} }`);
-  }
-  return `${lines.join("\n")}\n`;
-}
-
-function commandOutput(commandArgv, requiredWorkingDirectory) {
-  return {
-    kind: "host-command",
-    commandArgv,
-    powershellCommand: toPowerShellInvocation(commandArgv),
-    ...(requiredWorkingDirectory ? { requiredWorkingDirectory } : {}),
-    writesHostConfigWhenExecuted: true,
-  };
+  return validatePlan(plan).plan;
 }
 
 export function renderAgentIntegration(plan) {
-  const validated = validatePlan(plan);
-  const mcpServer = asMcpServer(validated);
-  if (validated.target === "codex") {
-    if (validated.scope === "project") {
-      return {
-        kind: "merge-fragment",
-        format: "toml",
-        configPath: path.join(validated.projectDirectory, ".codex", "config.toml"),
-        mergeFragment: renderCodexToml(validated),
-        writesHostConfigWhenExecuted: false,
-      };
-    }
-    return commandOutput([
-      "codex", "mcp", "add", "useful",
-      ...environmentArgv(validated.environment),
-      "--", validated.nodePath, validated.launcherPath,
-    ]);
+  const validated = validatePlan(plan).plan;
+  try {
+    return renderAgentIntegrationOutput(validated, { hostPlatform: process.platform });
+  } catch (error) {
+    throw asAgentIntegrationError(error);
   }
-  if (validated.target === "claude-code") {
-    const hostScope = validated.scope === "project" ? "project" : "user";
-    return commandOutput([
-      "claude", "mcp", "add",
-      ...environmentArgv(validated.environment),
-      "--transport", "stdio",
-      "--scope", hostScope,
-      "useful", "--", validated.nodePath, validated.launcherPath,
-    ], validated.scope === "project" ? validated.projectDirectory : undefined);
-  }
-  if (validated.target === "claude-desktop" || validated.target === "mcp-servers-json") {
-    return {
-      kind: "merge-fragment",
-      format: "json",
-      mergeFragment: { mcpServers: { useful: mcpServer } },
-      writesHostConfigWhenExecuted: false,
-    };
-  }
-  return fail("UNKNOWN_TARGET", "target 必须是受支持的 Agent 目标", { target: validated.target });
 }
 
 function addCheck(checks, id, status, message, details = undefined) {
@@ -402,20 +346,25 @@ export function doctorAgentIntegration(input) {
   }
   const output = renderAgentIntegration(plan);
   const generatedOutputOk = checkGeneratedOutput(output, checks);
-  return {
+  return deepFreezeAgentIntegrationData({
     schemaVersion: AGENT_INTEGRATION_SCHEMA_VERSION,
     ok: launcherOk && nodeOk && projectOk && nodeMajor >= 20 && generatedOutputOk,
     plan,
     output,
     checks,
-  };
+  });
 }
 
 export function planAgentIntegration(input) {
   const plan = buildAgentIntegrationPlan(input);
-  return {
+  return deepFreezeAgentIntegrationData({
     schemaVersion: AGENT_INTEGRATION_SCHEMA_VERSION,
     plan,
     output: renderAgentIntegration(plan),
-  };
+  });
+}
+
+export function exportAgentIntegration(input) {
+  const { plan } = planAgentIntegration(input);
+  return createAgentConnection({ plan });
 }

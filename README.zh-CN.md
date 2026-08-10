@@ -33,7 +33,8 @@ Windows 进程观测和第三方工具扩展能力。
 - **Agent 调用：** 通过 JSON CLI 或本地 stdio MCP 调用 36 个内置 Action；也可以用 Agent profile
   为特定宿主缩小可见范围。
 - **宿主配置计划：** 为 Codex、Claude Code、Claude Desktop 或采用 `mcpServers` JSON 的宿主生成
-  无 secret、可审阅的 MCP 配置计划，不修改宿主配置。
+  无 secret、可审阅的 MCP 配置计划，不修改宿主配置。`agent export` 会把同一条本地 stdio 候选输出为
+  `useful.agent-connection.v1` 审阅文档。
 
 界面支持简体中文和 English (US)，并提供浅色、深色主题。Windows 便携模式只需在 `Useful.exe`
 旁创建 `portable.flag`，数据便会写入 `./data`，而不是 `%APPDATA%\Useful`。
@@ -95,10 +96,13 @@ pnpm useful -- agent-contract --json
 ```console
 pnpm useful -- agent plan --target codex --launcher C:\ABSOLUTE\useful-mcp.mjs --json
 pnpm useful -- agent doctor --target claude-code --launcher C:\ABSOLUTE\useful-mcp.mjs --json
+pnpm useful -- agent export --target codex --launcher C:\ABSOLUTE\useful-mcp.mjs --json
 ```
 
-target 闭集为 `codex`、`claude-code`、`claude-desktop`、`mcp-servers-json`。Codex 与 Claude
-仍保留各自的审批和沙箱策略；Useful 不生成绕过权限或 always-allow 配置。scope 与 merge 语义见
+plan/export 的 target 闭集为 `codex`、`claude-code`、`claude-desktop`、`mcp-servers-json`。导出仅写 stdout、
+不含 secret、只供当前主机人工复核：它不写入宿主配置、不启动 launcher、不联网，也不证明 MCP handshake。Claude Desktop
+输出是本机合并片段；远程服务请使用其官方 Connectors。Codex 与 Claude 仍保留各自的审批和沙箱策略；Useful
+不生成绕过权限或 always-allow 配置。scope 与 merge 语义见
 [AI 接入说明](docs/AI-INTEGRATION.md)。
 
 `packages/useful-runtime` 提供 JSON 运行时，`packages/useful-mcp` 通过 stdio 暴露同一份 Action

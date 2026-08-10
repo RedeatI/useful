@@ -64,6 +64,12 @@ const AGENT_INTEGRATIONS_PROVENANCE_FILES = Object.freeze([
   "integration.mjs",
   "integration.d.ts",
 ]);
+const PROTOCOL_AGENT_CONNECTION_PROVENANCE_FILES = Object.freeze([
+  "agent-connection.mjs",
+  "agent-connection.d.ts",
+  "agent-integration.mjs",
+  "agent-integration.d.ts",
+]);
 const ACTION_RUNTIME_PROVENANCE_FILES = Object.freeze([
   "action-suggest.mjs",
   "builtins.mjs",
@@ -656,6 +662,8 @@ function workspaceResolver(repoRoot) {
     "@useful/host-actions": "packages/host-actions/src/index.mjs",
     "@useful/office-core": "packages/office-core/src/index.mjs",
     "@useful/plugin-actions": "packages/plugin-actions/src/index.mjs",
+    "@useful/protocol/agent-connection": "packages/protocol/src/agent-connection.mjs",
+    "@useful/protocol/agent-integration": "packages/protocol/src/agent-integration.mjs",
     "@useful/protocol/src/schemas.mjs": "packages/protocol/src/schemas.mjs",
   };
   return {
@@ -875,6 +883,10 @@ async function addRuntimeResources(entries, repoRoot) {
     const source = `packages/agent-integrations/src/${relative}`;
     addEntry(entries, `lib/provenance/agent-integrations/${relative}`, normalizedText(await readSourceFile(repoRoot, source)));
   }
+  for (const relative of PROTOCOL_AGENT_CONNECTION_PROVENANCE_FILES) {
+    const source = `packages/protocol/src/${relative}`;
+    addEntry(entries, `lib/provenance/protocol/${relative}`, normalizedText(await readSourceFile(repoRoot, source)));
+  }
   for (const relative of ACTION_RUNTIME_PROVENANCE_FILES) {
     const source = `packages/action-runtime/src/${relative}`;
     addEntry(entries, `lib/provenance/action-runtime/${relative}`, normalizedText(await readSourceFile(repoRoot, source)));
@@ -951,7 +963,7 @@ async function createPayload(repoRoot, dependencyRoot, version) {
   for (const legal of REQUIRED_LEGAL_FILES) addEntry(entries, legal, normalizedText(await readSourceFile(repoRoot, legal, `root ${legal}`)));
   for (const legal of FIRST_PARTY_LICENSE_FILES) addEntry(entries, legal, normalizedText(await readSourceFile(repoRoot, legal, legal)));
   addEntry(entries, "README.txt", Buffer.from(
-    `Useful Agent Kit ${version}\n\nRequires Node.js 20 or newer.\nCompatible commands: useful, useful-runtime, useful-mcp.\nThe @useful package names and useful/useful schema identities remain compatibility interfaces.\nNo global install or monorepo-relative runtime path is required.\nBundled dependency license texts and notices are indexed by THIRD_PARTY-LICENSES.json.\nThe component map is owner-approved, but this build remains an internal candidate and does not authorize publication of any specific snapshot.\n`,
+    `Useful Agent Kit ${version}\n\nRequires Node.js 20 or newer.\nCompatible commands: useful, useful-runtime, useful-mcp.\nThe @useful package names and useful/useful schema identities remain compatibility interfaces.\nNo global install or monorepo-relative runtime path is required.\nBundled dependency license texts and notices are indexed by THIRD_PARTY-LICENSES.json.\nAgent integration exports are manual-review-only and secret-free: they do not write host configuration, start a launcher, or make network connections.\nThe Claude Desktop JSON fragment is for local mcpServers merging only; remote/managed configuration is not generated.\nComputer Use has no default provider or host registration in this kit.\nThe component map is owner-approved, but this build remains an internal candidate and does not authorize publication of any specific snapshot.\n`,
     "utf8",
   ));
   addEntry(entries, "package.json", jsonBytes({

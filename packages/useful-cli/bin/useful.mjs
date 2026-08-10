@@ -26,9 +26,11 @@ import { agentContractData } from "./agent-contract-data.mjs";
 import {
   AgentIntegrationError,
   doctorAgentIntegration,
+  exportAgentIntegration,
   parseEnvironmentAssignments,
   planAgentIntegration,
 } from "@useful/agent-integrations";
+import { AgentConnectionError } from "@useful/protocol/agent-connection";
 import {
   appUpdateCreate,
   appUpdateSign,
@@ -176,6 +178,16 @@ async function agentCommand(cmd, rest, jsonMode) {
 function parseAgentIntegrationArgs(args) {
   const options = { environment: [] };
   const seen = new Set();
+  const unsupportedWriteOptions = new Set([
+    "apply",
+    "install",
+    "out",
+    "output",
+    "output-file",
+    "output-path",
+    "config-file",
+    "config-path",
+  ]);
   for (let index = 0; index < args.length; index += 1) {
     const value = args[index];
     if (!value.startsWith("--")) {
@@ -183,8 +195,9 @@ function parseAgentIntegrationArgs(args) {
     }
     const equals = value.indexOf("=");
     const name = value.slice(2, equals >= 0 ? equals : undefined);
-    if (name === "apply" || name === "install") {
-      throw usageError("APPLY_NOT_SUPPORTED", "V1 只生成和诊断配置，拒绝写入或安装", { option: name });
+    if (unsupportedWriteOptions.has(name)) {
+      const code = name === "apply" || name === "install" ? "APPLY_NOT_SUPPORTED" : "OUTPUT_PATH_NOT_SUPPORTED";
+      throw usageError(code, "V1 只向 stdout 生成配置，拒绝写入、安装或接受输出路径", { option: name });
     }
     if (name !== "env" && seen.has(name)) {
       throw usageError("DUPLICATE_FLAG", `--${name} 只能提供一次`, { option: name });
@@ -209,7 +222,7 @@ function parseAgentIntegrationArgs(args) {
 }
 
 function asCliIntegrationError(error) {
-  if (error instanceof AgentIntegrationError) {
+  if (error instanceof AgentIntegrationError || error instanceof AgentConnectionError) {
     return validationError(error.code, error.message, error.details);
   }
   return error;
@@ -217,22 +230,23 @@ function asCliIntegrationError(error) {
 
 async function agentIntegrationCommand(rest) {
   const [subcommand, ...args] = rest;
-  if (subcommand !== "plan" && subcommand !== "doctor") {
-    throw usageError("UNKNOWN_AGENT_COMMAND", "用法: useful agent <plan|doctor> --target <target> --launcher <绝对路径> [--scope user|project] [--project-dir <绝对目录>] [--env NAME=VALUE] --json", { subcommand: subcommand ?? null });
+  if (subcommand !== "plan" && subcommand !== "doctor" && subcommand !== "export") {
+    throw usageError("UNKNOWN_AGENT_COMMAND", "用法: useful agent <plan|doctor|export> --target <target> --launcher <绝对路径> [--scope user|project] [--project-dir <绝对目录>] [--env NAME=VALUE] --json", { subcommand: subcommand ?? null });
   }
   const options = parseAgentIntegrationArgs(args);
   if (!options.json) {
-    throw usageError("JSON_REQUIRED", "agent plan/doctor 仅提供 --json 输出", { subcommand });
+    throw usageError("JSON_REQUIRED", "agent plan/doctor/export 仅提供 --json 输出", { subcommand });
   }
   try {
     const input = {
       target: options.target,
       launcher: options.launcher,
       scope: options.scope ?? "user",
-      projectDirectory: options["project-dir"],
+      ...(options["project-dir"] === undefined ? {} : { projectDirectory: options["project-dir"] }),
       environment: parseEnvironmentAssignments(options.environment),
     };
     if (subcommand === "plan") return planAgentIntegration(input);
+    if (subcommand === "export") return exportAgentIntegration(input);
     const result = doctorAgentIntegration(input);
     if (!result.ok) {
       throw validationError(

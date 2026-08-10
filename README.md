@@ -40,6 +40,7 @@ Agent host.
   profile can narrow that set for a particular host.
 - **Client setup plans:** generate secret-free, reviewable MCP configuration plans for Codex,
   Claude Code, Claude Desktop, or an `mcpServers` JSON host without changing host configuration.
+  `agent export` emits the same local stdio candidate as a `useful.agent-connection.v1` review document.
 
 The interface is available in Simplified Chinese and English, with light and dark themes. Portable
 mode is supported on Windows by placing `portable.flag` next to `Useful.exe`; data is then stored in
@@ -104,9 +105,13 @@ Generate or diagnose a host-specific stdio configuration without writing it:
 ```console
 pnpm useful -- agent plan --target codex --launcher C:\ABSOLUTE\useful-mcp.mjs --json
 pnpm useful -- agent doctor --target claude-code --launcher C:\ABSOLUTE\useful-mcp.mjs --json
+pnpm useful -- agent export --target codex --launcher C:\ABSOLUTE\useful-mcp.mjs --json
 ```
 
-The plan target is one of `codex`, `claude-code`, `claude-desktop`, or `mcp-servers-json`.
+The plan/export target is one of `codex`, `claude-code`, `claude-desktop`, or `mcp-servers-json`.
+Export is stdout-only, secret-free, review-only, and current-host-only: it does not write host configuration,
+start the launcher, use the network, or prove an MCP handshake. Claude Desktop output is a local merge fragment;
+use its official Connectors for remote services.
 Codex and Claude keep their own approval and sandbox policies; Useful does not generate bypass or
 always-allow settings. See [AI Integration](docs/AI-INTEGRATION.md) for scope and merge semantics.
 
