@@ -65,6 +65,7 @@ try {
 | JSON runtime CLI | `pnpm --filter @useful/runtime-cli test` | 本次实际执行到的 list/search/suggest/describe/run/recipe、过滤排序分页、stdin/`@request.json`、host opt-in/grant/单次确认与稳定错误合同 | 已发布 standalone CLI、GUI、MCP host 或真实原生程序执行 |
 | stdio MCP | `pnpm --filter @useful/mcp test` | 本次实际执行到的 registry 映射、40 项默认 `tools/list`、4 个 helper、官方 client stdio call、profile 过滤、取消、host 只读授权/破坏性拒绝和进程清理 | 任一外部 Agent 产品的配置正确、真实原生程序执行、联网服务或 GUI |
 | Agent Kit | `pnpm --filter @useful/cli test` | 本次实际执行到的 5 bundle 闭集、自包含导入、provenance 资源、逐包第三方许可证、清单/摘要及无 monorepo 运行夹具 | 正式发布、远程 runner、签名、发布授权或任一外部 Agent 宿主配置；Agent Kit 仍是 internal candidate |
+| Host-injected browser adapter | `pnpm --filter @useful/computer-use-browser-adapter test` | 仅证明该 checkout 中 host-injected isolated browser adapter interface 的定向 Node 合同测试；不证明默认 Computer Use provider、浏览器发行物、真实浏览器宿主、GUI、跨平台运行或远程发布 |
 
 默认 Action 数量的静态口径必须从同一 checkout 的源码推导：
 `packages/action-runtime/src/semantics.mjs` 中 31 个 `ACTION_IDS`，加上

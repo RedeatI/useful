@@ -1,0 +1,21 @@
+{
+  "name": "@useful/computer-use-browser-adapter",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Host-injected isolated browser adapter interface; not the default provider or a browser distribution.",
+  "exports": {
+    ".": {
+      "types": "./src/index.d.ts",
+      "import": "./src/index.mjs"
+    }
+  },
+  "scripts": {
+    "test": "node --test",
+    "typecheck": "node --check src/index.mjs"
+  },
+  "dependencies": {
+    "@useful/computer-use-contract": "workspace:*"
+  },
+  "license": "Apache-2.0"
+}

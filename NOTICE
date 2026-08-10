@@ -13,7 +13,10 @@ This repository is a multi-license project. The owner-approved component map is:
   `services/OPERATIONS.md`, the build files directly under `services/`, `apps/source-admin`,
   `deploy/*`): AGPL-3.0-or-later
 - Protocols, JSON Schema, SDK, CLI, Agent integration interfaces (including
-  `packages/agent-integrations` and the non-executable `packages/computer-use-contract` contract),
+  `packages/agent-integrations`, the non-executable `packages/computer-use-contract` contract,
+  and the host-injected isolated browser adapter interface in
+  `packages/computer-use-browser-adapter`, not a default Computer Use provider or browser
+  distribution),
   repository fixtures, examples, and remaining first-party repository automation/configuration:
   Apache-2.0
 - Project documentation under `docs/*` and the root documentation/community files listed in
