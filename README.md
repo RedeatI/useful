@@ -30,8 +30,9 @@ Agent host.
   toolkit, not an Office-compatible editor.
 - **Video work:** inspect media, trim without re-encoding when possible, transcode precise ranges,
   extract audio, and cancel long-running jobs.
-- **Process monitor:** inspect CPU, memory, disk, GPU, and network activity on Windows. Ending a
-  process or requesting elevation is always an explicit operation.
+- **Process monitor:** inspect CPU, memory, disk, GPU, and network activity on Windows. The first
+  release is read-only: ending a process or process tree and one-click elevation are disabled. If
+  administrator access is required, exit Useful and manually run it as administrator in Windows.
 - **Tool library:** search, pin, and favorite built-in and installed tools from one screen.
 - **Extensions:** validate and package web tools as `.useful` archives, verify publisher signatures
   during trusted installation, or host a compatible source yourself.

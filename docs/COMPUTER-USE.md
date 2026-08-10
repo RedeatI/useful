@@ -40,6 +40,45 @@ Network evidence 是 provider 报告的合同证据，不是防火墙，也无�
 
 OpenAI Responses/Computer Use adapter 与 Anthropic Computer Use adapter 必须后续在独立包实现。两家的宿主消息、tool schema、循环控制、模型标识和 API 凭据不得进入本合同；adapter 只能把各自协议转换成这里的 session、observation、prepare/approval/commit 状态机。Codex、Claude、MCP、CLI 与 GUI 的注册和配置也由上层集成负责。
 
+`@useful/computer-use-browser-adapter` 只提供 owner-approved、宿主注入的
+isolated browser adapter interface；它不是默认 provider、浏览器发行物、
+Playwright 封装、防火墙或完整 Computer Use 产品，也不会注册 Action/MCP 或控制
+host desktop。它只接受 `isolated-browser`，并要求宿主网络 guard 在创建真实
+browser context 前授权固定且规范化的 `startUrl`。guard 必须声明并实际强制：
+逐 request、DNS 全部地址、每个 redirect hop 和明确的 effective port；证据必须
+来自 guard，不采信 page/driver 自报。
+
+宿主 context 是窄化的 trusted enforcement interface，只暴露 observe、九个固定
+动作 primitive 和幂等 close；没有任意导航、eval/JavaScript、文件/下载、剪贴板、
+扩展、raw browser/page 或桌面 handle。observe 返回由宿主隔离层签发的
+`documentToken`，每次 commit 都把该 token 传回 primitive；宿主必须在顶层文档
+变化后轮换 token，并在 token stale 时先于输入 fail closed。adapter 自己还会把
+prepared record 绑定到 session identity、generation、observation generation、
+document token、step、observation digest 和 canonical action digest，一次消费，
+拒绝 stale/replay/concurrent。这里的接口声明是集成方必须实现的信任边界，并不表示
+adapter 能从 driver capability 字段运行时自证这些隔离属性。
+
+所有外部对象采用 closed-world own-data-property 校验；截图复制进 adapter 自有
+`ArrayBuffer`，拒绝 SharedArrayBuffer/超限数据。若 commit 已开始后 abort、deadline
+或 guard evidence 失败，结果按未知处理并触发 context+guard quarantine/close。
+close 只有在两者都确认释放后才成功；失败保留可重试状态，不能伪报关闭。adapter
+不记录 screenshot、输入文本、按键或宿主错误原文。
+
+adapter 的首次 close 会永久关闭该 session 的 observe/prepare/commit admission；即使
+close 失败，之后也只允许 close 重试。释放顺序固定为先 context、确认成功后再 guard；
+context close 失败时绝不释放 guard。invalid、partial 或 abort-late acquisition 若未能
+确认释放，会被强引用保存在内部 quarantine registry。宿主集成可以显式调用窄化、幂等、
+可取消的 `provider.reapQuarantine({ signal })`，它只返回 remaining/closed 计数并保留
+失败项供以后重试；默认 controller 不接线、不暴露这个维护接口，也不会因此注册 Action
+或 MCP。
+
+quarantine 与正常 handle 使用同一套 raw identity resource lease：每个 raw 只有一个
+close state，每次 acquisition 分别持有 driver/guard claim。guard pending claim 必须在
+`createContext` 前登记；closing、closed 或 close-failed identity 不再接受新 claim。
+只有全部 claim 请求关闭且每个 guard 的 driver dependency 已确认 closed，才允许安装
+唯一共享 close promise 并调用 raw close。共享 identity、跨角色引用环和并发 reap 因此
+只能保留/推进 tombstone，不能绕过 driver→guard 顺序提前释放。
+
 ```js
 import { createComputerUseController } from "@useful/computer-use-contract";
 

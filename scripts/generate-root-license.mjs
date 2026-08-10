@@ -141,6 +141,8 @@ This repository is intentionally multi-licensed. The authoritative component map
 - Protocols, JSON Schema, SDK, CLI, Agent integration interfaces, static repository fixtures, and
   examples: ${mapping.protocolSdkCliExamples} (see \`packages/protocol\`, \`packages/action-contract\`,
   \`packages/agent-profile\`, \`packages/agent-integrations\`, \`packages/computer-use-contract\`,
+  and \`packages/computer-use-browser-adapter\`, a host-injected isolated browser adapter
+  interface that is not a default Computer Use provider or browser distribution,
   \`packages/plugin-actions\`, \`packages/useful-sdk\`,
   \`packages/useful-cli\`, \`packages/useful-mcp\`, \`packages/useful-runtime\`, \`repositories/*\`, and
   \`examples/*\`)
