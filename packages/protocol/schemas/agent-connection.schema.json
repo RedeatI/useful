@@ -1,0 +1,239 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.useful.example/agent/useful.agent-connection.v1.schema.json",
+  "title": "Useful Agent Connection V1",
+  "description": "A host-native, nonportable, manual-review-only structural description of a Useful MCP stdio integration. JSON Schema validation alone does not establish secret freedom, canonical rendering, or plan/output binding.",
+  "$comment": "Consumers MUST call parseAgentConnection after Schema validation. The parser snapshots plain data, validates the plan, recomputes output from plan plus hostPlatform, and requires an exact derived match. This document never authorizes host writes or command execution.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "kind", "writePolicy", "secretPolicy", "hostPlatform", "plan", "output"],
+  "properties": {
+    "schemaVersion": { "const": "useful.agent-connection.v1" },
+    "kind": { "const": "mcp-stdio-connection" },
+    "writePolicy": { "const": "manual-review-only" },
+    "secretPolicy": { "const": "no-secrets" },
+    "hostPlatform": {
+      "enum": ["win32", "linux", "darwin"],
+      "description": "The host whose native absolute paths and commands were rendered. Connection documents are nonportable across host platforms."
+    },
+    "plan": { "$ref": "https://schemas.useful.example/agent/useful.agent-integration.v1.schema.json" },
+    "output": {
+      "oneOf": [
+        { "$ref": "#/$defs/codexHostCommand" },
+        { "$ref": "#/$defs/claudeHostCommand" },
+        { "$ref": "#/$defs/claudeProjectHostCommand" },
+        { "$ref": "#/$defs/codexTomlMerge" },
+        { "$ref": "#/$defs/jsonMerge" }
+      ]
+    }
+  },
+  "allOf": [
+    {
+      "if": { "type": "object", "properties": { "plan": { "type": "object", "properties": { "target": { "const": "codex" }, "scope": { "const": "user" } }, "required": ["target", "scope"] } } },
+      "then": { "type": "object", "properties": { "output": { "$ref": "#/$defs/codexHostCommand" } } }
+    },
+    {
+      "if": { "type": "object", "properties": { "plan": { "type": "object", "properties": { "target": { "const": "codex" }, "scope": { "const": "project" } }, "required": ["target", "scope"] } } },
+      "then": { "type": "object", "properties": { "output": { "$ref": "#/$defs/codexTomlMerge" } } }
+    },
+    {
+      "if": { "type": "object", "properties": { "plan": { "type": "object", "properties": { "target": { "const": "claude-code" }, "scope": { "const": "user" } }, "required": ["target", "scope"] } } },
+      "then": { "type": "object", "properties": { "output": { "$ref": "#/$defs/claudeHostCommand" } } }
+    },
+    {
+      "if": { "type": "object", "properties": { "plan": { "type": "object", "properties": { "target": { "const": "claude-code" }, "scope": { "const": "project" } }, "required": ["target", "scope"] } } },
+      "then": { "type": "object", "properties": { "output": { "$ref": "#/$defs/claudeProjectHostCommand" } } }
+    },
+    {
+      "if": { "type": "object", "properties": { "plan": { "type": "object", "properties": { "target": { "enum": ["claude-desktop", "mcp-servers-json"] } }, "required": ["target"] } } },
+      "then": { "type": "object", "properties": { "output": { "$ref": "#/$defs/jsonMerge" } } }
+    }
+  ],
+  "$defs": {
+    "absoluteLocalPath": { "$ref": "https://schemas.useful.example/agent/useful.agent-integration.v1.schema.json#/$defs/absoluteLocalPath" },
+    "environment": { "$ref": "https://schemas.useful.example/agent/useful.agent-integration.v1.schema.json#/properties/server/properties/env" },
+    "environmentAssignment": {
+      "type": "string",
+      "pattern": "^(?:NO_COLOR=1|USEFUL_LOG_LEVEL=(?:error|warn|info)|USEFUL_PROFILE=[A-Za-z0-9][A-Za-z0-9._-]{0,63})$"
+    },
+    "codexArgv": {
+      "oneOf": [
+        {
+          "type": "array",
+          "prefixItems": [{ "const": "codex" }, { "const": "mcp" }, { "const": "add" }, { "const": "useful" }, { "const": "--" }, { "$ref": "#/$defs/absoluteLocalPath" }, { "$ref": "#/$defs/absoluteLocalPath" }],
+          "minItems": 7,
+          "maxItems": 7,
+          "items": false
+        },
+        {
+          "type": "array",
+          "prefixItems": [{ "const": "codex" }, { "const": "mcp" }, { "const": "add" }, { "const": "useful" }, { "const": "--env" }, { "$ref": "#/$defs/environmentAssignment" }, { "const": "--" }, { "$ref": "#/$defs/absoluteLocalPath" }, { "$ref": "#/$defs/absoluteLocalPath" }],
+          "minItems": 9,
+          "maxItems": 9,
+          "items": false
+        },
+        {
+          "type": "array",
+          "prefixItems": [{ "const": "codex" }, { "const": "mcp" }, { "const": "add" }, { "const": "useful" }, { "const": "--env" }, { "$ref": "#/$defs/environmentAssignment" }, { "const": "--env" }, { "$ref": "#/$defs/environmentAssignment" }, { "const": "--" }, { "$ref": "#/$defs/absoluteLocalPath" }, { "$ref": "#/$defs/absoluteLocalPath" }],
+          "minItems": 11,
+          "maxItems": 11,
+          "items": false
+        },
+        {
+          "type": "array",
+          "prefixItems": [{ "const": "codex" }, { "const": "mcp" }, { "const": "add" }, { "const": "useful" }, { "const": "--env" }, { "$ref": "#/$defs/environmentAssignment" }, { "const": "--env" }, { "$ref": "#/$defs/environmentAssignment" }, { "const": "--env" }, { "$ref": "#/$defs/environmentAssignment" }, { "const": "--" }, { "$ref": "#/$defs/absoluteLocalPath" }, { "$ref": "#/$defs/absoluteLocalPath" }],
+          "minItems": 13,
+          "maxItems": 13,
+          "items": false
+        }
+      ]
+    },
+    "claudeUserArgv": {
+      "oneOf": [
+        {
+          "type": "array",
+          "prefixItems": [{ "const": "claude" }, { "const": "mcp" }, { "const": "add" }, { "const": "--transport" }, { "const": "stdio" }, { "const": "--scope" }, { "const": "user" }, { "const": "useful" }, { "const": "--" }, { "$ref": "#/$defs/absoluteLocalPath" }, { "$ref": "#/$defs/absoluteLocalPath" }],
+          "minItems": 11,
+          "maxItems": 11,
+          "items": false
+        },
+        {
+          "type": "array",
+          "prefixItems": [{ "const": "claude" }, { "const": "mcp" }, { "const": "add" }, { "const": "--env" }, { "$ref": "#/$defs/environmentAssignment" }, { "const": "--transport" }, { "const": "stdio" }, { "const": "--scope" }, { "const": "user" }, { "const": "useful" }, { "const": "--" }, { "$ref": "#/$defs/absoluteLocalPath" }, { "$ref": "#/$defs/absoluteLocalPath" }],
+          "minItems": 13,
+          "maxItems": 13,
+          "items": false
+        },
+        {
+          "type": "array",
+          "prefixItems": [{ "const": "claude" }, { "const": "mcp" }, { "const": "add" }, { "const": "--env" }, { "$ref": "#/$defs/environmentAssignment" }, { "const": "--env" }, { "$ref": "#/$defs/environmentAssignment" }, { "const": "--transport" }, { "const": "stdio" }, { "const": "--scope" }, { "const": "user" }, { "const": "useful" }, { "const": "--" }, { "$ref": "#/$defs/absoluteLocalPath" }, { "$ref": "#/$defs/absoluteLocalPath" }],
+          "minItems": 15,
+          "maxItems": 15,
+          "items": false
+        },
+        {
+          "type": "array",
+          "prefixItems": [{ "const": "claude" }, { "const": "mcp" }, { "const": "add" }, { "const": "--env" }, { "$ref": "#/$defs/environmentAssignment" }, { "const": "--env" }, { "$ref": "#/$defs/environmentAssignment" }, { "const": "--env" }, { "$ref": "#/$defs/environmentAssignment" }, { "const": "--transport" }, { "const": "stdio" }, { "const": "--scope" }, { "const": "user" }, { "const": "useful" }, { "const": "--" }, { "$ref": "#/$defs/absoluteLocalPath" }, { "$ref": "#/$defs/absoluteLocalPath" }],
+          "minItems": 17,
+          "maxItems": 17,
+          "items": false
+        }
+      ]
+    },
+    "claudeProjectArgv": {
+      "oneOf": [
+        {
+          "type": "array",
+          "prefixItems": [{ "const": "claude" }, { "const": "mcp" }, { "const": "add" }, { "const": "--transport" }, { "const": "stdio" }, { "const": "--scope" }, { "const": "project" }, { "const": "useful" }, { "const": "--" }, { "$ref": "#/$defs/absoluteLocalPath" }, { "$ref": "#/$defs/absoluteLocalPath" }],
+          "minItems": 11,
+          "maxItems": 11,
+          "items": false
+        },
+        {
+          "type": "array",
+          "prefixItems": [{ "const": "claude" }, { "const": "mcp" }, { "const": "add" }, { "const": "--env" }, { "$ref": "#/$defs/environmentAssignment" }, { "const": "--transport" }, { "const": "stdio" }, { "const": "--scope" }, { "const": "project" }, { "const": "useful" }, { "const": "--" }, { "$ref": "#/$defs/absoluteLocalPath" }, { "$ref": "#/$defs/absoluteLocalPath" }],
+          "minItems": 13,
+          "maxItems": 13,
+          "items": false
+        },
+        {
+          "type": "array",
+          "prefixItems": [{ "const": "claude" }, { "const": "mcp" }, { "const": "add" }, { "const": "--env" }, { "$ref": "#/$defs/environmentAssignment" }, { "const": "--env" }, { "$ref": "#/$defs/environmentAssignment" }, { "const": "--transport" }, { "const": "stdio" }, { "const": "--scope" }, { "const": "project" }, { "const": "useful" }, { "const": "--" }, { "$ref": "#/$defs/absoluteLocalPath" }, { "$ref": "#/$defs/absoluteLocalPath" }],
+          "minItems": 15,
+          "maxItems": 15,
+          "items": false
+        },
+        {
+          "type": "array",
+          "prefixItems": [{ "const": "claude" }, { "const": "mcp" }, { "const": "add" }, { "const": "--env" }, { "$ref": "#/$defs/environmentAssignment" }, { "const": "--env" }, { "$ref": "#/$defs/environmentAssignment" }, { "const": "--env" }, { "$ref": "#/$defs/environmentAssignment" }, { "const": "--transport" }, { "const": "stdio" }, { "const": "--scope" }, { "const": "project" }, { "const": "useful" }, { "const": "--" }, { "$ref": "#/$defs/absoluteLocalPath" }, { "$ref": "#/$defs/absoluteLocalPath" }],
+          "minItems": 17,
+          "maxItems": 17,
+          "items": false
+        }
+      ]
+    },
+    "baseHostCommandProperties": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "commandArgv", "powershellCommand", "writesHostConfigWhenExecuted"],
+      "properties": {
+        "kind": { "const": "host-command" },
+        "commandArgv": { "type": "array", "minItems": 7, "maxItems": 20, "items": { "type": "string", "minLength": 1, "maxLength": 4096 } },
+        "powershellCommand": { "type": "string", "minLength": 1, "maxLength": 32768 },
+        "requiredWorkingDirectory": { "$ref": "#/$defs/absoluteLocalPath" },
+        "writesHostConfigWhenExecuted": { "const": true }
+      }
+    },
+    "codexHostCommand": {
+      "allOf": [
+        { "$ref": "#/$defs/baseHostCommandProperties" },
+        { "type": "object", "properties": { "requiredWorkingDirectory": false, "commandArgv": { "$ref": "#/$defs/codexArgv" } } }
+      ]
+    },
+    "claudeHostCommand": {
+      "allOf": [
+        { "$ref": "#/$defs/baseHostCommandProperties" },
+        { "type": "object", "properties": { "requiredWorkingDirectory": false, "commandArgv": { "$ref": "#/$defs/claudeUserArgv" } } }
+      ]
+    },
+    "claudeProjectHostCommand": {
+      "allOf": [
+        { "$ref": "#/$defs/baseHostCommandProperties" },
+        {
+          "type": "object",
+          "required": ["requiredWorkingDirectory"],
+          "properties": {
+            "requiredWorkingDirectory": { "$ref": "#/$defs/absoluteLocalPath" },
+            "commandArgv": { "$ref": "#/$defs/claudeProjectArgv" }
+          }
+        }
+      ]
+    },
+    "codexTomlMerge": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "format", "configPath", "mergeFragment", "writesHostConfigWhenExecuted"],
+      "properties": {
+        "kind": { "const": "merge-fragment" },
+        "format": { "const": "toml" },
+        "configPath": { "$ref": "#/$defs/absoluteLocalPath" },
+        "mergeFragment": { "type": "string", "minLength": 1, "maxLength": 32768 },
+        "writesHostConfigWhenExecuted": { "const": false }
+      }
+    },
+    "jsonMerge": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "format", "mergeFragment", "writesHostConfigWhenExecuted"],
+      "properties": {
+        "kind": { "const": "merge-fragment" },
+        "format": { "const": "json" },
+        "mergeFragment": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["mcpServers"],
+          "properties": {
+            "mcpServers": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["useful"],
+              "properties": {
+                "useful": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["command", "args"],
+                  "properties": {
+                    "command": { "$ref": "#/$defs/absoluteLocalPath" },
+                    "args": { "type": "array", "minItems": 1, "maxItems": 1, "items": { "$ref": "#/$defs/absoluteLocalPath" } },
+                    "env": { "$ref": "#/$defs/environment" }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "writesHostConfigWhenExecuted": { "const": false }
+      }
+    }
+  }
+}

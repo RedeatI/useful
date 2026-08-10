@@ -4,11 +4,14 @@ import os from "node:os";
 import path from "node:path";
 import process from "node:process";
 import test from "node:test";
+import { renderAgentIntegrationOutput } from "@useful/protocol/agent-integration";
+import { parseAgentConnection } from "@useful/protocol/agent-connection";
 import {
   AGENT_INTEGRATION_SCHEMA_VERSION,
   AgentIntegrationError,
   buildAgentIntegrationPlan,
   doctorAgentIntegration,
+  exportAgentIntegration,
   parseEnvironmentAssignments,
   planAgentIntegration,
   quotePowerShellLiteral,
@@ -76,6 +79,28 @@ test("four targets render canonical argv or merge fragments", () => {
   }
 });
 
+test("four targets export canonical deterministic secret-free connection documents", () => {
+  const fixture = makeFixture();
+  for (const target of ["codex", "claude-code", "claude-desktop", "mcp-servers-json"]) {
+    const input = { target, launcher: fixture.launcher, environment: { USEFUL_PROFILE: "office-safe", NO_COLOR: "1" } };
+    const first = exportAgentIntegration(input);
+    const second = exportAgentIntegration(input);
+    assert.deepEqual(first, second);
+    assert.deepEqual(Object.keys(first), ["hostPlatform", "kind", "output", "plan", "schemaVersion", "secretPolicy", "writePolicy"]);
+    assert.equal(first.schemaVersion, "useful.agent-connection.v1");
+    assert.equal(first.kind, "mcp-stdio-connection");
+    assert.equal(first.writePolicy, "manual-review-only");
+    assert.equal(first.secretPolicy, "no-secrets");
+    assert.equal(first.hostPlatform, process.platform);
+    assert.equal(first.plan.target, target);
+    assert.equal(first.plan.server.launcherPath, fixture.launcher);
+    assert.equal(Object.isFrozen(first), true);
+    assert.equal(Object.isFrozen(first.plan), true);
+    assert.equal(Object.isFrozen(first.output), true);
+    assert.doesNotMatch(JSON.stringify(first), /createdAt|generatedAt|hostname|nodeVersion|cwd/i);
+  }
+});
+
 test("PowerShell display quotes every argument and doubles apostrophes", () => {
   assert.equal(quotePowerShellLiteral("C:\\Agent's Tools\\launcher.mjs"), "'C:\\Agent''s Tools\\launcher.mjs'");
 });
@@ -111,14 +136,65 @@ test("relative UNC incomplete roots invalid characters and unsupported scopes ar
   }
 });
 
-test("renderer fully revalidates and rejects forged plans", () => {
+test("connection parser rejects derived output and host platform tampering after a valid export", () => {
   const fixture = makeFixture();
-  const plan = buildAgentIntegrationPlan({ target: "mcp-servers-json", launcher: fixture.launcher });
-  const forged = {
-    ...plan,
-    server: { ...plan.server, args: ["--unsafe"], injected: true },
+  const valid = exportAgentIntegration({ target: "mcp-servers-json", launcher: fixture.launcher });
+  const forgedOutput = JSON.parse(JSON.stringify(valid));
+  forgedOutput.output.mergeFragment.mcpServers.useful.args[0] = path.join(fixture.root, "other-launcher.mjs");
+  assert.throws(
+    () => parseAgentConnection(forgedOutput),
+    (error) => error.code === "OUTPUT_PLAN_MISMATCH",
+  );
+  const forgedPlatform = {
+    ...valid,
+    hostPlatform: process.platform === "win32" ? "linux" : "win32",
   };
-  assert.throws(() => renderAgentIntegration(forged), (error) => error instanceof AgentIntegrationError && error.code === "INVALID_PLAN");
+  assert.throws(
+    () => parseAgentConnection(forgedPlatform),
+    (error) => error.code === "HOST_PATH_MISMATCH",
+  );
+});
+
+test("integration renderer delegates to the protocol single source for every target", () => {
+  const fixture = makeFixture();
+  for (const target of ["codex", "claude-code", "claude-desktop", "mcp-servers-json"]) {
+    const plan = buildAgentIntegrationPlan({ target, launcher: fixture.launcher, environment: { USEFUL_PROFILE: "secretary-tokenizer" } });
+    assert.deepEqual(renderAgentIntegration(plan), renderAgentIntegrationOutput(plan, { hostPlatform: process.platform }));
+  }
+});
+
+test("object APIs reject Proxy accessors hidden fields symbols and cycles before validation", () => {
+  const fixture = makeFixture();
+  assert.throws(
+    () => buildAgentIntegrationPlan(new Proxy({ target: "codex", launcher: fixture.launcher }, {})),
+    (error) => error instanceof AgentIntegrationError && error.code === "PROXY_FORBIDDEN",
+  );
+  for (const descriptor of [
+    { get() { throw new Error("must not run"); }, enumerable: true },
+    { value: "codex", enumerable: false },
+  ]) {
+    const input = { launcher: fixture.launcher };
+    Object.defineProperty(input, "target", descriptor);
+    assert.throws(() => buildAgentIntegrationPlan(input), (error) => error instanceof AgentIntegrationError && error.code === "ACCESSOR_PROPERTY_FORBIDDEN");
+  }
+  const symbol = { target: "codex", launcher: fixture.launcher, [Symbol("hidden")]: true };
+  assert.throws(() => buildAgentIntegrationPlan(symbol), (error) => error.code === "SYMBOL_PROPERTY_FORBIDDEN");
+  const cyclic = { target: "codex", launcher: fixture.launcher };
+  cyclic.self = cyclic;
+  assert.throws(() => buildAgentIntegrationPlan(cyclic), (error) => error.code === "CYCLIC_INPUT_FORBIDDEN");
+});
+
+test("secret-like ordinary profile and path text does not trigger substring rejection", () => {
+  const fixture = makeFixture();
+  const secretPath = path.join(fixture.root, "secretary-tokenizer.mjs");
+  fs.writeFileSync(secretPath, "// fixture\n", "utf8");
+  const result = planAgentIntegration({
+    target: "mcp-servers-json",
+    launcher: secretPath,
+    environment: { USEFUL_PROFILE: "secretary-tokenizer" },
+  });
+  assert.equal(result.plan.server.launcherPath, secretPath);
+  assert.equal(result.plan.server.env.USEFUL_PROFILE, "secretary-tokenizer");
 });
 
 test("doctor rejects missing and linked launcher paths without executing them", (context) => {
