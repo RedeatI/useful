@@ -5,6 +5,10 @@ export const AGENT_PROBE_SCHEMA_FILE = "agent-probe.schema.json";
 export const AGENT_PROBE_SCHEMA_ID = "https://schemas.useful.example/agent/useful.agent-probe.v1.schema.json";
 export const AGENT_PROBE_SCOPE = "useful-mcp-local-stdio";
 export const AGENT_PROBE_INSTALLATION_MODES = Object.freeze(["source", "agent-kit"]);
+/** The snapshot root has depth 1; every property value or array item adds 1. */
+export const AGENT_PROBE_MAX_DEPTH = 64;
+/** The snapshot root counts as 1 node, as does every visited JSON value. */
+export const AGENT_PROBE_MAX_NODES = 4096;
 
 const UNSAFE_KEY = new Set(["__proto__", "prototype", "constructor"]);
 const SHA256 = /^[a-f0-9]{64}$/u;
@@ -46,8 +50,35 @@ function compareCodePoints(left, right) {
 /** Captures ordinary JSON data without evaluating user-defined accessors. */
 export function snapshotAgentProbeData(value, field = "input") {
   const ancestors = new Set();
+  let nodeCount = 0;
 
-  function visit(current, currentField) {
+  function assertChildCapacity(childCount, currentField) {
+    const minimumNodeCount = nodeCount + childCount;
+    if (minimumNodeCount > AGENT_PROBE_MAX_NODES) {
+      fail("MAX_NODES_EXCEEDED", `${currentField} 超过最大节点数`, {
+        field: currentField,
+        maximumNodes: AGENT_PROBE_MAX_NODES,
+        observedNodes: minimumNodeCount,
+      });
+    }
+  }
+
+  function visit(current, currentField, depth) {
+    if (depth > AGENT_PROBE_MAX_DEPTH) {
+      fail("MAX_DEPTH_EXCEEDED", `${currentField} 超过最大深度`, {
+        field: currentField,
+        maximumDepth: AGENT_PROBE_MAX_DEPTH,
+        observedDepth: depth,
+      });
+    }
+    nodeCount += 1;
+    if (nodeCount > AGENT_PROBE_MAX_NODES) {
+      fail("MAX_NODES_EXCEEDED", `${currentField} 超过最大节点数`, {
+        field: currentField,
+        maximumNodes: AGENT_PROBE_MAX_NODES,
+        observedNodes: nodeCount,
+      });
+    }
     if (current === null || typeof current === "string" || typeof current === "boolean") return current;
     if (typeof current === "number") {
       if (!Number.isFinite(current)) fail("UNSUPPORTED_VALUE", `${currentField} 只接受有限数字`, { field: currentField });
@@ -70,22 +101,25 @@ export function snapshotAgentProbeData(value, field = "input") {
         if (keys.length !== current.length || keys.some((key, index) => key !== String(index))) {
           fail("INVALID_ARRAY", `${currentField} 必须是无额外字段的稠密数组`, { field: currentField });
         }
+        assertChildCapacity(keys.length, currentField);
         return keys.map((key, index) => {
           const descriptor = descriptors[key];
           if (!descriptor.enumerable || !("value" in descriptor)) {
             fail("ACCESSOR_PROPERTY_FORBIDDEN", `${currentField} 只允许可枚举数据项`, { field: currentField, key });
           }
-          return visit(descriptor.value, `${currentField}[${index}]`);
+          return visit(descriptor.value, `${currentField}[${index}]`, depth + 1);
         });
       }
       const output = {};
-      for (const key of Object.keys(descriptors).sort(compareCodePoints)) {
+      const keys = Object.keys(descriptors);
+      assertChildCapacity(keys.length, currentField);
+      for (const key of keys.sort(compareCodePoints)) {
         if (UNSAFE_KEY.has(key)) fail("PROTOTYPE_POLLUTION_FORBIDDEN", `${currentField} 包含不安全字段`, { field: currentField, key });
         const descriptor = descriptors[key];
         if (!descriptor.enumerable || !("value" in descriptor)) {
           fail("ACCESSOR_PROPERTY_FORBIDDEN", `${currentField} 只允许可枚举数据字段`, { field: currentField, key });
         }
-        output[key] = visit(descriptor.value, `${currentField}.${key}`);
+        output[key] = visit(descriptor.value, `${currentField}.${key}`, depth + 1);
       }
       return output;
     } finally {
@@ -93,7 +127,7 @@ export function snapshotAgentProbeData(value, field = "input") {
     }
   }
 
-  return visit(value, field);
+  return visit(value, field, 1);
 }
 
 function deepFreeze(value) {
