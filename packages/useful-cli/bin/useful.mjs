@@ -26,6 +26,10 @@ import {
 import { agentContractData } from "./agent-contract-data.mjs";
 import { AgentSelfProbeError, runAgentSelfProbe } from "./agent-probe.mjs";
 import {
+  AgentConnectionVerifyError,
+  runAgentConnectionVerification,
+} from "./agent-connection-verify.mjs";
+import {
   AgentIntegrationError,
   doctorAgentIntegration,
   exportAgentIntegration,
@@ -33,6 +37,7 @@ import {
   planAgentIntegration,
 } from "@useful/agent-integrations";
 import { AgentConnectionError } from "@useful/protocol/agent-connection";
+import { AgentConnectionVerificationError } from "@useful/protocol/agent-connection-verification";
 import { AgentProbeProtocolError } from "@useful/protocol/agent-probe";
 import {
   appUpdateCreate,
@@ -190,6 +195,7 @@ function parseAgentIntegrationArgs(args) {
     "output-path",
     "config-file",
     "config-path",
+    "config",
   ]);
   for (let index = 0; index < args.length; index += 1) {
     const value = args[index];
@@ -242,6 +248,19 @@ function asCliProbeError(error) {
   return error;
 }
 
+function asCliConnectionVerificationError(error) {
+  if (error instanceof AgentConnectionVerifyError) {
+    const factory = error.exitCode === 4 ? securityError : validationError;
+    return factory(error.code, error.message, error.details);
+  }
+  if (error instanceof AgentConnectionVerificationError) {
+    return validationError(error.code, error.message, error.details);
+  }
+  const probeError = asCliProbeError(error);
+  if (probeError !== error) return probeError;
+  return asCliIntegrationError(error);
+}
+
 async function agentIntegrationCommand(rest) {
   const [subcommand, ...args] = rest;
   if (subcommand === "probe") {
@@ -257,12 +276,12 @@ async function agentIntegrationCommand(rest) {
       throw asCliProbeError(error);
     }
   }
-  if (subcommand !== "plan" && subcommand !== "doctor" && subcommand !== "export") {
-    throw usageError("UNKNOWN_AGENT_COMMAND", "用法: useful agent <plan|doctor|export|probe> ...；probe 仅接受 --json", { subcommand: subcommand ?? null });
+  if (subcommand !== "plan" && subcommand !== "doctor" && subcommand !== "export" && subcommand !== "verify") {
+    throw usageError("UNKNOWN_AGENT_COMMAND", "用法: useful agent <plan|doctor|export|verify|probe> ...；probe 仅接受 --json", { subcommand: subcommand ?? null });
   }
   const options = parseAgentIntegrationArgs(args);
   if (!options.json) {
-    throw usageError("JSON_REQUIRED", "agent plan/doctor/export 仅提供 --json 输出", { subcommand });
+    throw usageError("JSON_REQUIRED", "agent plan/doctor/export/verify 仅提供 --json 输出", { subcommand });
   }
   try {
     const input = {
@@ -274,6 +293,7 @@ async function agentIntegrationCommand(rest) {
     };
     if (subcommand === "plan") return planAgentIntegration(input);
     if (subcommand === "export") return exportAgentIntegration(input);
+    if (subcommand === "verify") return await runAgentConnectionVerification(input);
     const result = doctorAgentIntegration(input);
     if (!result.ok) {
       throw validationError(
@@ -285,6 +305,7 @@ async function agentIntegrationCommand(rest) {
     }
     return result;
   } catch (error) {
+    if (subcommand === "verify") throw asCliConnectionVerificationError(error);
     throw asCliIntegrationError(error);
   }
 }

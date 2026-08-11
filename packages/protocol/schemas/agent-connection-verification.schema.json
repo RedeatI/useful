@@ -1,0 +1,65 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.useful.example/agent/useful.agent-connection-verification.v1.schema.json",
+  "title": "Useful Agent Connection Verification V1",
+  "description": "A portable, self-reported record binding a Useful MCP stdio connection candidate to a local fixed-launcher probe result. It is not authenticated and is not a signature, origin, execution, external-agent installation/configuration, or host-configuration read/write proof.",
+  "$comment": "JSON Schema and parseAgentConnectionVerification validate structure, canonical subdocuments, the fixed default tool closure, and exact endpoint binding only; neither authenticates that execution occurred. createAgentConnectionVerification also constructs self-reported claims rather than authenticated evidence.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "kind", "status", "claimScope", "connection", "probe", "endpoint", "claims"],
+  "properties": {
+    "schemaVersion": { "const": "useful.agent-connection-verification.v1" },
+    "kind": { "const": "mcp-stdio-connection-verification" },
+    "status": { "const": "success" },
+    "claimScope": { "const": "useful-mcp-local-stdio-connection-candidate-self-reported" },
+    "connection": { "$ref": "https://schemas.useful.example/agent/useful.agent-connection.v1.schema.json" },
+    "probe": {
+      "allOf": [
+        { "$ref": "https://schemas.useful.example/agent/useful.agent-probe.v1.schema.json" },
+        {
+          "type": "object",
+          "required": ["tools"],
+          "properties": {
+            "tools": {
+              "type": "object",
+              "required": ["count", "actionCount", "helperCount", "namesSha256"],
+              "properties": {
+                "count": { "const": 40 },
+                "actionCount": { "const": 36 },
+                "helperCount": { "const": 4 },
+                "namesSha256": { "const": "2740f646530580de5ad2079f3290c01517e8b37f58c6d624293ae74e665c6f17" }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "endpoint": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["nodePath", "launcherPath", "installationMode", "sourceRevision", "productVersion"],
+      "properties": {
+        "nodePath": { "$ref": "https://schemas.useful.example/agent/useful.agent-integration.v1.schema.json#/$defs/absoluteLocalPath" },
+        "launcherPath": { "$ref": "https://schemas.useful.example/agent/useful.agent-integration.v1.schema.json#/$defs/absoluteLocalPath" },
+        "installationMode": { "enum": ["source", "agent-kit"] },
+        "sourceRevision": { "$ref": "https://schemas.useful.example/agent/useful.agent-probe.v1.schema.json#/$defs/sha256LikeRevision" },
+        "productVersion": { "$ref": "https://schemas.useful.example/agent/useful.agent-probe.v1.schema.json#/$defs/semver" }
+      }
+    },
+    "claims": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["documentAuthenticated", "connectionGeneratedInCurrentProcess", "fixedUsefulLauncherMatchedInCurrentProcess", "hostCommandExecutedByVerifier", "hostConfigReadByVerifier", "hostConfigWrittenByVerifier", "externalAgentInstalledAttested", "externalAgentConfiguredAttested"],
+      "properties": {
+        "documentAuthenticated": { "const": false },
+        "connectionGeneratedInCurrentProcess": { "const": true },
+        "fixedUsefulLauncherMatchedInCurrentProcess": { "const": true },
+        "hostCommandExecutedByVerifier": { "const": false },
+        "hostConfigReadByVerifier": { "const": false },
+        "hostConfigWrittenByVerifier": { "const": false },
+        "externalAgentInstalledAttested": { "const": false },
+        "externalAgentConfiguredAttested": { "const": false }
+      }
+    }
+  }
+}

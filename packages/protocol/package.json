@@ -15,6 +15,10 @@
       "types": "./src/agent-connection.d.ts",
       "import": "./src/agent-connection.mjs"
     },
+    "./agent-connection-verification": {
+      "types": "./src/agent-connection-verification.d.ts",
+      "import": "./src/agent-connection-verification.mjs"
+    },
     "./agent-integration": {
       "types": "./src/agent-integration.d.ts",
       "import": "./src/agent-integration.mjs"
@@ -30,6 +34,7 @@
   "typesVersions": {
     "*": {
       "agent-connection": ["src/agent-connection.d.ts"],
+      "agent-connection-verification": ["src/agent-connection-verification.d.ts"],
       "agent-integration": ["src/agent-integration.d.ts"],
       "agent-probe": ["src/agent-probe.d.ts"]
     }

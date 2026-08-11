@@ -40,6 +40,12 @@ Windows 进程观测和第三方工具扩展能力。
   Agent Kit 的 `artifactVerified` 只表示本地解压目录匹配 MANIFEST 的字节数和哈希闭集，不代表签名、来源、
   sidecar 或发布授权。30 秒硬截止从同步的本地路径/MANIFEST 预检结束后开始，只覆盖 MCP 执行与 transport
   关闭阶段，不限制这段同步预检的耗时。
+- **连接绑定验证：** `agent verify --target <target> --launcher <fixed-entry> --json` 要求使用当前安装解析出的
+  固定 Useful MCP 入口，重新生成 `useful.agent-connection.v1` 候选，运行本地 probe，并将两者绑定为
+  `useful.agent-connection-verification.v1`。其中 `claimScope` 和 `claims` 明确是本次 CLI 自报，且
+  `documentAuthenticated: false`：Schema/parser 通过只校验结构与 endpoint 绑定，不认证执行。verifier 不会
+  执行生成的宿主 `commandArgv`，也不读写宿主配置；不认证 Codex/Claude 已安装、已配置或会接受候选。
+  V1 拒绝 `USEFUL_PROFILE`，也不宣称 profile 绑定、签名、来源、sidecar、发布状态或 launcher 无网络访问。
 
 界面支持简体中文和 English (US)，并提供浅色、深色主题。Windows 便携模式只需在 `Useful.exe`
 旁创建 `portable.flag`，数据便会写入 `./data`，而不是 `%APPDATA%\Useful`。
@@ -103,6 +109,7 @@ pnpm useful -- agent plan --target codex --launcher C:\ABSOLUTE\useful-mcp.mjs -
 pnpm useful -- agent doctor --target claude-code --launcher C:\ABSOLUTE\useful-mcp.mjs --json
 pnpm useful -- agent export --target codex --launcher C:\ABSOLUTE\useful-mcp.mjs --json
 pnpm useful -- agent probe --json
+pnpm useful -- agent verify --target codex --launcher C:\ABSOLUTE\PATH\TO\tools\packages\useful-mcp\bin\useful-mcp.mjs --json
 ```
 
 plan/export 的 target 闭集为 `codex`、`claude-code`、`claude-desktop`、`mcp-servers-json`。导出仅写 stdout、
@@ -110,6 +117,12 @@ plan/export 的 target 闭集为 `codex`、`claude-code`、`claude-desktop`、`m
 输出是本机合并片段；远程服务请使用其官方 Connectors。Codex 与 Claude 仍保留各自的审批和沙箱策略；Useful
 不生成绕过权限或 always-allow 配置。scope 与 merge 语义见
 [AI 接入说明](docs/AI-INTEGRATION.md)。
+`agent verify` 要求 `--launcher` 解析为固定的源码或 Agent Kit MCP 入口；传入其他 launcher 会 fail closed。
+它内嵌的 probe 必须报告完整默认面：40 个工具 = 36 个 Action + 4 个 helper，工具名 SHA-256 也必须匹配
+`2740f646530580de5ad2079f3290c01517e8b37f58c6d624293ae74e665c6f17`。这个 JSON 可以复制和解析，但
+parser 通过也不认证任何自报的本地执行，
+也不会让 current-host 路径变得可移植。endpoint 只绑定 node/launcher 路径和安装身份，不绑定 env/cwd，
+也不会执行或应用候选。
 
 `packages/useful-runtime` 提供 JSON 运行时，`packages/useful-mcp` 通过 stdio 暴露同一份 Action
 注册表。两者目前都属于需要 Node.js 的开发入口，尚未作为独立二进制发布。MCP 另外保留
