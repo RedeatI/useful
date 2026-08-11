@@ -57,6 +57,13 @@ Agent host.
   read/write host configuration. It does not attest that Codex/Claude is installed, configured, or
   will accept the candidate; V1 rejects `USEFUL_PROFILE` and makes no profile-bound, signature,
   origin, sidecar, publication, or launcher-network claim.
+- **All-host candidate verification:** `agent verify-all --launcher <fixed-entry> --json` uses one MCP
+  self-probe to build the four user-scope candidates in the fixed order `codex`, `claude-code`,
+  `claude-desktop`, `mcp-servers-json`. It returns all four or fails without a partial set. A
+  candidate-ready result and every true claim remain current-process, self-reported statements:
+  Schema/parser success does not authenticate execution. The verifier does not execute Codex,
+  Claude, browser, or input commands; read or write host configuration; accept a profile; or attest
+  that an external Agent is installed, configured, connected, or will accept a candidate.
 - **Offline Computer Use capability probe:** `computer-use probe --json` validates the bundled
   `useful.computer-use.v1` contract, fixed nine-action-type closure, disabled default controller,
   host-desktop rejection, and the presence of the host-injected browser-adapter interface. Its
@@ -133,6 +140,8 @@ pnpm useful -- agent export --target codex --launcher C:\ABSOLUTE\useful-mcp.mjs
 pnpm useful -- computer-use probe --json
 pnpm useful -- agent probe --json
 pnpm useful -- agent verify --target codex --launcher C:\ABSOLUTE\PATH\TO\tools\packages\useful-mcp\bin\useful-mcp.mjs --json
+pnpm useful -- agent verify-all --launcher C:\ABSOLUTE\PATH\TO\tools\packages\useful-mcp\bin\useful-mcp.mjs --json
+C:\ABSOLUTE\KIT\bin\useful.cmd agent verify-all --launcher C:\ABSOLUTE\KIT\lib\useful-mcp.mjs --json
 ```
 
 The plan/export target is one of `codex`, `claude-code`, `claude-desktop`, or `mcp-servers-json`.
@@ -148,6 +157,11 @@ Actions + 4 helpers and tool-name SHA-256
 copied and parsed, but that does not authenticate any claimed local execution or make its current-host
 paths portable. Its endpoint binds only the node/launcher paths and installation identity; it does not
 bind environment or working directory, execute, or apply the candidate.
+`agent verify-all` accepts only the fixed launcher and `--json`: there is no target, scope, project,
+environment, profile, config, apply, or install option. It runs the MCP self-probe once, then emits
+the four user-scope verifications in the fixed order above as one all-or-nothing
+`useful.agent-connection-verification-set.v1` document. Its 40/36/4 counts and tool-name hash are the
+same fixed closure as `agent verify`; all claims, including true claims, are self-reported.
 
 `packages/useful-runtime` provides the JSON runtime, and `packages/useful-mcp` exposes the same
 registry over stdio. Both are development entry points that currently require Node.js; they are not

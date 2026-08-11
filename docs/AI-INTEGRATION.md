@@ -203,6 +203,7 @@ allowlist，不会注册缺失 entry、授予权限或生成确认。CLI 只从�
 & "<ABS_KIT>\bin\useful-runtime.cmd" actions list --json
 & "<ABS_KIT>\bin\useful.cmd" computer-use probe --json
 & "<ABS_KIT>\bin\useful.cmd" agent verify --target codex --launcher "<ABS_KIT>\lib\useful-mcp.mjs" --json
+& "<ABS_KIT>\bin\useful.cmd" agent verify-all --launcher "<ABS_KIT>\lib\useful-mcp.mjs" --json
 ```
 
 ```bash
@@ -210,6 +211,7 @@ allowlist，不会注册缺失 entry、授予权限或生成确认。CLI 只从�
 "<ABS_KIT>/bin/useful-runtime" actions list --json
 "<ABS_KIT>/bin/useful" computer-use probe --json
 "<ABS_KIT>/bin/useful" agent verify --target codex --launcher "<ABS_KIT>/lib/useful-mcp.mjs" --json
+"<ABS_KIT>/bin/useful" agent verify-all --launcher "<ABS_KIT>/lib/useful-mcp.mjs" --json
 ```
 
 MCP host 推荐绕过 shell launcher，直接配置 `node <ABS_KIT>/lib/useful-mcp.mjs`：
@@ -388,6 +390,33 @@ connection/probe/endpoint 绑定和固定工具闭集有效；不认证所述执
 签名、发布者、来源、sidecar 或发布授权；固定 launcher 匹配也不等于“launcher 无网络访问”。V1 拒绝
 `--env USEFUL_PROFILE=...`，也不读取 `--agent-profile`，因此不产生 profile-bound 证明。宿主仍必须按官方
 流程人工复核和应用候选。
+
+## 四宿主候选集合验证（Agent Connection Verification Set V1）
+
+源码入口：
+
+```powershell
+pnpm useful -- agent verify-all `
+  --launcher "C:\ABSOLUTE\PATH\TO\tools\packages\useful-mcp\bin\useful-mcp.mjs" `
+  --json
+```
+
+`agent verify-all` 只接受 `--launcher` 和 `--json`；没有 `--target`、`--scope`、`--project-dir`、`--env`、
+profile、node/argv/cwd/output、config、apply、install 等覆盖。launcher 必须是当前 source checkout 或 Agent Kit
+解析出的固定 Useful MCP 入口。命令只运行一次 MCP self-probe，再按 `codex`、`claude-code`、
+`claude-desktop`、`mcp-servers-json` 固定顺序生成四个 user-scope connection verification。四项的 endpoint 与
+同一个 probe 必须一致，并分别保持 40 个工具 = 36 个 Action + 4 个 helper 及固定工具名 SHA-256
+`2740f646530580de5ad2079f3290c01517e8b37f58c6d624293ae74e665c6f17`。任何一项生成、绑定或验证失败都会使
+整个命令失败，不输出可当作成功使用的部分集合；成功文档为
+`useful.agent-connection-verification-set.v1`，Schema 位于
+`packages/protocol/schemas/agent-connection-verification-set.schema.json`。
+
+集合的 `claimScope` 固定为 `useful-mcp-local-stdio-connection-candidates-self-reported`。candidate-ready 状态、
+`singleProbeUsedForAllCandidatesInCurrentProcess: true` 及其他值为 true 的 claims 都只是本次 CLI 的
+self-reported 陈述；Schema/parser 通过或复制 JSON 不会认证执行。命令不执行任何生成的 Codex/Claude
+`commandArgv`，不查找或启动 Codex、Claude、browser、input 命令，不读写宿主配置，也不证明外部 Agent 已安装、
+已配置、已连接或会接受候选。V1 不支持 profile，`artifactVerified` 即使在 Agent Kit 中为 `true`，也仍只证明
+本地 `MANIFEST.json` 的文件字节数/哈希闭集，不证明签名、来源、sidecar、发布授权或 launcher 无网络访问。
 
 MCP 是 Useful 对外的公共执行面，而不是宿主权限的替代者。Codex、Claude 和其他宿主各自决定审批、沙箱、
 日志、配置位置与配置变更确认；Useful 只提供本地 stdio server 及其已有的 action/profile 信任边界。始终先审阅

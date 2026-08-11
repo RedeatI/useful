@@ -170,17 +170,23 @@ function canonicalExportInput(doctor, fixedLauncher) {
   };
 }
 
-async function executeAgentConnectionVerification(input, dependencies = {}) {
+function prepareAgentConnectionVerification(input, dependencies = {}) {
   const resolveInstallation = dependencies.resolveInstallation ?? resolveAgentProbeInstallation;
-  const doctor = dependencies.doctor ?? doctorAgentIntegration;
-  const exportConnection = dependencies.exportConnection ?? exportAgentIntegration;
-  const probe = dependencies.probe ?? runAgentSelfProbe;
-  const createVerification = dependencies.createVerification ?? createAgentConnectionVerification;
-
   const initial = resolveInstallation();
   const captured = captureInput(input);
   rejectUnsupportedProfile(captured.environment);
   const fixedLauncher = assertFixedLauncher(captured.launcher, initial.mcpEntry);
+  return Object.freeze({ captured, fixedLauncher, initial });
+}
+
+function buildAgentConnectionCandidate(context, input, dependencies = {}) {
+  const doctor = dependencies.doctor ?? doctorAgentIntegration;
+  const exportConnection = dependencies.exportConnection ?? exportAgentIntegration;
+  const captured = captureInput(input);
+  rejectUnsupportedProfile(captured.environment);
+  if (comparablePath(captured.launcher) !== comparablePath(context.fixedLauncher)) {
+    fail("AGENT_VERIFY_LAUNCHER_MISMATCH", "launcher 必须与本次验证固定入口一致", {}, 4);
+  }
 
   const doctorResult = doctor(captured);
   if (!doctorResult?.ok) {
@@ -190,23 +196,45 @@ async function executeAgentConnectionVerification(input, dependencies = {}) {
     fail("AGENT_INTEGRATION_DOCTOR_FAILED", "Agent 集成诊断未通过", { failedChecks });
   }
   rejectUnsupportedProfile(doctorResult.plan?.server?.env);
+  return exportConnection(canonicalExportInput(doctorResult, context.fixedLauncher));
+}
 
-  const connection = exportConnection(canonicalExportInput(doctorResult, fixedLauncher));
-  const probeResult = await probe();
+function assertAgentConnectionVerificationIdentity(context, probeResult, dependencies = {}) {
+  const resolveInstallation = dependencies.resolveInstallation ?? resolveAgentProbeInstallation;
   const final = resolveInstallation();
+  const initial = context.initial;
   if (!sameInstallation(initial.installation, probeResult?.installation)
     || !sameInstallation(initial.installation, final.installation)
     || comparablePath(initial.mcpEntry) !== comparablePath(final.mcpEntry)
     || comparablePath(initial.root) !== comparablePath(final.root)) {
     fail("AGENT_VERIFY_INSTALLATION_DRIFT", "Agent verify 期间 Useful 安装身份发生变化", {}, 4);
   }
+}
 
+function createAgentConnectionCandidateVerification(connection, probeResult, dependencies = {}) {
+  const createVerification = dependencies.createVerification ?? createAgentConnectionVerification;
   return createVerification({ connection, probe: probeResult });
+}
+
+async function executeAgentConnectionVerification(input, dependencies = {}) {
+  const probe = dependencies.probe ?? runAgentSelfProbe;
+  const context = prepareAgentConnectionVerification(input, dependencies);
+  const connection = buildAgentConnectionCandidate(context, context.captured, dependencies);
+  const probeResult = await probe();
+  assertAgentConnectionVerificationIdentity(context, probeResult, dependencies);
+  return createAgentConnectionCandidateVerification(connection, probeResult, dependencies);
 }
 
 export async function runAgentConnectionVerification(input) {
   return executeAgentConnectionVerification(input);
 }
+
+export const agentConnectionVerificationInternals = Object.freeze({
+  prepare: prepareAgentConnectionVerification,
+  buildCandidate: buildAgentConnectionCandidate,
+  assertIdentity: assertAgentConnectionVerificationIdentity,
+  createCandidateVerification: createAgentConnectionCandidateVerification,
+});
 
 // Test seam only. The production CLI never exposes dependency, launcher,
 // process, argv, cwd, environment, host-command, or host-config overrides.

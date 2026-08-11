@@ -29,6 +29,7 @@ import {
   AgentConnectionVerifyError,
   runAgentConnectionVerification,
 } from "./agent-connection-verify.mjs";
+import { runAgentConnectionVerificationSet } from "./agent-connection-verify-all.mjs";
 import { ComputerUseProbeError, runComputerUseProbe } from "./computer-use-probe.mjs";
 import {
   AgentIntegrationError,
@@ -39,6 +40,7 @@ import {
 } from "@useful/agent-integrations";
 import { AgentConnectionError } from "@useful/protocol/agent-connection";
 import { AgentConnectionVerificationError } from "@useful/protocol/agent-connection-verification";
+import { AgentConnectionVerificationSetError } from "@useful/protocol/agent-connection-verification-set";
 import { AgentProbeProtocolError } from "@useful/protocol/agent-probe";
 import { ComputerUseProbeProtocolError } from "@useful/protocol/computer-use-probe";
 import {
@@ -232,6 +234,40 @@ function parseAgentIntegrationArgs(args) {
   return options;
 }
 
+function parseAgentVerifyAllArgs(args) {
+  const options = {};
+  const seen = new Set();
+  for (let index = 0; index < args.length; index += 1) {
+    const value = args[index];
+    if (!value.startsWith("--")) {
+      throw usageError("INVALID_ARGUMENTS", "agent verify-all 不接受位置参数", { value });
+    }
+    const equals = value.indexOf("=");
+    const name = value.slice(2, equals >= 0 ? equals : undefined);
+    if (name !== "launcher" && name !== "json") {
+      throw usageError("UNKNOWN_FLAG", `未知选项: --${name}`, { option: name });
+    }
+    if (seen.has(name)) {
+      throw usageError("DUPLICATE_FLAG", `--${name} 只能提供一次`, { option: name });
+    }
+    seen.add(name);
+    if (name === "json") {
+      if (equals >= 0) throw usageError("INVALID_FLAG_VALUE", "--json 不接受值", { option: name });
+      options.json = true;
+      continue;
+    }
+    const optionValue = equals >= 0 ? value.slice(equals + 1) : args[++index];
+    if (optionValue === undefined || optionValue.startsWith("--")) {
+      throw usageError("MISSING_OPTION_VALUE", `--${name} 需要值`, { option: name });
+    }
+    options.launcher = optionValue;
+  }
+  if (!Object.hasOwn(options, "launcher")) {
+    throw usageError("MISSING_REQUIRED_OPTION", "agent verify-all 要求显式 --launcher", { option: "launcher" });
+  }
+  return options;
+}
+
 function asCliIntegrationError(error) {
   if (error instanceof AgentIntegrationError || error instanceof AgentConnectionError) {
     return validationError(error.code, error.message, error.details);
@@ -255,7 +291,7 @@ function asCliConnectionVerificationError(error) {
     const factory = error.exitCode === 4 ? securityError : validationError;
     return factory(error.code, error.message, error.details);
   }
-  if (error instanceof AgentConnectionVerificationError) {
+  if (error instanceof AgentConnectionVerificationError || error instanceof AgentConnectionVerificationSetError) {
     return validationError(error.code, error.message, error.details);
   }
   const probeError = asCliProbeError(error);
@@ -285,8 +321,19 @@ async function agentIntegrationCommand(rest) {
       throw asCliProbeError(error);
     }
   }
+  if (subcommand === "verify-all") {
+    const options = parseAgentVerifyAllArgs(args);
+    if (!options.json) {
+      throw usageError("JSON_REQUIRED", "agent verify-all 仅提供 --json 输出", { subcommand });
+    }
+    try {
+      return await runAgentConnectionVerificationSet({ launcher: options.launcher });
+    } catch (error) {
+      throw asCliConnectionVerificationError(error);
+    }
+  }
   if (subcommand !== "plan" && subcommand !== "doctor" && subcommand !== "export" && subcommand !== "verify") {
-    throw usageError("UNKNOWN_AGENT_COMMAND", "用法: useful agent <plan|doctor|export|verify|probe> ...；probe 仅接受 --json", { subcommand: subcommand ?? null });
+    throw usageError("UNKNOWN_AGENT_COMMAND", "用法: useful agent <plan|doctor|export|verify|verify-all|probe> ...；probe 与 verify-all 使用各自严格参数闭集", { subcommand: subcommand ?? null });
   }
   const options = parseAgentIntegrationArgs(args);
   if (!options.json) {

@@ -389,6 +389,8 @@ describe("Useful Agent Kit builder", () => {
       "lib/provenance/protocol/agent-connection.mjs",
       "lib/provenance/protocol/agent-connection-verification.d.ts",
       "lib/provenance/protocol/agent-connection-verification.mjs",
+      "lib/provenance/protocol/agent-connection-verification-set.d.ts",
+      "lib/provenance/protocol/agent-connection-verification-set.mjs",
       "lib/provenance/protocol/agent-integration.d.ts",
       "lib/provenance/protocol/agent-integration.mjs",
       "lib/provenance/protocol/agent-probe.d.ts",
@@ -408,6 +410,7 @@ describe("Useful Agent Kit builder", () => {
       "lib/useful.plugin-action.v1.schema.json",
       "schemas/agent-connection.schema.json",
       "schemas/agent-connection-verification.schema.json",
+      "schemas/agent-connection-verification-set.schema.json",
       "schemas/agent-integration.schema.json",
       "schemas/agent-probe.schema.json",
       "schemas/computer-use-probe.schema.json",
@@ -434,6 +437,8 @@ describe("Useful Agent Kit builder", () => {
     expect(kitReadme).toContain("bin\\useful.cmd agent probe --json");
     expect(kitReadme).toContain("bin/useful agent verify --target codex --launcher <ABS_KIT>/lib/useful-mcp.mjs --json");
     expect(kitReadme).toContain("bin\\useful.cmd agent verify --target codex --launcher <ABS_KIT>\\lib\\useful-mcp.mjs --json");
+    expect(kitReadme).toContain("bin/useful agent verify-all --launcher <ABS_KIT>/lib/useful-mcp.mjs --json");
+    expect(kitReadme).toContain("bin\\useful.cmd agent verify-all --launcher <ABS_KIT>\\lib\\useful-mcp.mjs --json");
     expect(kitReadme).toContain("does not attest an external Agent, signature, publisher, origin, sidecar, or publication authorization");
     expect(kitReadme).toContain("does not bound that preflight");
     expect(kitReadme).toContain("claimScope and claims are self-reported, with documentAuthenticated false");
@@ -451,6 +456,11 @@ describe("Useful Agent Kit builder", () => {
     expect(kitReadme).toContain("includes only a host-injected browser-adapter factory, which the probe checks as an interface and never calls");
     expect(kitReadme).toContain("does not prove real browser/VM isolation, network enforcement, or external-model integration");
     expect(kitReadme).toContain("default Computer Use provider remains disabled after the probe");
+    expect(kitReadme).toContain("runs one MCP self-probe");
+    expect(kitReadme).toContain("fixed codex, claude-code, claude-desktop, mcp-servers-json order or fails without a partial set");
+    expect(kitReadme).toContain("candidate-ready status and every true claim are self-reported, not authenticated proof");
+    expect(kitReadme).toContain("does not execute Codex, Claude, browser, or input commands; read or write host configuration");
+    expect(kitReadme).toContain("artifactVerified means only the local MANIFEST size/hash closed-set check");
     const thirdPartyLicenses = JSON.parse(inspected.entries.get("THIRD_PARTY-LICENSES.json").data.toString("utf8"));
     expect(thirdPartyLicenses.schemaVersion).toBe("useful.agent-kit.third-party-licenses.v1");
     expect(thirdPartyLicenses.packages.map((dependency) => dependency.name)).toEqual(expect.arrayContaining([
@@ -488,9 +498,130 @@ describe("Useful Agent Kit builder", () => {
     expect(contractData.commandSequence.join("\n")).not.toMatch(/\b(?:npx|pnpm\s+dlx)\b/);
     expect(contractData.commands.agentVerify).toBe("useful agent verify --target <codex|claude-code|claude-desktop|mcp-servers-json> --launcher <current-installation-fixed-useful-mcp-entry> [--scope user|project] [--project-dir <host-native-absolute-directory>] [--env NO_COLOR=1] [--env USEFUL_LOG_LEVEL=<error|warn|info>] --json");
     expect(contractData.commandSequence[6]).toBe("useful agent verify --target mcp-servers-json --launcher \"<ABS_FIXED_USEFUL_MCP_LAUNCHER>\" --json");
-    expect(contractData.commandSequence[7]).toBe("useful computer-use probe --json");
+    expect(contractData.commands.agentVerifyAll).toBe("useful agent verify-all --launcher <current-installation-fixed-useful-mcp-entry> --json");
+    expect(contractData.commandSequence[7]).toBe("useful agent verify-all --launcher \"<ABS_FIXED_USEFUL_MCP_LAUNCHER>\" --json");
+    expect(contractData.commandSequence[8]).toBe("useful computer-use probe --json");
     expect(contractData.commands.computerUseProbe).toBe("useful computer-use probe --json");
     expect(contractData.commandSequence).toContain("useful computer-use probe --json");
+
+    const verifyAllSentinelRoot = path.join(fixture.outer, "verify all sentinels");
+    const verifyAllFakeBin = path.join(verifyAllSentinelRoot, "fake bin");
+    const verifyAllHome = path.join(verifyAllSentinelRoot, "home");
+    const verifyAllAppData = path.join(verifyAllSentinelRoot, "appdata");
+    const verifyAllLocalAppData = path.join(verifyAllSentinelRoot, "localappdata");
+    const verifyAllXdgConfig = path.join(verifyAllSentinelRoot, "xdg config");
+    for (const directory of [verifyAllFakeBin, verifyAllHome, verifyAllAppData, verifyAllLocalAppData, verifyAllXdgConfig]) {
+      fs.mkdirSync(directory, { recursive: true });
+      if (directory !== verifyAllFakeBin) fs.writeFileSync(path.join(directory, "pre-existing.txt"), "unchanged\n", "utf8");
+    }
+    const verifyAllHostSentinel = path.join(verifyAllSentinelRoot, "host-command-executed.txt");
+    const verifyAllBrowserSentinel = path.join(verifyAllSentinelRoot, "browser-started.txt");
+    const verifyAllInputSentinel = path.join(verifyAllSentinelRoot, "input-injected.txt");
+    for (const name of ["codex", "claude"]) {
+      writeFakeCommand(verifyAllFakeBin, name, "USEFUL_VERIFY_ALL_HOST_SENTINEL");
+    }
+    for (const name of ["chrome", "google-chrome", "chromium", "msedge", "playwright"]) {
+      writeFakeCommand(verifyAllFakeBin, name, "USEFUL_VERIFY_ALL_BROWSER_SENTINEL");
+    }
+    for (const name of process.platform === "win32" ? ["wscript"] : ["xdotool", "osascript"]) {
+      writeFakeCommand(verifyAllFakeBin, name, "USEFUL_VERIFY_ALL_INPUT_SENTINEL");
+    }
+    const verifyAllConfigBefore = {
+      home: snapshotRegularFiles(verifyAllHome),
+      appData: snapshotRegularFiles(verifyAllAppData),
+      localAppData: snapshotRegularFiles(verifyAllLocalAppData),
+      xdg: snapshotRegularFiles(verifyAllXdgConfig),
+    };
+    const verifyAllPathEntries = [verifyAllFakeBin, path.dirname(process.execPath)];
+    if (process.platform === "win32") {
+      verifyAllPathEntries.push(path.dirname(process.env.ComSpec ?? "C:\\Windows\\System32\\cmd.exe"));
+    } else {
+      verifyAllPathEntries.push("/usr/bin", "/bin");
+    }
+    const agentMcpLauncher = path.join(kitRoot, "lib", "useful-mcp.mjs");
+    const verifyAllRun = runLauncher(kitRoot, "useful", [
+      "agent", "verify-all",
+      "--launcher", agentMcpLauncher,
+      "--json",
+    ], {
+      env: {
+        APPDATA: verifyAllAppData,
+        HOME: verifyAllHome,
+        LOCALAPPDATA: verifyAllLocalAppData,
+        PATH: verifyAllPathEntries.join(path.delimiter),
+        USERPROFILE: verifyAllHome,
+        USEFUL_VERIFY_ALL_BROWSER_SENTINEL: verifyAllBrowserSentinel,
+        USEFUL_VERIFY_ALL_HOST_SENTINEL: verifyAllHostSentinel,
+        USEFUL_VERIFY_ALL_INPUT_SENTINEL: verifyAllInputSentinel,
+        XDG_CONFIG_HOME: verifyAllXdgConfig,
+      },
+    });
+    const verificationSet = expectJsonSuccess(verifyAllRun);
+    expect(verifyAllRun.stderr).toBe("");
+    expect(verificationSet).toMatchObject({
+      schemaVersion: "useful.agent-connection-verification-set.v1",
+      kind: "mcp-stdio-connection-verification-set",
+      status: "candidate-ready",
+      claimScope: "useful-mcp-local-stdio-connection-candidates-self-reported",
+    });
+    expect(verificationSet.claims).toEqual({
+      documentAuthenticated: false,
+      setGeneratedInCurrentProcess: true,
+      singleProbeUsedForAllCandidatesInCurrentProcess: true,
+      fixedUsefulLauncherMatchedInCurrentProcess: true,
+      hostCommandExecutedByVerifier: false,
+      hostConfigReadByVerifier: false,
+      hostConfigWrittenByVerifier: false,
+      externalAgentInstalledAttested: false,
+      externalAgentConfiguredAttested: false,
+      externalAgentConnectedAttested: false,
+    });
+    expect(verificationSet.verifications.map((verification) => verification.connection.plan.target)).toEqual([
+      "codex", "claude-code", "claude-desktop", "mcp-servers-json",
+    ]);
+    expect(verificationSet.verifications.map((verification) => verification.connection.plan.scope)).toEqual([
+      "user", "user", "user", "user",
+    ]);
+    expect(verificationSet.verifications.map((verification) => verification.connection.plan.server.env)).toEqual([
+      {}, {}, {}, {},
+    ]);
+    expect(verificationSet.verifications.every((verification) => verification.status === "success")).toBe(true);
+    const [referenceVerification, ...otherVerifications] = verificationSet.verifications;
+    expect(referenceVerification.probe.installation).toMatchObject({
+      mode: "agent-kit",
+      artifactVerified: true,
+      sourceRevision: inspected.manifest.source.revision,
+      version: inspected.manifest.product.version,
+    });
+    expect(referenceVerification.probe.tools).toEqual({
+      count: 40,
+      actionCount: 36,
+      helperCount: 4,
+      namesSha256: "2740f646530580de5ad2079f3290c01517e8b37f58c6d624293ae74e665c6f17",
+    });
+    for (const verification of otherVerifications) {
+      expect(verification.endpoint).toEqual(referenceVerification.endpoint);
+      expect(verification.probe).toEqual(referenceVerification.probe);
+    }
+    for (const verification of verificationSet.verifications) {
+      expect(verification.claims).toMatchObject({
+        documentAuthenticated: false,
+        hostCommandExecutedByVerifier: false,
+        hostConfigReadByVerifier: false,
+        hostConfigWrittenByVerifier: false,
+        externalAgentInstalledAttested: false,
+        externalAgentConfiguredAttested: false,
+      });
+    }
+    expect(fs.existsSync(verifyAllHostSentinel)).toBe(false);
+    expect(fs.existsSync(verifyAllBrowserSentinel)).toBe(false);
+    expect(fs.existsSync(verifyAllInputSentinel)).toBe(false);
+    expect({
+      home: snapshotRegularFiles(verifyAllHome),
+      appData: snapshotRegularFiles(verifyAllAppData),
+      localAppData: snapshotRegularFiles(verifyAllLocalAppData),
+      xdg: snapshotRegularFiles(verifyAllXdgConfig),
+    }).toEqual(verifyAllConfigBefore);
 
     const computerUseSentinelRoot = path.join(fixture.outer, "computer use probe sentinels");
     const fakeBin = path.join(computerUseSentinelRoot, "fake bin");
@@ -637,7 +768,6 @@ describe("Useful Agent Kit builder", () => {
       },
     });
 
-    const agentMcpLauncher = path.join(kitRoot, "lib", "useful-mcp.mjs");
     const integrationPlan = expectJsonSuccess(runLauncher(kitRoot, "useful", [
       "agent", "plan",
       "--target", "codex",
