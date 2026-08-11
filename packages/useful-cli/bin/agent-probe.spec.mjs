@@ -1,5 +1,6 @@
 import { PassThrough } from "node:stream";
 import { spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -18,6 +19,15 @@ const realCli = path.join(path.dirname(fileURLToPath(import.meta.url)), "useful.
 const sourceModule = pathToFileURL(path.join(path.dirname(realCli), "agent-probe.mjs")).href;
 const CLI_TEST_TIMEOUT_MS = 40_000;
 const CANONICAL_TEMP_ROOT = fs.realpathSync.native(os.tmpdir());
+const COMPUTER_USE_AGENT_KIT_REQUIRED_FILES = Object.freeze([
+  "schemas/computer-use-probe.schema.json",
+  "lib/provenance/protocol/computer-use-probe.mjs",
+  "lib/provenance/protocol/computer-use-probe.d.ts",
+  "lib/provenance/computer-use-contract/index.mjs",
+  "lib/provenance/computer-use-contract/index.d.ts",
+  "lib/provenance/computer-use-browser-adapter/index.mjs",
+  "lib/provenance/computer-use-browser-adapter/index.d.ts",
+]);
 
 function actionNames() {
   return [...Object.values(ACTION_IDS), ...Object.values(OFFICE_ACTION_IDS)].sort();
@@ -129,6 +139,74 @@ function writeAgentKitTraversalFixture(root) {
     closure: { manifestPath: "MANIFEST.json", manifestSelfExcluded: true },
     files: [{ path: "lib/useful.mjs", sha256: "0".repeat(64), size: 7 }],
   })}\n`);
+  return moduleFile;
+}
+
+function writeClosedAgentKitManifest(root) {
+  const files = [];
+  const visit = (directory) => {
+    for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+      const absolute = path.join(directory, entry.name);
+      if (entry.isDirectory()) visit(absolute);
+      else if (entry.isFile() && entry.name !== "MANIFEST.json") {
+        const bytes = fs.readFileSync(absolute);
+        files.push({
+          path: path.relative(root, absolute).split(path.sep).join("/"),
+          sha256: createHash("sha256").update(bytes).digest("hex"),
+          size: bytes.length,
+        });
+      }
+    }
+  };
+  visit(root);
+  files.sort((left, right) => left.path < right.path ? -1 : left.path > right.path ? 1 : 0);
+  fs.writeFileSync(path.join(root, "MANIFEST.json"), `${JSON.stringify({
+    schemaVersion: "useful.agent-kit.manifest.v1",
+    product: { name: "Useful", version: "0.1.0-beta.3" },
+    source: { revision: "ab".repeat(20) },
+    node: { requirement: ">=20" },
+    commands: {
+      useful: { entry: "lib/useful.mjs", posix: "bin/useful", windows: "bin/useful.cmd" },
+      "useful-runtime": { entry: "lib/useful-runtime.mjs", posix: "bin/useful-runtime", windows: "bin/useful-runtime.cmd" },
+      "useful-mcp": { entry: "lib/useful-mcp.mjs", posix: "bin/useful-mcp", windows: "bin/useful-mcp.cmd" },
+    },
+    closure: { manifestPath: "MANIFEST.json", manifestSelfExcluded: true },
+    files,
+  })}\n`);
+}
+
+function writeValidAgentKitFixture(root) {
+  const required = new Set([
+    ...agentProbeTesting.requiredAgentKitFiles,
+    ...COMPUTER_USE_AGENT_KIT_REQUIRED_FILES,
+  ]);
+  for (const relative of required) {
+    const file = path.join(root, ...relative.split("/"));
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.writeFileSync(file, `${relative}\n`);
+  }
+  fs.writeFileSync(path.join(root, "package.json"), `${JSON.stringify({
+    name: "useful-agent-kit",
+    version: "0.1.0-beta.3",
+    description: "Valid Agent Kit probe fixture",
+    private: true,
+    license: "SEE LICENSE IN LICENSE",
+    type: "module",
+    engines: { node: ">=20" },
+  })}\n`);
+  const moduleFile = path.join(root, "lib", "useful.mjs");
+  fs.writeFileSync(moduleFile, [
+    `import { resolveAgentProbeInstallation } from ${JSON.stringify(sourceModule)};`,
+    "try {",
+    "  const result = resolveAgentProbeInstallation(import.meta.url, true);",
+    "  process.stdout.write(JSON.stringify({ ok: true, installation: result.installation }) + '\\n');",
+    "} catch (error) {",
+    "  process.stdout.write(JSON.stringify({ name: error?.name ?? null, code: error?.code ?? null, details: error?.details ?? null }) + '\\n');",
+    "  process.exitCode = 4;",
+    "}",
+    "",
+  ].join("\n"));
+  writeClosedAgentKitManifest(root);
   return moduleFile;
 }
 
@@ -253,6 +331,44 @@ describe("useful agent self-probe production", () => {
       fs.rmSync(root, { recursive: true, force: true });
     }
   });
+
+  it.each(COMPUTER_USE_AGENT_KIT_REQUIRED_FILES)(
+    "rejects a closed Agent Kit missing required Computer Use file %s",
+    (requiredPath) => {
+      const root = fs.mkdtempSync(path.join(CANONICAL_TEMP_ROOT, "useful-probe-computer-use-required-"));
+      try {
+        const moduleFile = writeValidAgentKitFixture(root);
+        expect(agentProbeTesting.verifyAgentKit(moduleFile)).toMatchObject({
+          installation: { mode: "agent-kit", artifactVerified: true },
+        });
+
+        fs.rmSync(path.join(root, ...requiredPath.split("/")));
+        writeClosedAgentKitManifest(root);
+
+        expect(() => agentProbeTesting.verifyAgentKit(moduleFile)).toThrowError(expect.objectContaining({
+          code: "AGENT_KIT_MANIFEST_INVALID",
+          details: { path: requiredPath },
+        }));
+        const child = spawnSync(process.execPath, [moduleFile], {
+          cwd: root,
+          encoding: "utf8",
+          timeout: CLI_TEST_TIMEOUT_MS,
+          windowsHide: true,
+        });
+        expect(child.status).toBe(4);
+        expect(child.stderr).toBe("");
+        expect(child.stdout.trim().split(/\r?\n/u)).toHaveLength(1);
+        expect(JSON.parse(child.stdout)).toEqual({
+          name: "AgentSelfProbeError",
+          code: "AGENT_KIT_MANIFEST_INVALID",
+          details: { path: requiredPath },
+        });
+      } finally {
+        fs.rmSync(root, { recursive: true, force: true });
+      }
+    },
+    CLI_TEST_TIMEOUT_MS,
+  );
 
   it("rejects an Agent Kit with more than 4096 directories", () => {
     const root = fs.mkdtempSync(path.join(CANONICAL_TEMP_ROOT, "useful-probe-dir-limit-"));

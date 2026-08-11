@@ -29,6 +29,7 @@ import {
   AgentConnectionVerifyError,
   runAgentConnectionVerification,
 } from "./agent-connection-verify.mjs";
+import { ComputerUseProbeError, runComputerUseProbe } from "./computer-use-probe.mjs";
 import {
   AgentIntegrationError,
   doctorAgentIntegration,
@@ -39,6 +40,7 @@ import {
 import { AgentConnectionError } from "@useful/protocol/agent-connection";
 import { AgentConnectionVerificationError } from "@useful/protocol/agent-connection-verification";
 import { AgentProbeProtocolError } from "@useful/protocol/agent-probe";
+import { ComputerUseProbeProtocolError } from "@useful/protocol/computer-use-probe";
 import {
   appUpdateCreate,
   appUpdateSign,
@@ -261,6 +263,13 @@ function asCliConnectionVerificationError(error) {
   return asCliIntegrationError(error);
 }
 
+function asCliComputerUseProbeError(error) {
+  if (error instanceof ComputerUseProbeError || error instanceof ComputerUseProbeProtocolError) {
+    return validationError(error.code, error.message, error.details);
+  }
+  return asCliProbeError(error);
+}
+
 async function agentIntegrationCommand(rest) {
   const [subcommand, ...args] = rest;
   if (subcommand === "probe") {
@@ -310,16 +319,43 @@ async function agentIntegrationCommand(rest) {
   }
 }
 
+async function computerUseCommand(rest) {
+  const [subcommand, ...args] = rest;
+  if (subcommand !== "probe") {
+    throw usageError("UNKNOWN_COMPUTER_USE_COMMAND", "用法: useful computer-use probe --json", {
+      subcommand: subcommand ?? null,
+    });
+  }
+  const { options, positional } = parseStrictArgs(args, new Set(["json"]));
+  requirePositionals(positional, 0, 0, "用法: useful computer-use probe --json");
+  if (args.filter((value) => value === "--json").length > 1) {
+    throw usageError("DUPLICATE_FLAG", "--json 只能提供一次", { option: "json" });
+  }
+  if (!options.json) {
+    throw usageError("JSON_REQUIRED", "computer-use probe 仅提供 --json 输出", { subcommand });
+  }
+  try {
+    return await runComputerUseProbe();
+  } catch (error) {
+    throw asCliComputerUseProbeError(error);
+  }
+}
+
 async function main() {
   const [cmd, ...rest] = process.argv.slice(2);
   const jsonMode = process.argv.slice(2).includes("--json");
   const agentCommands = new Set(["create", "doctor", "validate", "pack", "agent-contract"]);
-  if (jsonMode && !agentCommands.has(cmd) && cmd !== "publisher" && cmd !== "agent") {
+  if (jsonMode && !agentCommands.has(cmd) && cmd !== "publisher" && cmd !== "agent" && cmd !== "computer-use") {
     throw usageError("JSON_UNSUPPORTED", `命令 ${cmd ?? "<none>"} 不支持 --json`, { command: cmd ?? null });
   }
   if (cmd === "agent") {
     const data = await agentIntegrationCommand(rest);
     writeJson(successEnvelope(`agent ${rest[0]}`, data));
+    return;
+  }
+  if (cmd === "computer-use") {
+    const data = await computerUseCommand(rest);
+    writeJson(successEnvelope(`computer-use ${rest[0]}`, data));
     return;
   }
   if (agentCommands.has(cmd)) {
@@ -346,7 +382,7 @@ async function main() {
       break;
     default:
       if (cmd) throw usageError("UNKNOWN_COMMAND", `未知命令: ${cmd}`, { command: cmd });
-      console.log("用法: useful <create|doctor|dev|validate|pack|agent-contract|agent> ...，或 useful <source|publisher|key|app-update> <子命令>");
+      console.log("用法: useful <create|doctor|dev|validate|pack|agent-contract|agent|computer-use> ...，或 useful <source|publisher|key|app-update> <子命令>");
   }
 }
 
@@ -496,7 +532,9 @@ function appUpdateMain(rest) {
 
 const rawArguments = process.argv.slice(2);
 const jsonMode = rawArguments.includes("--json");
-const compoundCommand = (rawArguments[0] === "publisher" || rawArguments[0] === "agent") && rawArguments[1];
+const compoundCommand = (rawArguments[0] === "publisher"
+  || rawArguments[0] === "agent"
+  || rawArguments[0] === "computer-use") && rawArguments[1];
 const commandLabel = compoundCommand
   ? `${rawArguments[0]} ${rawArguments[1]}`
   : rawArguments[0] ?? "help";

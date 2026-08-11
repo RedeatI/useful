@@ -46,6 +46,12 @@ Windows 进程观测和第三方工具扩展能力。
   `documentAuthenticated: false`：Schema/parser 通过只校验结构与 endpoint 绑定，不认证执行。verifier 不会
   执行生成的宿主 `commandArgv`，也不读写宿主配置；不认证 Codex/Claude 已安装、已配置或会接受候选。
   V1 拒绝 `USEFUL_PROFILE`，也不宣称 profile 绑定、签名、来源、sidecar、发布状态或 launcher 无网络访问。
+- **离线 Computer Use 能力自检：** `computer-use probe --json` 校验包内 `useful.computer-use.v1`
+  合同、固定 9 项动作类型闭集、默认 controller 仍禁用、`host-desktop` 被拒绝，以及宿主注入 browser adapter
+  接口存在。`useful.computer-use-probe.v1` 的 claims 只是本机自报，且
+  `documentAuthenticated: false`；命令不启动浏览器、不联网、不注入输入、不读写宿主配置、不启用 provider，
+  也不注册 Action、MCP 工具或 GUI 功能。当前没有已启用或自包含的 browser/VM provider；包内仅有必须由
+  宿主注入的 browser-adapter factory，probe 只检查其接口而不会调用它。
 
 界面支持简体中文和 English (US)，并提供浅色、深色主题。Windows 便携模式只需在 `Useful.exe`
 旁创建 `portable.flag`，数据便会写入 `./data`，而不是 `%APPDATA%\Useful`。
@@ -108,6 +114,7 @@ pnpm useful -- agent-contract --json
 pnpm useful -- agent plan --target codex --launcher C:\ABSOLUTE\useful-mcp.mjs --json
 pnpm useful -- agent doctor --target claude-code --launcher C:\ABSOLUTE\useful-mcp.mjs --json
 pnpm useful -- agent export --target codex --launcher C:\ABSOLUTE\useful-mcp.mjs --json
+pnpm useful -- computer-use probe --json
 pnpm useful -- agent probe --json
 pnpm useful -- agent verify --target codex --launcher C:\ABSOLUTE\PATH\TO\tools\packages\useful-mcp\bin\useful-mcp.mjs --json
 ```
@@ -148,8 +155,12 @@ Office Action 只在有大小上限的 JSON 中传递 canonical Base64 文件内
 只读 Action，绝不会代替用户确认。该 pack 仍需真实平台与精确发布候选验证。
 
 仓库还包含供未来隔离浏览器/隔离 VM adapter 使用的 provider-neutral
-[Computer Use 合同](docs/COMPUTER-USE.md)。它默认禁用，没有可执行 provider，不注册为 Action 或 MCP
-工具，也不能控制宿主桌面。
+[Computer Use 合同](docs/COMPUTER-USE.md)。它默认禁用，没有已启用或自包含的 browser/VM provider；仅包含
+必须由宿主注入且 probe 不会调用的 browser-adapter factory。它不注册为 Action 或 MCP 工具，也不能控制
+宿主桌面。离线能力自检会报告动作类型闭集 SHA-256
+`a9bce07e51d533f830833d94ddc5fd53ae7f0b837da31edc8b68f64394a10cf7`；parser 或 probe
+通过不认证文档，也不证明真实隔离、网络强制、外部模型集成或平台执行。默认 MCP 面仍保持
+40 个工具 = 36 个 Action + 4 个 helper。
 
 Agent Kit 构建器只会生成带 `publicationAuthorized: false` 的本地候选，构建本身不授予发布权；仅当
 受控发布工作流把它附加到匹配的 GitHub Release 时，才属于官方可用资产，且源码/Agent Kit Release

@@ -21,6 +21,8 @@
     "adm-zip": "^0.6.0",
     "yaml": "^2.6.1",
     "@useful/agent-integrations": "workspace:^",
+    "@useful/computer-use-browser-adapter": "workspace:^",
+    "@useful/computer-use-contract": "workspace:^",
     "@useful/protocol": "workspace:^",
     "@useful/plugin-actions": "workspace:^"
   },

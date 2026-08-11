@@ -1,0 +1,120 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.useful.example/agent/useful.computer-use-probe.v1.schema.json",
+  "title": "Useful Computer Use Capability Probe V1",
+  "description": "A bounded, local, self-reported description of the Computer Use contract and disabled-by-default capability surface. It does not authenticate the document or attest executable installation, isolation, network enforcement, a real browser, user input, or host-desktop access.",
+  "$comment": "This JSON Schema validates a self-reported structure only. It does not authenticate execution or installation and does not prove isolation or network enforcement. Consumers must call parseComputerUseProbe after JSON parsing to enforce the same fixed semantic values and cross-field installation invariant.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "status", "claimScope", "installation", "contract", "capabilities", "claims"],
+  "properties": {
+    "schemaVersion": { "const": "useful.computer-use-probe.v1" },
+    "status": { "const": "success" },
+    "claimScope": { "const": "useful-computer-use-capability-local-self-reported" },
+    "installation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mode", "artifactVerified", "sourceRevision", "version"],
+      "properties": {
+        "mode": { "enum": ["source", "agent-kit"] },
+        "artifactVerified": {
+          "type": "boolean",
+          "description": "True only when the Agent Kit MANIFEST closed-set hash/size integrity self-check completed. It does not attest a signature, origin, sidecar, or publication authorization."
+        },
+        "sourceRevision": { "$ref": "#/$defs/sha256LikeRevision" },
+        "version": { "$ref": "#/$defs/semver" }
+      },
+      "allOf": [
+        {
+          "if": { "type": "object", "properties": { "mode": { "const": "source" } }, "required": ["mode"] },
+          "then": { "type": "object", "properties": { "artifactVerified": { "const": false } } },
+          "else": { "type": "object", "properties": { "artifactVerified": { "const": true } } }
+        }
+      ]
+    },
+    "contract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schemaVersion", "environments", "actionTypes", "actionTypesSha256", "defaultPolicy"],
+      "properties": {
+        "schemaVersion": { "const": "useful.computer-use.v1" },
+        "environments": {
+          "type": "array",
+          "prefixItems": [
+            { "const": "isolated-browser" },
+            { "const": "isolated-vm" }
+          ],
+          "items": false,
+          "minItems": 2,
+          "maxItems": 2
+        },
+        "actionTypes": {
+          "type": "array",
+          "prefixItems": [
+            { "const": "screenshot" },
+            { "const": "click" },
+            { "const": "double-click" },
+            { "const": "drag" },
+            { "const": "move" },
+            { "const": "scroll" },
+            { "const": "type" },
+            { "const": "key" },
+            { "const": "wait" }
+          ],
+          "items": false,
+          "minItems": 9,
+          "maxItems": 9
+        },
+        "actionTypesSha256": { "const": "a9bce07e51d533f830833d94ddc5fd53ae7f0b837da31edc8b68f64394a10cf7" },
+        "defaultPolicy": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["environment", "allowDomainsCount", "maxRedirects", "developmentMode", "allowPrivateDomains"],
+          "properties": {
+            "environment": { "const": "isolated-browser" },
+            "allowDomainsCount": { "const": 0 },
+            "maxRedirects": { "const": 0 },
+            "developmentMode": { "const": false },
+            "allowPrivateDomains": { "const": false }
+          }
+        }
+      }
+    },
+    "capabilities": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["cliProbeAvailable", "cliExecutionAvailable", "defaultProviderEnabled", "executableBrowserProviderPresent", "isolatedVmAdapterPresent", "modelAdapterPresent", "actionRegistered", "mcpRegistered", "guiRegistered", "browserAdapterInterfacePresent"],
+      "properties": {
+        "cliProbeAvailable": { "const": true },
+        "cliExecutionAvailable": { "const": false },
+        "defaultProviderEnabled": { "const": false },
+        "executableBrowserProviderPresent": { "const": false },
+        "isolatedVmAdapterPresent": { "const": false },
+        "modelAdapterPresent": { "const": false },
+        "actionRegistered": { "const": false },
+        "mcpRegistered": { "const": false },
+        "guiRegistered": { "const": false },
+        "browserAdapterInterfacePresent": { "const": true }
+      }
+    },
+    "claims": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["documentAuthenticated", "defaultControllerDisabledObserved", "hostDesktopRejectedObserved", "networkUsedByProbe", "userInputPerformed", "hostDesktopTouched", "realBrowserAttested", "networkEnforcementAttested"],
+      "properties": {
+        "documentAuthenticated": { "const": false },
+        "defaultControllerDisabledObserved": { "const": true },
+        "hostDesktopRejectedObserved": { "const": true },
+        "networkUsedByProbe": { "const": false },
+        "userInputPerformed": { "const": false },
+        "hostDesktopTouched": { "const": false },
+        "realBrowserAttested": { "const": false },
+        "networkEnforcementAttested": { "const": false }
+      }
+    }
+  },
+  "$defs": {
+    "sha256LikeRevision": { "type": "string", "pattern": "^[a-f0-9]{40,64}$" },
+    "semver": { "type": "string", "maxLength": 128, "pattern": "^(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)(?:-(?:[0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*))?$" }
+  }
+}

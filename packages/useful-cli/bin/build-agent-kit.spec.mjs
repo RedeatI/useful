@@ -46,6 +46,8 @@ const fixturePaths = [
   "packages/action-runtime",
   "packages/agent-integrations",
   "packages/agent-profile",
+  "packages/computer-use-browser-adapter",
+  "packages/computer-use-contract",
   "packages/host-actions",
   "packages/office-core",
   "packages/plugin-actions",
@@ -57,6 +59,35 @@ const fixturePaths = [
 
 function sha256(bytes) {
   return createHash("sha256").update(bytes).digest("hex");
+}
+
+function snapshotRegularFiles(root) {
+  const files = [];
+  const visit = (directory, prefix = "") => {
+    for (const entry of fs.readdirSync(directory, { withFileTypes: true }).sort((left, right) => left.name < right.name ? -1 : left.name > right.name ? 1 : 0)) {
+      const relative = prefix ? `${prefix}/${entry.name}` : entry.name;
+      const absolute = path.join(directory, entry.name);
+      if (entry.isDirectory()) visit(absolute, relative);
+      else if (entry.isFile()) {
+        const bytes = fs.readFileSync(absolute);
+        files.push({ path: relative, size: bytes.length, sha256: sha256(bytes) });
+      }
+    }
+  };
+  visit(root);
+  return files;
+}
+
+function writeFakeCommand(directory, name, sentinelEnvironmentVariable) {
+  const file = path.join(directory, process.platform === "win32" ? `${name}.cmd` : name);
+  fs.writeFileSync(
+    file,
+    process.platform === "win32"
+      ? `@ECHO off\r\n>"%${sentinelEnvironmentVariable}%" ECHO executed\r\nEXIT /B 97\r\n`
+      : `#!/bin/sh\nprintf 'executed\\n' > "$${sentinelEnvironmentVariable}"\nexit 97\n`,
+    "utf8",
+  );
+  if (process.platform !== "win32") fs.chmodSync(file, 0o755);
 }
 
 function makeCaseCollisionZip(original) {
@@ -267,6 +298,18 @@ describe("Useful Agent Kit builder", () => {
     })).rejects.toMatchObject({ code: "SOURCE_DIRTY", exitCode: 3 });
   }, AGENT_KIT_FIXTURE_TIMEOUT_MS);
 
+  it("rejects dirty Computer Use contract, browser adapter, or probe protocol source", async () => {
+    const fixture = makeCleanFixture();
+    fs.appendFileSync(path.join(fixture.fixtureRoot, "packages/computer-use-contract/src/index.mjs"), "\n");
+    fs.appendFileSync(path.join(fixture.fixtureRoot, "packages/computer-use-browser-adapter/src/index.mjs"), "\n");
+    fs.appendFileSync(path.join(fixture.fixtureRoot, "packages/protocol/src/computer-use-probe.mjs"), "\n");
+    await expect(buildAgentKit({
+      repoRoot: fixture.fixtureRoot,
+      dependencyRoot: toolingRoot,
+      outDir: path.join(fixture.outer, "out"),
+    })).rejects.toMatchObject({ code: "SOURCE_DIRTY", exitCode: 3 });
+  }, AGENT_KIT_FIXTURE_TIMEOUT_MS);
+
   it("rejects linked repository and output path components before reading or creating through them", async () => {
     const fixture = makeCleanFixture();
     const linkedRoot = path.join(fixture.outer, "linked source");
@@ -338,6 +381,10 @@ describe("Useful Agent Kit builder", () => {
       "lib/regex-worker-thread.mjs",
       "lib/provenance/agent-integrations/integration.d.ts",
       "lib/provenance/agent-integrations/integration.mjs",
+      "lib/provenance/computer-use-browser-adapter/index.d.ts",
+      "lib/provenance/computer-use-browser-adapter/index.mjs",
+      "lib/provenance/computer-use-contract/index.d.ts",
+      "lib/provenance/computer-use-contract/index.mjs",
       "lib/provenance/protocol/agent-connection.d.ts",
       "lib/provenance/protocol/agent-connection.mjs",
       "lib/provenance/protocol/agent-connection-verification.d.ts",
@@ -346,6 +393,8 @@ describe("Useful Agent Kit builder", () => {
       "lib/provenance/protocol/agent-integration.mjs",
       "lib/provenance/protocol/agent-probe.d.ts",
       "lib/provenance/protocol/agent-probe.mjs",
+      "lib/provenance/protocol/computer-use-probe.d.ts",
+      "lib/provenance/protocol/computer-use-probe.mjs",
       "lib/provenance/action-runtime/action-suggest.mjs",
       "lib/provenance/action-runtime/builtins.mjs",
       "lib/provenance/action-runtime/office-worker-thread.mjs",
@@ -361,6 +410,7 @@ describe("Useful Agent Kit builder", () => {
       "schemas/agent-connection-verification.schema.json",
       "schemas/agent-integration.schema.json",
       "schemas/agent-probe.schema.json",
+      "schemas/computer-use-probe.schema.json",
       "schemas/package-manifest.schema.json",
     ]));
     expect(listed.filter((entry) => /^lib\/[^/]+\.mjs$/.test(entry)).sort()).toEqual([
@@ -378,6 +428,8 @@ describe("Useful Agent Kit builder", () => {
     const kitPackage = JSON.parse(inspected.entries.get("package.json").data.toString("utf8"));
     expect(kitPackage).toMatchObject({ private: true, license: "SEE LICENSE IN LICENSE" });
     const kitReadme = inspected.entries.get("README.txt").data.toString("utf8");
+    expect(kitReadme).toContain("bin/useful computer-use probe --json");
+    expect(kitReadme).toContain("bin\\useful.cmd computer-use probe --json");
     expect(kitReadme).toContain("bin/useful agent probe --json");
     expect(kitReadme).toContain("bin\\useful.cmd agent probe --json");
     expect(kitReadme).toContain("bin/useful agent verify --target codex --launcher <ABS_KIT>/lib/useful-mcp.mjs --json");
@@ -391,6 +443,14 @@ describe("Useful Agent Kit builder", () => {
     expect(kitReadme).toContain("does not execute output commandArgv or apply merge output");
     expect(kitReadme).toContain("V1 rejects USEFUL_PROFILE and makes no Agent Profile binding claim");
     expect(kitReadme).toContain("does not attest Codex/Claude installation, configuration, or acceptance, a signature, publisher, origin, sidecar, publication authorization, or that the fixed launcher has no network access");
+    expect(kitReadme).toContain("uses the bundled contract, browser-adapter interface, and protocol parser");
+    expect(kitReadme).toContain("documentAuthenticated false");
+    expect(kitReadme).toContain("does not start a browser, use the network, inject input, read or write host configuration");
+    expect(kitReadme).toContain("enable a provider, or register an Action/MCP tool/GUI feature");
+    expect(kitReadme).toContain("no enabled or self-contained browser/VM provider");
+    expect(kitReadme).toContain("includes only a host-injected browser-adapter factory, which the probe checks as an interface and never calls");
+    expect(kitReadme).toContain("does not prove real browser/VM isolation, network enforcement, or external-model integration");
+    expect(kitReadme).toContain("default Computer Use provider remains disabled after the probe");
     const thirdPartyLicenses = JSON.parse(inspected.entries.get("THIRD_PARTY-LICENSES.json").data.toString("utf8"));
     expect(thirdPartyLicenses.schemaVersion).toBe("useful.agent-kit.third-party-licenses.v1");
     expect(thirdPartyLicenses.packages.map((dependency) => dependency.name)).toEqual(expect.arrayContaining([
@@ -424,10 +484,124 @@ describe("Useful Agent Kit builder", () => {
     const contractData = expectJsonSuccess(contract);
     expect(contractData.product).toBeUndefined();
     expect(contractData.templates.map((template) => template.id)).toEqual(["minimal-web", "minimal-action", "starter-web"]);
-    expect(contractData.commandSequence.slice(0, 7).every((command) => command.startsWith("useful "))).toBe(true);
+    expect(contractData.commandSequence.slice(0, 8).every((command) => command.startsWith("useful "))).toBe(true);
     expect(contractData.commandSequence.join("\n")).not.toMatch(/\b(?:npx|pnpm\s+dlx)\b/);
     expect(contractData.commands.agentVerify).toBe("useful agent verify --target <codex|claude-code|claude-desktop|mcp-servers-json> --launcher <current-installation-fixed-useful-mcp-entry> [--scope user|project] [--project-dir <host-native-absolute-directory>] [--env NO_COLOR=1] [--env USEFUL_LOG_LEVEL=<error|warn|info>] --json");
     expect(contractData.commandSequence[6]).toBe("useful agent verify --target mcp-servers-json --launcher \"<ABS_FIXED_USEFUL_MCP_LAUNCHER>\" --json");
+    expect(contractData.commandSequence[7]).toBe("useful computer-use probe --json");
+    expect(contractData.commands.computerUseProbe).toBe("useful computer-use probe --json");
+    expect(contractData.commandSequence).toContain("useful computer-use probe --json");
+
+    const computerUseSentinelRoot = path.join(fixture.outer, "computer use probe sentinels");
+    const fakeBin = path.join(computerUseSentinelRoot, "fake bin");
+    const isolatedHome = path.join(computerUseSentinelRoot, "home");
+    const isolatedAppData = path.join(computerUseSentinelRoot, "appdata");
+    const isolatedLocalAppData = path.join(computerUseSentinelRoot, "localappdata");
+    const isolatedXdgConfig = path.join(computerUseSentinelRoot, "xdg config");
+    for (const directory of [fakeBin, isolatedHome, isolatedAppData, isolatedLocalAppData, isolatedXdgConfig]) {
+      fs.mkdirSync(directory, { recursive: true });
+    }
+    const networkSentinel = path.join(computerUseSentinelRoot, "network-used.txt");
+    const browserSentinel = path.join(computerUseSentinelRoot, "browser-started.txt");
+    const inputSentinel = path.join(computerUseSentinelRoot, "input-injected.txt");
+    const fetchShim = path.join(computerUseSentinelRoot, "fetch-sentinel.mjs");
+    fs.writeFileSync(fetchShim, [
+      'import { writeFileSync } from "node:fs";',
+      'globalThis.fetch = async () => {',
+      '  writeFileSync(process.env.USEFUL_TEST_NETWORK_SENTINEL, "executed\\n", "utf8");',
+      '  throw new Error("Computer Use probe must not call fetch");',
+      '};',
+      "",
+    ].join("\n"), "utf8");
+    for (const name of ["chrome", "google-chrome", "chromium", "msedge", "playwright"]) {
+      writeFakeCommand(fakeBin, name, "USEFUL_TEST_BROWSER_SENTINEL");
+    }
+    for (const name of process.platform === "win32" ? ["wscript"] : ["xdotool", "osascript"]) {
+      writeFakeCommand(fakeBin, name, "USEFUL_TEST_INPUT_SENTINEL");
+    }
+    const configBefore = {
+      home: snapshotRegularFiles(isolatedHome),
+      appData: snapshotRegularFiles(isolatedAppData),
+      localAppData: snapshotRegularFiles(isolatedLocalAppData),
+      xdg: snapshotRegularFiles(isolatedXdgConfig),
+    };
+    const executablePathEntries = [fakeBin, path.dirname(process.execPath)];
+    if (process.platform === "win32") {
+      executablePathEntries.push(path.dirname(process.env.ComSpec ?? "C:\\Windows\\System32\\cmd.exe"));
+    } else {
+      executablePathEntries.push("/usr/bin", "/bin");
+    }
+    const computerUseProbeRun = runLauncher(kitRoot, "useful", ["computer-use", "probe", "--json"], {
+      env: {
+        APPDATA: isolatedAppData,
+        HOME: isolatedHome,
+        LOCALAPPDATA: isolatedLocalAppData,
+        NODE_OPTIONS: `--import=${pathToFileURL(fetchShim).href}`,
+        PATH: executablePathEntries.join(path.delimiter),
+        USERPROFILE: isolatedHome,
+        USEFUL_TEST_BROWSER_SENTINEL: browserSentinel,
+        USEFUL_TEST_INPUT_SENTINEL: inputSentinel,
+        USEFUL_TEST_NETWORK_SENTINEL: networkSentinel,
+        XDG_CONFIG_HOME: isolatedXdgConfig,
+      },
+    });
+    const computerUseProbe = expectJsonSuccess(computerUseProbeRun);
+    expect(computerUseProbeRun.stderr).toBe("");
+    expect(computerUseProbe).toEqual({
+      schemaVersion: "useful.computer-use-probe.v1",
+      status: "success",
+      claimScope: "useful-computer-use-capability-local-self-reported",
+      installation: {
+        mode: "agent-kit",
+        artifactVerified: true,
+        sourceRevision: inspected.manifest.source.revision,
+        version: inspected.manifest.product.version,
+      },
+      contract: {
+        schemaVersion: "useful.computer-use.v1",
+        environments: ["isolated-browser", "isolated-vm"],
+        actionTypes: ["screenshot", "click", "double-click", "drag", "move", "scroll", "type", "key", "wait"],
+        actionTypesSha256: "a9bce07e51d533f830833d94ddc5fd53ae7f0b837da31edc8b68f64394a10cf7",
+        defaultPolicy: {
+          environment: "isolated-browser",
+          allowDomainsCount: 0,
+          maxRedirects: 0,
+          developmentMode: false,
+          allowPrivateDomains: false,
+        },
+      },
+      capabilities: {
+        cliProbeAvailable: true,
+        cliExecutionAvailable: false,
+        defaultProviderEnabled: false,
+        executableBrowserProviderPresent: false,
+        isolatedVmAdapterPresent: false,
+        modelAdapterPresent: false,
+        actionRegistered: false,
+        mcpRegistered: false,
+        guiRegistered: false,
+        browserAdapterInterfacePresent: true,
+      },
+      claims: {
+        documentAuthenticated: false,
+        defaultControllerDisabledObserved: true,
+        hostDesktopRejectedObserved: true,
+        networkUsedByProbe: false,
+        userInputPerformed: false,
+        hostDesktopTouched: false,
+        realBrowserAttested: false,
+        networkEnforcementAttested: false,
+      },
+    });
+    expect(fs.existsSync(networkSentinel)).toBe(false);
+    expect(fs.existsSync(browserSentinel)).toBe(false);
+    expect(fs.existsSync(inputSentinel)).toBe(false);
+    expect({
+      home: snapshotRegularFiles(isolatedHome),
+      appData: snapshotRegularFiles(isolatedAppData),
+      localAppData: snapshotRegularFiles(isolatedLocalAppData),
+      xdg: snapshotRegularFiles(isolatedXdgConfig),
+    }).toEqual(configBefore);
 
     const agentProbeRun = runLauncher(kitRoot, "useful", ["agent", "probe", "--json"]);
     const agentProbe = expectJsonSuccess(agentProbeRun);
