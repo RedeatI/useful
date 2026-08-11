@@ -19,6 +19,10 @@
       "types": "./src/agent-integration.d.ts",
       "import": "./src/agent-integration.mjs"
     },
+    "./agent-probe": {
+      "types": "./src/agent-probe.d.ts",
+      "import": "./src/agent-probe.mjs"
+    },
     "./schemas/*": "./schemas/*",
     "./openapi/*": "./openapi/*",
     "./src/*": "./src/*"
@@ -26,7 +30,8 @@
   "typesVersions": {
     "*": {
       "agent-connection": ["src/agent-connection.d.ts"],
-      "agent-integration": ["src/agent-integration.d.ts"]
+      "agent-integration": ["src/agent-integration.d.ts"],
+      "agent-probe": ["src/agent-probe.d.ts"]
     }
   },
   "scripts": {

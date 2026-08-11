@@ -41,6 +41,13 @@ Agent host.
 - **Client setup plans:** generate secret-free, reviewable MCP configuration plans for Codex,
   Claude Code, Claude Desktop, or an `mcpServers` JSON host without changing host configuration.
   `agent export` emits the same local stdio candidate as a `useful.agent-connection.v1` review document.
+- **MCP self-probe:** `agent probe --json` runs a read-only current-Useful MCP protocol self-test. It
+  does not accept a launcher, write host configuration, or prove Codex/Claude installation or external
+  launcher safety. The result is a `useful.agent-probe.v1` document. Agent Kit `artifactVerified`
+  means only that the extracted local directory matches MANIFEST sizes and hashes; it is not a
+  signature, provenance, sidecar, or publication-authorization claim. Its 30-second deadline starts
+  after synchronous local path/MANIFEST preflight and covers MCP execution plus transport closure; it
+  does not bound that preflight.
 
 The interface is available in Simplified Chinese and English, with light and dark themes. Portable
 mode is supported on Windows by placing `portable.flag` next to `Useful.exe`; data is then stored in
@@ -106,6 +113,7 @@ Generate or diagnose a host-specific stdio configuration without writing it:
 pnpm useful -- agent plan --target codex --launcher C:\ABSOLUTE\useful-mcp.mjs --json
 pnpm useful -- agent doctor --target claude-code --launcher C:\ABSOLUTE\useful-mcp.mjs --json
 pnpm useful -- agent export --target codex --launcher C:\ABSOLUTE\useful-mcp.mjs --json
+pnpm useful -- agent probe --json
 ```
 
 The plan/export target is one of `codex`, `claude-code`, `claude-desktop`, or `mcp-servers-json`.

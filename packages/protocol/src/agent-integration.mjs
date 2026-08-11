@@ -13,7 +13,7 @@ const ALLOWED_ENVIRONMENT = Object.freeze({
   NO_COLOR: new Set(["1"]),
   USEFUL_LOG_LEVEL: new Set(["error", "warn", "info"]),
 });
-const PROFILE_VALUE = /^[a-z0-9][a-z0-9._-]{0,63}$/iu;
+const PROFILE_VALUE = /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/;
 const MAX_PATH_LENGTH = 4096;
 
 export class AgentIntegrationProtocolError extends Error {

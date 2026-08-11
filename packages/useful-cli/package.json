@@ -17,6 +17,7 @@
     "lint": "eslint bin --ext .mjs --max-warnings 0"
   },
   "dependencies": {
+    "@modelcontextprotocol/client": "2.0.0",
     "adm-zip": "^0.6.0",
     "yaml": "^2.6.1",
     "@useful/agent-integrations": "workspace:^",

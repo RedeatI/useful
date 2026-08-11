@@ -70,6 +70,10 @@ const PROTOCOL_AGENT_CONNECTION_PROVENANCE_FILES = Object.freeze([
   "agent-integration.mjs",
   "agent-integration.d.ts",
 ]);
+const PROTOCOL_AGENT_PROBE_PROVENANCE_FILES = Object.freeze([
+  "agent-probe.mjs",
+  "agent-probe.d.ts",
+]);
 const ACTION_RUNTIME_PROVENANCE_FILES = Object.freeze([
   "action-suggest.mjs",
   "builtins.mjs",
@@ -664,6 +668,7 @@ function workspaceResolver(repoRoot) {
     "@useful/plugin-actions": "packages/plugin-actions/src/index.mjs",
     "@useful/protocol/agent-connection": "packages/protocol/src/agent-connection.mjs",
     "@useful/protocol/agent-integration": "packages/protocol/src/agent-integration.mjs",
+    "@useful/protocol/agent-probe": "packages/protocol/src/agent-probe.mjs",
     "@useful/protocol/src/schemas.mjs": "packages/protocol/src/schemas.mjs",
   };
   return {
@@ -887,6 +892,10 @@ async function addRuntimeResources(entries, repoRoot) {
     const source = `packages/protocol/src/${relative}`;
     addEntry(entries, `lib/provenance/protocol/${relative}`, normalizedText(await readSourceFile(repoRoot, source)));
   }
+  for (const relative of PROTOCOL_AGENT_PROBE_PROVENANCE_FILES) {
+    const source = `packages/protocol/src/${relative}`;
+    addEntry(entries, `lib/provenance/protocol/${relative}`, normalizedText(await readSourceFile(repoRoot, source)));
+  }
   for (const relative of ACTION_RUNTIME_PROVENANCE_FILES) {
     const source = `packages/action-runtime/src/${relative}`;
     addEntry(entries, `lib/provenance/action-runtime/${relative}`, normalizedText(await readSourceFile(repoRoot, source)));
@@ -963,7 +972,7 @@ async function createPayload(repoRoot, dependencyRoot, version) {
   for (const legal of REQUIRED_LEGAL_FILES) addEntry(entries, legal, normalizedText(await readSourceFile(repoRoot, legal, `root ${legal}`)));
   for (const legal of FIRST_PARTY_LICENSE_FILES) addEntry(entries, legal, normalizedText(await readSourceFile(repoRoot, legal, legal)));
   addEntry(entries, "README.txt", Buffer.from(
-    `Useful Agent Kit ${version}\n\nRequires Node.js 20 or newer.\nCompatible commands: useful, useful-runtime, useful-mcp.\nThe @useful package names and useful/useful schema identities remain compatibility interfaces.\nNo global install or monorepo-relative runtime path is required.\nBundled dependency license texts and notices are indexed by THIRD_PARTY-LICENSES.json.\nAgent integration exports are manual-review-only and secret-free: they do not write host configuration, start a launcher, or make network connections.\nThe Claude Desktop JSON fragment is for local mcpServers merging only; remote/managed configuration is not generated.\nComputer Use has no default provider or host registration in this kit.\nThe component map is owner-approved, but this build remains an internal candidate and does not authorize publication of any specific snapshot.\n`,
+    `Useful Agent Kit ${version}\n\nRequires Node.js 20 or newer.\nCompatible commands: useful, useful-runtime, useful-mcp.\nThe @useful package names and useful/useful schema identities remain compatibility interfaces.\nNo global install or monorepo-relative runtime path is required.\nBundled dependency license texts and notices are indexed by THIRD_PARTY-LICENSES.json.\nRun the local MCP self-probe on POSIX: bin/useful agent probe --json\nRun the local MCP self-probe on Windows: bin\\useful.cmd agent probe --json\nThe self-probe proves only this extracted directory's local MANIFEST closed set and bundled Useful MCP protocol surface; it does not attest an external Agent, signature, publisher, origin, sidecar, or publication authorization.\nIts 30-second deadline covers MCP execution and transport closure after synchronous MANIFEST preflight; it does not bound that preflight.\nAgent integration exports are manual-review-only and secret-free: they do not write host configuration, start a launcher, or make network connections.\nThe Claude Desktop JSON fragment is for local mcpServers merging only; remote/managed configuration is not generated.\nComputer Use has no default provider or host registration in this kit.\nThe component map is owner-approved, but this build remains an internal candidate and does not authorize publication of any specific snapshot.\n`,
     "utf8",
   ));
   addEntry(entries, "package.json", jsonBytes({

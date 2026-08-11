@@ -35,6 +35,11 @@ Windows 进程观测和第三方工具扩展能力。
 - **宿主配置计划：** 为 Codex、Claude Code、Claude Desktop 或采用 `mcpServers` JSON 的宿主生成
   无 secret、可审阅的 MCP 配置计划，不修改宿主配置。`agent export` 会把同一条本地 stdio 候选输出为
   `useful.agent-connection.v1` 审阅文档。
+- **MCP 自检：** `agent probe --json` 只对当前 Useful MCP 做只读协议自检。不接受 launcher、不写宿主配置，
+  也不证明 Codex/Claude 已安装或外部 launcher 没有网络与副作用；结果为 `useful.agent-probe.v1` 文档。
+  Agent Kit 的 `artifactVerified` 只表示本地解压目录匹配 MANIFEST 的字节数和哈希闭集，不代表签名、来源、
+  sidecar 或发布授权。30 秒硬截止从同步的本地路径/MANIFEST 预检结束后开始，只覆盖 MCP 执行与 transport
+  关闭阶段，不限制这段同步预检的耗时。
 
 界面支持简体中文和 English (US)，并提供浅色、深色主题。Windows 便携模式只需在 `Useful.exe`
 旁创建 `portable.flag`，数据便会写入 `./data`，而不是 `%APPDATA%\Useful`。
@@ -97,6 +102,7 @@ pnpm useful -- agent-contract --json
 pnpm useful -- agent plan --target codex --launcher C:\ABSOLUTE\useful-mcp.mjs --json
 pnpm useful -- agent doctor --target claude-code --launcher C:\ABSOLUTE\useful-mcp.mjs --json
 pnpm useful -- agent export --target codex --launcher C:\ABSOLUTE\useful-mcp.mjs --json
+pnpm useful -- agent probe --json
 ```
 
 plan/export 的 target 闭集为 `codex`、`claude-code`、`claude-desktop`、`mcp-servers-json`。导出仅写 stdout、

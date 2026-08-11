@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
+import { realpathSync } from "node:fs";
 import { lstat, mkdir, mkdtemp, readFile, realpath, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -14,6 +15,7 @@ import {
   sha256,
 } from "./public-source-policy.mjs";
 
+const canonicalTempRoot = realpathSync.native(tmpdir());
 const scriptsDirectory = path.dirname(fileURLToPath(import.meta.url));
 const verifierPath = path.join(scriptsDirectory, "verify-public-commit.mjs");
 const AUTHORITY_CONDITION =
@@ -49,7 +51,7 @@ function receiptSummary(receipt) {
 }
 
 async function makeRepository() {
-  const container = await mkdtemp(path.join(tmpdir(), "useful-public-commit-"));
+  const container = await mkdtemp(path.join(canonicalTempRoot, "useful-public-commit-"));
   const root = path.join(container, "public");
   const receiptPath = path.join(container, "receipt.json");
   const markerPath = path.join(container, "transaction.json");

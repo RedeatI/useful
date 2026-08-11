@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
+import { realpathSync } from "node:fs";
 import {
   link,
   mkdir,
@@ -26,6 +27,7 @@ import {
 } from "./public-source-policy.mjs";
 import { BuilderError, generate } from "./prepare-public-source.mjs";
 
+const canonicalTemporaryDirectory = realpathSync.native(tmpdir());
 const scriptsDirectory = path.dirname(fileURLToPath(import.meta.url));
 const builderPath = path.join(scriptsDirectory, "prepare-public-source.mjs");
 const checkerPath = path.join(scriptsDirectory, "public-source-check.mjs");
@@ -50,7 +52,7 @@ async function write(root, relative, contents = "") {
 }
 
 async function makeRepository({ internalFiles = false } = {}) {
-  const container = await mkdtemp(path.join(tmpdir(), "useful snapshot fixture "));
+  const container = await mkdtemp(path.join(canonicalTemporaryDirectory, "useful snapshot fixture "));
   const root = path.join(container, "source repo 空间");
   await mkdir(root);
   for (const relative of requiredFiles) await write(root, relative, `${relative}\n`);

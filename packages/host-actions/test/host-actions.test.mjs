@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { chmod, mkdir, mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises";
+import { chmod, mkdir, mkdtemp, readFile, realpath, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { after, test } from "node:test";
@@ -18,7 +18,7 @@ after(async () => {
 });
 
 async function fixture(overrides = {}) {
-  const root = await mkdtemp(path.join(tmpdir(), "useful host actions "));
+  const root = await realpath(await mkdtemp(path.join(tmpdir(), "useful host actions ")));
   temporaryRoots.push(root);
   const readRoot = path.join(root, "read");
   const writeRoot = path.join(root, "write");

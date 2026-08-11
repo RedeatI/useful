@@ -274,6 +274,8 @@ name `useful`、空的 V1 扩展 args、安全闭集 env 与 scope。严格 JSON
   --scope project `
   --project-dir "C:\ABSOLUTE\PROJECT" `
   --json
+
+& "<ABS_KIT>\bin\useful.cmd" agent probe --json
 ```
 
 `commandArgv` 是命令型输出的唯一规范表示。Codex user scope 的顺序固定为
@@ -295,6 +297,29 @@ point，要求 node/launcher 为常规文件、当前 Node 为 20 或更高版�
 秘密型环境变量和未列入安全闭集的 env 都会失败。
 唯一允许的可选 env 是 `NO_COLOR=1`、`USEFUL_LOG_LEVEL=error|warn|info`，或受限格式的 `USEFUL_PROFILE`；
 密钥、token、密码、PATH 和任意自定义环境变量均不接受。
+
+## 当前 MCP 自检（Agent Probe V1）
+
+`useful agent probe --json` 是当前机器上 Useful MCP 的只读自检。它启动并关闭一个临时的
+stdio MCP client/server，验证固定的协议版本、工具发现与可调用工具数量，并把结果写为一个
+`useful.agent-probe.v1` 文档。自检只验证当前 Useful checkout 或 Agent Kit 的 MCP 面；它不是
+launcher 试运行，不接收 `--launcher`，不写 Codex/Claude 或其他宿主配置，也不证明 Codex/Claude
+已经安装、已连接或会接受该配置。自检不证明 launcher、宿主或外部 MCP server 没有网络访问和副作用；
+它只报告 Useful 自己的本地协议边界。
+
+30 秒硬截止从同步路径/MANIFEST 预检完成、进入 MCP 执行后开始，覆盖 initialize、工具查询/调用与
+transport 关闭阶段；它不限制此前同步预检的耗时。
+
+source 模式固定报告 `artifactVerified: false`。Agent Kit 模式只有在本地解压目录与 `MANIFEST.json`
+形成闭集、每个登记文件的字节数和 SHA-256 都匹配且固定 CLI/MCP 入口也在闭集内时，才报告
+`artifactVerified: true`。这个字段只表示本地 MANIFEST 闭集校验，不代表签名、发布者身份、来源可信、
+ZIP/sidecar 校验或发布授权，也不能据此把本地候选称为 GitHub Release 资产。
+
+JSON 模式的 stdout 恰好输出一个成功或失败 envelope；child MCP 的原始 stderr 永不回显到该文档。
+成功记录只包含 `process.stderrBytes`、`process.stderrSha256` 与 transport close 状态，调用方不能从摘要
+还原原文。退出码 `0` 表示完整 self-probe 成功；`2` 表示命令用法错误，`3` 表示协议或探测验证失败，
+`4` 表示本地路径、MANIFEST、I/O 或安全边界失败，`5` 保留给意外内部错误。任一非零退出码都必须停止，
+不能把 failure envelope 当作部分通过。
 
 MCP 是 Useful 对外的公共执行面，而不是宿主权限的替代者。Codex、Claude 和其他宿主各自决定审批、沙箱、
 日志、配置位置与配置变更确认；Useful 只提供本地 stdio server 及其已有的 action/profile 信任边界。始终先审阅
