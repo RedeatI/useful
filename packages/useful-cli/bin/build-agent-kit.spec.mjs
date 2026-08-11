@@ -137,7 +137,7 @@ function git(fixtureRoot, args, env = {}) {
 }
 
 function makeCleanFixture({ license = true } = {}) {
-  const outer = fs.mkdtempSync(path.join(fs.realpathSync(os.tmpdir()), "useful-agent-kit-fixture-"));
+  const outer = fs.mkdtempSync(path.join(fs.realpathSync.native(os.tmpdir()), "useful-agent-kit-fixture-"));
   temporaryRoots.push(outer);
   const fixtureRoot = path.join(outer, "clean source");
   fs.mkdirSync(fixtureRoot);
@@ -341,6 +341,8 @@ describe("Useful Agent Kit builder", () => {
       "lib/provenance/protocol/agent-connection.mjs",
       "lib/provenance/protocol/agent-integration.d.ts",
       "lib/provenance/protocol/agent-integration.mjs",
+      "lib/provenance/protocol/agent-probe.d.ts",
+      "lib/provenance/protocol/agent-probe.mjs",
       "lib/provenance/action-runtime/action-suggest.mjs",
       "lib/provenance/action-runtime/builtins.mjs",
       "lib/provenance/action-runtime/office-worker-thread.mjs",
@@ -354,6 +356,7 @@ describe("Useful Agent Kit builder", () => {
       "lib/useful.plugin-action.v1.schema.json",
       "schemas/agent-connection.schema.json",
       "schemas/agent-integration.schema.json",
+      "schemas/agent-probe.schema.json",
       "schemas/package-manifest.schema.json",
     ]));
     expect(listed.filter((entry) => /^lib\/[^/]+\.mjs$/.test(entry)).sort()).toEqual([
@@ -370,9 +373,15 @@ describe("Useful Agent Kit builder", () => {
     }
     const kitPackage = JSON.parse(inspected.entries.get("package.json").data.toString("utf8"));
     expect(kitPackage).toMatchObject({ private: true, license: "SEE LICENSE IN LICENSE" });
+    const kitReadme = inspected.entries.get("README.txt").data.toString("utf8");
+    expect(kitReadme).toContain("bin/useful agent probe --json");
+    expect(kitReadme).toContain("bin\\useful.cmd agent probe --json");
+    expect(kitReadme).toContain("does not attest an external Agent, signature, publisher, origin, sidecar, or publication authorization");
+    expect(kitReadme).toContain("does not bound that preflight");
     const thirdPartyLicenses = JSON.parse(inspected.entries.get("THIRD_PARTY-LICENSES.json").data.toString("utf8"));
     expect(thirdPartyLicenses.schemaVersion).toBe("useful.agent-kit.third-party-licenses.v1");
     expect(thirdPartyLicenses.packages.map((dependency) => dependency.name)).toEqual(expect.arrayContaining([
+      "@modelcontextprotocol/client",
       "@modelcontextprotocol/server",
       "adm-zip",
       "ajv",
@@ -404,6 +413,40 @@ describe("Useful Agent Kit builder", () => {
     expect(contractData.templates.map((template) => template.id)).toEqual(["minimal-web", "minimal-action", "starter-web"]);
     expect(contractData.commandSequence.slice(0, 7).every((command) => command.startsWith("useful "))).toBe(true);
     expect(contractData.commandSequence.join("\n")).not.toMatch(/\b(?:npx|pnpm\s+dlx)\b/);
+
+    const agentProbeRun = runLauncher(kitRoot, "useful", ["agent", "probe", "--json"]);
+    const agentProbe = expectJsonSuccess(agentProbeRun);
+    expect(agentProbeRun.stderr).toBe("");
+    expect(agentProbe).toMatchObject({
+      schemaVersion: "useful.agent-probe.v1",
+      status: "success",
+      proofScope: "useful-mcp-local-stdio",
+      installation: {
+        mode: "agent-kit",
+        artifactVerified: true,
+        sourceRevision: inspected.manifest.source.revision,
+        version: inspected.manifest.product.version,
+      },
+      tools: { count: 40, actionCount: 36, helperCount: 4 },
+      proof: {
+        handshake: true,
+        list: true,
+        search: true,
+        describe: true,
+        safeCall: true,
+        transportClosed: true,
+        externalAgentInstalled: false,
+        codexConfigured: false,
+        claudeConfigured: false,
+        hostConfigWrittenByProbe: false,
+        launcherNetworkAttested: false,
+      },
+      process: {
+        stderrBytes: 0,
+        stderrSha256: sha256(Buffer.alloc(0)),
+        transportClosed: true,
+      },
+    });
 
     const agentMcpLauncher = path.join(kitRoot, "lib", "useful-mcp.mjs");
     const integrationPlan = expectJsonSuccess(runLauncher(kitRoot, "useful", [

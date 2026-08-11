@@ -19,8 +19,10 @@ import {
   validateEnvironment,
 } from "../src/integration.mjs";
 
+const CANONICAL_TEMP_ROOT = fs.realpathSync.native(os.tmpdir());
+
 function makeFixture() {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "useful-agent-integration-"));
+  const root = fs.mkdtempSync(path.join(CANONICAL_TEMP_ROOT, "useful-agent-integration-"));
   const launcher = path.join(root, "Useful MCP launcher.mjs");
   fs.writeFileSync(launcher, "// fixture\n", "utf8");
   return { root, launcher };
@@ -195,6 +197,20 @@ test("secret-like ordinary profile and path text does not trigger substring reje
   });
   assert.equal(result.plan.server.launcherPath, secretPath);
   assert.equal(result.plan.server.env.USEFUL_PROFILE, "secretary-tokenizer");
+});
+
+test("USEFUL_PROFILE is restricted to the explicit ASCII identifier alphabet", () => {
+  const fixture = makeFixture();
+  for (const profile of ["Kit", "Ｆullwidth", "équipe", "中文"]) {
+    assert.throws(
+      () => planAgentIntegration({ target: "codex", launcher: fixture.launcher, environment: { USEFUL_PROFILE: profile } }),
+      (error) => error instanceof AgentIntegrationError && error.code === "INVALID_ENVIRONMENT_VALUE",
+    );
+  }
+  assert.equal(
+    planAgentIntegration({ target: "codex", launcher: fixture.launcher, environment: { USEFUL_PROFILE: "Office_SAFE-1.2" } }).plan.server.env.USEFUL_PROFILE,
+    "Office_SAFE-1.2",
+  );
 });
 
 test("doctor rejects missing and linked launcher paths without executing them", (context) => {

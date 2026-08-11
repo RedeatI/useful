@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
+import { realpathSync } from "node:fs";
 import { mkdir, mkdtemp, readFile, rm, writeFile, cp } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -9,6 +10,7 @@ import { generateRootLicense } from "./generate-root-license.mjs";
 import { generate } from "./prepare-public-source.mjs";
 import { REQUIRED_PUBLIC_FILES, sha256 } from "./public-source-policy.mjs";
 
+const canonicalTempRoot = realpathSync.native(tmpdir());
 const scriptsDirectory = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(scriptsDirectory, "..");
 const verifierPath = path.join(scriptsDirectory, "verify-public-commit.mjs");
@@ -31,7 +33,7 @@ async function write(root, relative, contents) {
 }
 
 test("owner-approved LICENSE unlocks prepare + strict check on a clean synthetic tree", async () => {
-  const container = await mkdtemp(path.join(tmpdir(), "useful-owner-path-"));
+  const container = await mkdtemp(path.join(canonicalTempRoot, "useful-owner-path-"));
   const source = path.join(container, "source");
   const output = path.join(container, "public-out");
   const receipt = path.join(container, "public-out.receipt.json");

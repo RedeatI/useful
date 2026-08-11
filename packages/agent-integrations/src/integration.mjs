@@ -28,7 +28,7 @@ const SECRET_ENVIRONMENT_NAMES = new Set([
   "PASSWORD",
   "PRIVATE_KEY",
 ]);
-const PROFILE_VALUE = /^[a-z0-9][a-z0-9._-]{0,63}$/i;
+const PROFILE_VALUE = /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/;
 
 export class AgentIntegrationError extends Error {
   constructor(code, message, details = {}) {

@@ -17,12 +17,14 @@ import {
   CliError,
   exitCodeFor,
   failureEnvelope,
+  securityError,
   successEnvelope,
   usageError,
   validationError,
   writeJson,
 } from "./cli-contract.mjs";
 import { agentContractData } from "./agent-contract-data.mjs";
+import { AgentSelfProbeError, runAgentSelfProbe } from "./agent-probe.mjs";
 import {
   AgentIntegrationError,
   doctorAgentIntegration,
@@ -31,6 +33,7 @@ import {
   planAgentIntegration,
 } from "@useful/agent-integrations";
 import { AgentConnectionError } from "@useful/protocol/agent-connection";
+import { AgentProbeProtocolError } from "@useful/protocol/agent-probe";
 import {
   appUpdateCreate,
   appUpdateSign,
@@ -228,10 +231,34 @@ function asCliIntegrationError(error) {
   return error;
 }
 
+function asCliProbeError(error) {
+  if (error instanceof AgentSelfProbeError) {
+    const factory = error.exitCode === 4 ? securityError : validationError;
+    return factory(error.code, error.message, error.details);
+  }
+  if (error instanceof AgentProbeProtocolError) {
+    return validationError(error.code, error.message, error.details);
+  }
+  return error;
+}
+
 async function agentIntegrationCommand(rest) {
   const [subcommand, ...args] = rest;
+  if (subcommand === "probe") {
+    const { options, positional } = parseStrictArgs(args, new Set(["json"]));
+    requirePositionals(positional, 0, 0, "用法: useful agent probe --json");
+    if (args.filter((value) => value === "--json").length > 1) {
+      throw usageError("DUPLICATE_FLAG", "--json 只能提供一次", { option: "json" });
+    }
+    if (!options.json) throw usageError("JSON_REQUIRED", "agent probe 仅提供 --json 输出", { subcommand });
+    try {
+      return await runAgentSelfProbe();
+    } catch (error) {
+      throw asCliProbeError(error);
+    }
+  }
   if (subcommand !== "plan" && subcommand !== "doctor" && subcommand !== "export") {
-    throw usageError("UNKNOWN_AGENT_COMMAND", "用法: useful agent <plan|doctor|export> --target <target> --launcher <绝对路径> [--scope user|project] [--project-dir <绝对目录>] [--env NAME=VALUE] --json", { subcommand: subcommand ?? null });
+    throw usageError("UNKNOWN_AGENT_COMMAND", "用法: useful agent <plan|doctor|export|probe> ...；probe 仅接受 --json", { subcommand: subcommand ?? null });
   }
   const options = parseAgentIntegrationArgs(args);
   if (!options.json) {

@@ -1,0 +1,93 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.useful.example/agent/useful.agent-probe.v1.schema.json",
+  "title": "Useful Local MCP Agent Probe V1",
+  "description": "A bounded, secret-free success record for a local Useful MCP stdio probe. It does not attest host configuration, external-agent installation, launcher network policy, or OS process-tree reaping.",
+  "$comment": "This JSON Schema validates structure only. Consumers must call parseAgentProbe after JSON parsing to enforce semantic and cross-field invariants.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "status", "proofScope", "installation", "server", "tools", "proof", "process"],
+  "properties": {
+    "schemaVersion": { "const": "useful.agent-probe.v1" },
+    "status": { "const": "success" },
+    "proofScope": { "const": "useful-mcp-local-stdio" },
+    "installation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mode", "artifactVerified", "sourceRevision", "version"],
+      "properties": {
+        "mode": { "enum": ["source", "agent-kit"] },
+        "artifactVerified": {
+          "type": "boolean",
+          "description": "True only when this probe completed the Agent Kit MANIFEST closed-set hash/size integrity self-check. It does not attest a signature, origin, sidecar, or publication authorization."
+        },
+        "sourceRevision": { "$ref": "#/$defs/sha256LikeRevision" },
+        "version": { "$ref": "#/$defs/semver" }
+      },
+      "allOf": [
+        {
+          "if": { "type": "object", "properties": { "mode": { "const": "source" } }, "required": ["mode"] },
+          "then": { "type": "object", "properties": { "artifactVerified": { "const": false } } },
+          "else": { "type": "object", "properties": { "artifactVerified": { "const": true } } }
+        }
+      ]
+    },
+    "server": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "version", "protocolVersion"],
+      "properties": {
+        "name": { "const": "useful-actions" },
+        "version": { "$ref": "#/$defs/semver" },
+        "protocolVersion": { "const": "2026-07-28" }
+      }
+    },
+    "tools": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["count", "namesSha256", "actionCount", "helperCount"],
+      "properties": {
+        "count": { "type": "integer", "minimum": 0, "maximum": 1000 },
+        "namesSha256": {
+          "$ref": "#/$defs/sha256",
+          "description": "Lowercase hexadecimal SHA-256 digest of the UTF-8 bytes of JSON.stringify(toolNames), where toolNames is the complete tool-name array sorted in Unicode code-point order. JSON.stringify is used without whitespace or a trailing newline."
+        },
+        "actionCount": { "type": "integer", "minimum": 0, "maximum": 1000 },
+        "helperCount": { "type": "integer", "minimum": 0, "maximum": 1000 }
+      }
+    },
+    "proof": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["handshake", "list", "search", "describe", "safeCall", "transportClosed", "externalAgentInstalled", "codexConfigured", "claudeConfigured", "hostConfigWrittenByProbe", "launcherNetworkAttested"],
+      "properties": {
+        "handshake": { "const": true },
+        "list": { "const": true },
+        "search": { "const": true },
+        "describe": { "const": true },
+        "safeCall": { "const": true },
+        "transportClosed": { "const": true },
+        "externalAgentInstalled": { "const": false },
+        "codexConfigured": { "const": false },
+        "claudeConfigured": { "const": false },
+        "hostConfigWrittenByProbe": { "const": false },
+        "launcherNetworkAttested": { "const": false }
+      }
+    },
+    "process": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["stderrBytes", "stderrSha256", "transportClosed"],
+      "properties": {
+        "stderrBytes": { "type": "integer", "minimum": 0, "maximum": 65536 },
+        "stderrSha256": { "$ref": "#/$defs/sha256" },
+        "transportClosed": { "const": true }
+      }
+    }
+  },
+  "$defs": {
+    "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "sha256LikeRevision": { "type": "string", "pattern": "^[a-f0-9]{40,64}$" },
+    "semver": { "type": "string", "maxLength": 128, "pattern": "^(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)(?:-(?:[0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*))?$" }
+  }
+}

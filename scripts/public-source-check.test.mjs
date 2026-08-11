@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
+import { realpathSync } from "node:fs";
 import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -18,6 +19,7 @@ import {
   sha256,
 } from "./public-source-policy.mjs";
 
+const canonicalTemporaryDirectory = realpathSync.native(tmpdir());
 const scriptPath = path.join(path.dirname(fileURLToPath(import.meta.url)), "public-source-check.mjs");
 const requiredFiles = [...REQUIRED_PUBLIC_FILES];
 
@@ -110,7 +112,7 @@ async function writeZip(file, entries) {
 }
 
 async function makeRepository({ unsafe = false } = {}) {
-  const root = await mkdtemp(path.join(tmpdir(), "useful-public-source-"));
+  const root = await mkdtemp(path.join(canonicalTemporaryDirectory, "useful-public-source-"));
   await mkdir(path.join(root, "docs"), { recursive: true });
   await mkdir(path.join(root, "fixtures"), { recursive: true });
   for (const relative of requiredFiles) {
@@ -347,7 +349,7 @@ test("keeps product-review documents, release notes, and json-diff-pro-tool sour
 
 test("does not read through a filesystem symlink or junction", async (t) => {
   const root = await makeRepository();
-  const outside = await mkdtemp(path.join(tmpdir(), "useful-public-source-outside-"));
+  const outside = await mkdtemp(path.join(canonicalTemporaryDirectory, "useful-public-source-outside-"));
   t.after(() => rm(root, { recursive: true, force: true }));
   t.after(() => rm(outside, { recursive: true, force: true }));
   await writeFile(path.join(outside, "outside.txt"), "must not be scanned\n");
@@ -389,7 +391,7 @@ test("strict CLI rejects dirty input and rejects --allow-dirty as a stable usage
 });
 
 test("classifies native missing-directory I/O as exit 4 instead of INTERNAL_ERROR", async (t) => {
-  const container = await mkdtemp(path.join(tmpdir(), "useful-public-source-missing-"));
+  const container = await mkdtemp(path.join(canonicalTemporaryDirectory, "useful-public-source-missing-"));
   t.after(() => rm(container, { recursive: true, force: true }));
   const result = runRaw(path.join(container, "missing"));
   assert.equal(result.status, 4);
