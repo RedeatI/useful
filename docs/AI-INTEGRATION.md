@@ -418,6 +418,27 @@ self-reported 陈述；Schema/parser 通过或复制 JSON 不会认证执行。�
 已配置、已连接或会接受候选。V1 不支持 profile，`artifactVerified` 即使在 Agent Kit 中为 `true`，也仍只证明
 本地 `MANIFEST.json` 的文件字节数/哈希闭集，不证明签名、来源、sidecar、发布授权或 launcher 无网络访问。
 
+### 设置页 Agent Connections Inspector
+
+设置 → Agent Connections 提供一个仅用于人工检查和复制的 Inspector。先在终端显式运行上述
+`useful agent verify-all ... --json`，再由用户把完整 JSON 粘贴进文本框并点击检查；界面不会自行运行 CLI、
+读取剪贴板或查找 launcher。浏览器专用 parser 对不可信文本执行 1 MiB UTF-8/code-unit 输入预算、深度与节点
+预算、危险键拒绝、exact-key/闭集枚举以及 connection/probe/endpoint/output 的 cross-field 绑定校验。只有完整
+集合通过后，界面才按固定顺序显示 `codex`、`claude-code`、`claude-desktop`、`mcp-servers-json` 四个
+`scope: user`、空 `env` 候选。
+
+Inspector 在 mount、输入和检查阶段都保持零宿主副作用：没有 Tauri IPC、子进程、路径选择器、宿主配置读取或
+写入，也不会执行候选的 `commandArgv` 或应用 merge fragment。它不自动读取或写入剪贴板；只有用户点击“复制”
+时，才把规范化集合 JSON 或所选连接输出写入剪贴板。输出包含本机 `nodePath`、`launcherPath` 或宿主命令，因此
+复制前应视为本机路径信息，粘贴到聊天、工单或远程系统前必须复核。输入在上次成功检查后发生变化时，旧结果
+只标记为 stale，不会被当作新输入的结果或自动重新解析。
+
+浏览器 parser 通过只证明该文本满足闭集结构与内部绑定；结果仍是 self-reported，且
+`documentAuthenticated: false`。它不证明 CLI 所述执行实际发生，不证明 Codex/Claude 已安装、已配置、已连接
+或会接受候选，也不证明签名、来源、sidecar 或发布授权。当前桌面应用没有可受信地绑定当前安装的 Node 与
+Agent Kit launcher 的锚点，所以刻意不提供“一键运行验证”；未来若增加该能力，必须先建立独立的受信安装身份
+和原生可达性证据，不能由粘贴 JSON 或 parser 成功推导。
+
 MCP 是 Useful 对外的公共执行面，而不是宿主权限的替代者。Codex、Claude 和其他宿主各自决定审批、沙箱、
 日志、配置位置与配置变更确认；Useful 只提供本地 stdio server 及其已有的 action/profile 信任边界。始终先审阅
 生成物，再按对应宿主的官方文档手动合并或运行命令。

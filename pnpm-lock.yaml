@@ -44,6 +44,9 @@ importers:
       '@useful/office-core':
         specifier: workspace:^
         version: link:../../packages/office-core
+      '@useful/protocol':
+        specifier: workspace:^
+        version: link:../../packages/protocol
       '@useful/sdk':
         specifier: workspace:*
         version: link:../../packages/useful-sdk

@@ -67,11 +67,11 @@ describe("SettingsView", () => {
     setActivePinia(createPinia());
   });
 
-  function mountView() {
+  function mountView(stubs: Record<string, unknown> = {}) {
     return mount(SettingsView, {
       global: {
         plugins: [router],
-        stubs: { AgentProfilePanel: true, PerfPanel: true },
+        stubs: { AgentProfilePanel: true, AgentConnectionPanel: true, PerfPanel: true, ...stubs },
       },
     });
   }
@@ -103,6 +103,31 @@ describe("SettingsView", () => {
     const nightly = wrapper.findAll('[data-testid="update-channel"] button').find((button) => button.text() === "Nightly")!;
     await nightly.trigger("click");
     expect(ipcMock.appUpdateChannelSet).toHaveBeenCalledWith("nightly");
+  });
+
+  it("keeps the profile and connection inspectors in separate settings sections", () => {
+    const wrapper = mountView();
+    expect(wrapper.get("#agent-settings").find("agent-profile-panel-stub").exists()).toBe(true);
+    expect(wrapper.get("#agent-connections").find("agent-connection-panel-stub").exists()).toBe(true);
+  });
+
+  it("isolates errors from each async Agent panel", async () => {
+    function ThrowingProfile(): never {
+      throw new Error("profile-only");
+    }
+    let wrapper = mountView({ AgentProfilePanel: ThrowingProfile });
+    await flushPromises();
+    expect(wrapper.get("#agent-settings").text()).toContain("profile-only");
+    expect(wrapper.get("#agent-connections").text()).not.toContain("profile-only");
+    wrapper.unmount();
+
+    function ThrowingConnections(): never {
+      throw new Error("connections-only");
+    }
+    wrapper = mountView({ AgentConnectionPanel: ThrowingConnections });
+    await flushPromises();
+    expect(wrapper.get("#agent-connections").text()).toContain("connections-only");
+    expect(wrapper.get("#agent-settings").text()).not.toContain("connections-only");
   });
 
   it("labels the production default as official and offers no redundant reset", async () => {
