@@ -1,4 +1,7 @@
 // Browser-safe action semantics. This module must stay free of node:* imports.
+import { ACTION_IDS, createBuiltinDescriptorMetadata } from "./catalog.mjs";
+
+export { ACTION_IDS };
 
 export const ERROR_CODES = Object.freeze({
   UNKNOWN_ACTION: "UNKNOWN_ACTION",
@@ -13,40 +16,6 @@ export const ERROR_CODES = Object.freeze({
   CANCELLED: "CANCELLED",
   TIMEOUT: "TIMEOUT",
   ACTION_FAILED: "ACTION_FAILED",
-});
-
-export const ACTION_IDS = Object.freeze({
-  JSON: "builtin.utilities.json",
-  BASE64: "builtin.utilities.base64",
-  HASH: "builtin.utilities.hash",
-  URL: "builtin.utilities.url",
-  UUID: "builtin.utilities.uuid",
-  PASSWORD: "builtin.utilities.password",
-  TIMESTAMP: "builtin.utilities.timestamp",
-  BASE_CONVERT: "builtin.utilities.base-convert",
-  COLOR: "builtin.utilities.color",
-  CASE: "builtin.utilities.case",
-  REGEX: "builtin.utilities.regex",
-  JWT: "builtin.utilities.jwt",
-  HTML: "builtin.utilities.html",
-  HEX_TEXT: "builtin.utilities.hex-text",
-  MORSE: "builtin.utilities.morse",
-  TEXT_STATS: "builtin.utilities.text-stats",
-  TEXT_LINES: "builtin.utilities.text-lines",
-  SLUG: "builtin.utilities.slug",
-  BYTE_SIZE: "builtin.utilities.byte-size",
-  LOREM: "builtin.utilities.lorem",
-  DURATION: "builtin.utilities.duration",
-  BYTE_UNIT: "builtin.utilities.byte-unit",
-  NUMBER_FORMAT: "builtin.utilities.number-format",
-  UNICODE: "builtin.utilities.unicode",
-  CAESAR: "builtin.utilities.caesar",
-  LUHN: "builtin.utilities.luhn",
-  CONTRAST: "builtin.utilities.contrast",
-  RANDOM_NUMBER: "builtin.utilities.random-number",
-  DATA_FORMAT: "builtin.utilities.data-format",
-  TEXT_DIFF: "builtin.utilities.text-diff",
-  IPV4: "builtin.utilities.ipv4",
 });
 
 export const HASH_ALGORITHMS = Object.freeze(["SHA-1", "SHA-256", "SHA-384", "SHA-512"]);
@@ -77,48 +46,23 @@ function assertExactObject(input, required, optional = []) {
   }
 }
 
-function common({ sourceDigest, actionId, title, description, keywords, aliases, inputSchema, outputSchema, examples, testVectors, maxOutputBytes = 2097152 }) {
-  if (!/^[a-f0-9]{64}$/.test(sourceDigest)) throw new TypeError("sourceDigest must be SHA-256 hex");
+function common({ sourceDigest, actionId, inputSchema, outputSchema, examples, testVectors, maxOutputBytes = 2097152 }) {
+  const metadata = createBuiltinDescriptorMetadata(actionId, sourceDigest);
   return {
-    contractVersion: "1.0",
-    actionId,
-    version: "1.0.0",
-    source: {
-      kind: "builtin",
-      toolId: "builtin.utilities",
-      publisher: { id: "useful.project", name: "Useful" },
-      digest: sourceDigest,
-    },
-    title,
-    description,
-    keywords,
-    aliases,
+    ...metadata,
     inputSchema,
     outputSchema,
     examples,
     testVectors,
     execution: {
-      mode: "pure",
+      ...metadata.execution,
       handler: actionId,
       timeoutMs: 2000,
       maxInputBytes: 1048576,
       maxOutputBytes,
       supportsCancellation: false,
     },
-    behavior: {
-      readOnly: true,
-      destructive: false,
-      idempotent: true,
-      openWorld: false,
-      sideEffects: [],
-      requiresConfirmation: false,
-    },
-    permissions: { required: [], capabilities: [] },
     sensitive: { input: ["/text"], output: [], redactLogs: true },
-    presentation: {
-      route: `/tools/utilities/${actionId.split(".").at(-1)}`,
-      category: "utilities",
-    },
   };
 }
 
@@ -127,10 +71,6 @@ export function createBuiltinDescriptors(sourceDigest) {
   const json = common({
     sourceDigest,
     actionId: ACTION_IDS.JSON,
-    title: "JSON format",
-    description: "Parse and deterministically format or minify JSON text.",
-    keywords: ["json", "format", "pretty", "minify"],
-    aliases: ["beautify"],
     inputSchema: schema({
       operation: { type: "string", enum: ["format", "minify"] },
       text: string(),
@@ -161,10 +101,6 @@ export function createBuiltinDescriptors(sourceDigest) {
   const base64 = common({
     sourceDigest,
     actionId: ACTION_IDS.BASE64,
-    title: "Base64 encode/decode",
-    description: "Encode UTF-8 text to Base64 or decode canonical Base64 to UTF-8 text.",
-    keywords: ["base64", "encode", "decode"],
-    aliases: ["b64"],
     inputSchema: schema({
       operation: { type: "string", enum: ["encode", "decode"] },
       text: string(),
@@ -195,10 +131,6 @@ export function createBuiltinDescriptors(sourceDigest) {
   const hash = common({
     sourceDigest,
     actionId: ACTION_IDS.HASH,
-    title: "Text hash",
-    description: "Hash UTF-8 text with a selected SHA algorithm and return lowercase hexadecimal output.",
-    keywords: ["hash", "sha", "digest", "checksum"],
-    aliases: ["sha256"],
     inputSchema: schema({
       algorithm: { type: "string", enum: [...HASH_ALGORITHMS] },
       text: string(),

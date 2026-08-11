@@ -6,7 +6,7 @@ import {
   searchTools,
   UTIL_ACTIONS,
 } from "@/lib/tools/registry";
-import { BUILTIN_ACTION_DESCRIPTORS } from "@useful/action-runtime/browser";
+import { BUILTIN_ACTION_CATALOG } from "@useful/action-runtime/catalog";
 
 describe("实用工具注册表", () => {
   it("每个工具字段完整且 id 唯一", () => {
@@ -47,7 +47,7 @@ describe("实用工具注册表", () => {
 
   it("全部 31 个 utility action 共享 GUI/CLI/MCP 自动化元数据且顺序闭合", () => {
     const automated = UTIL_ACTIONS.filter((action) => action.automation);
-    const descriptors = BUILTIN_ACTION_DESCRIPTORS.filter(
+    const descriptors = BUILTIN_ACTION_CATALOG.filter(
       (descriptor) =>
         "toolId" in descriptor.source && descriptor.source.toolId === "builtin.utilities",
     );

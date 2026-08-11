@@ -1,28 +1,61 @@
 {
-  "schemaVersion": "useful.size-budgets.v1",
+  "schemaVersion": "useful.size-budgets.v2",
   "notes": [
-    "Hard limits fail CI when exceeded. Targets are goals for phase B.",
-    "Portable ZIP and setup limits should be tightened after the first measured baseline.",
-    "Reports are written to artifacts/size/ and must never be mixed into dist-release asset closed sets."
+    "Hard limits fail closed after production builds; targets remain non-enforcing goals.",
+    "frontendDistBytes is the exact composition of frontendAppBytes plus the single controlled officeWorker asset.",
+    "Reports are written to artifacts/size/ and must never be mixed into release asset closed sets."
   ],
-  "growthWarnPercent": 5,
+  "maximumMetricBytes": 1000000000,
   "hardLimits": {
     "usefulExeBytes": 14680064,
     "bootstrapExeBytes": 10485760,
-    "frontendDistBytes": 786432,
-    "entryJsBytes": 256000,
-    "agentChunkBytes": 40960,
+    "frontendAppBytes": 819200,
+    "officeWorkerBytes": 524288,
+    "frontendDistBytes": 1343488,
+    "initialJsBytes": 256000,
+    "agentProfileChunkBytes": 40960,
     "portableLiteZipBytes": 26214400,
     "setupLiteBytes": 26214400,
     "portableFullZipBytes": 157286400
   },
   "targets": {
     "usefulExeBytes": 13107200,
-    "frontendDistBytes": 629145,
-    "entryJsBytes": 235520,
-    "agentChunkBytes": 30720,
+    "frontendAppBytes": 629145,
+    "initialJsBytes": 235520,
+    "agentProfileChunkBytes": 30720,
     "portableLiteZipBytes": 20971520,
     "setupLiteBytes": 20971520,
     "portableFullZipBytes": 125829120
+  },
+  "requiredProfiles": {
+    "frontend": [
+      "frontendAppBytes",
+      "officeWorkerBytes",
+      "frontendDistBytes",
+      "initialJsBytes",
+      "agentProfileChunkBytes"
+    ],
+    "ci": [
+      "usefulExeBytes",
+      "bootstrapExeBytes",
+      "frontendAppBytes",
+      "officeWorkerBytes",
+      "frontendDistBytes",
+      "initialJsBytes",
+      "agentProfileChunkBytes",
+      "portableLiteZipBytes"
+    ],
+    "release": [
+      "usefulExeBytes",
+      "bootstrapExeBytes",
+      "frontendAppBytes",
+      "officeWorkerBytes",
+      "frontendDistBytes",
+      "initialJsBytes",
+      "agentProfileChunkBytes",
+      "portableLiteZipBytes",
+      "setupLiteBytes",
+      "portableFullZipBytes"
+    ]
   }
 }

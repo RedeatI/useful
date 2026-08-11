@@ -23,6 +23,7 @@
     "policy:test": "node --test scripts/check-brand.test.mjs scripts/check-workflows.test.mjs scripts/public-source-check.test.mjs scripts/prepare-public-source.test.mjs scripts/release-readiness.test.mjs scripts/public-release-path.test.mjs scripts/verify-public-commit.test.mjs",
     "release:checks": "node --test scripts/gen-sbom.test.mjs scripts/install-media-pack.test.mjs scripts/media-pack-catalog.test.mjs scripts/media-pack-signing.test.mjs scripts/media-pack-v2.test.mjs scripts/release-metadata-media.test.mjs scripts/release-metadata.test.mjs scripts/release-packaging-contract.test.mjs scripts/release-publish-gate.test.mjs scripts/release-signing-status.test.mjs scripts/size-budget.test.mjs",
     "size:measure": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/measure-size.ps1",
+    "size:check": "node scripts/size-budget.mjs",
     "size:editions": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/measure-edition-size.ps1",
     "size:media-essentials": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/evaluate-media-essentials.ps1",
     "size:media-packs-candidate": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/package-media-packs.ps1",

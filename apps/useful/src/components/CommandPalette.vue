@@ -146,21 +146,27 @@ const filtered = computed<PaletteItem[]>(() => {
   }));
 });
 
-watch(open, async (isOpen) => {
-  if (isOpen) {
-    previouslyFocused = document.activeElement instanceof HTMLElement
-      ? document.activeElement
-      : null;
-    query.value = "";
-    activeIndex.value = 0;
-    await nextTick();
-    inputRef.value?.focus();
-  } else {
-    await nextTick();
-    previouslyFocused?.focus();
-    previouslyFocused = null;
-  }
-});
+watch(
+  open,
+  async (isOpen) => {
+    if (isOpen) {
+      previouslyFocused = document.activeElement instanceof HTMLElement
+        ? document.activeElement
+        : null;
+      query.value = "";
+      activeIndex.value = 0;
+      await nextTick();
+      inputRef.value?.focus();
+    } else {
+      await nextTick();
+      previouslyFocused?.focus();
+      previouslyFocused = null;
+    }
+  },
+  // The component is loaded only after the first open, so its initial state is
+  // already true and must receive the same focus setup as later transitions.
+  { immediate: true },
+);
 watch(filtered, () => {
   activeIndex.value = 0;
 });

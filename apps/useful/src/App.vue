@@ -1,27 +1,156 @@
 <script setup lang="ts">
-import { nextTick, onMounted, onUnmounted } from "vue";
+import { defineAsyncComponent, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 import AppSidebar from "@/components/AppSidebar.vue";
-import CommandPalette from "@/components/CommandPalette.vue";
 import { useAppStore } from "@/stores/app";
 import { useUiStore } from "@/stores/ui";
 import { emit, listen } from "@tauri-apps/api/event";
 import type { UnlistenFn } from "@tauri-apps/api/event";
-import { runNativeSmoke, type NativeSmokeStart } from "@/lib/nativeSmoke";
-import { runNativePluginSmoke, type NativePluginSmokeStart } from "@/lib/nativePluginSmoke";
+import type { NativeSmokeStart } from "@/lib/nativeSmoke";
+import type { NativePluginSmokeStart } from "@/lib/nativePluginSmoke";
 import { t } from "@/i18n";
 import { findBuiltinAction } from "@/lib/actionCatalog";
 import { requestOpenFile } from "@/lib/openFileBus";
 
+const CommandPalette = defineAsyncComponent(() => import("@/components/CommandPalette.vue"));
+
 const appStore = useAppStore();
 const uiStore = useUiStore();
 const router = useRouter();
+const commandPaletteLoaded = ref(uiStore.commandPaletteOpen);
+
+// Do not request the palette chunk during initial render. Once opened, retain the
+// component so its own close watcher can restore focus and future opens stay warm.
+watch(
+  () => uiStore.commandPaletteOpen,
+  (isOpen) => {
+    if (isOpen) commandPaletteLoaded.value = true;
+  },
+  { flush: "sync" },
+);
 
 let unlistenOpenTool: UnlistenFn | null = null;
 let unlistenNativeSmoke: UnlistenFn | null = null;
 let unlistenNativePluginSmoke: UnlistenFn | null = null;
 let unlistenNativeReceipts: UnlistenFn | null = null;
 let nativeReceiptsEnabled = false;
+let nativeSmokeModule: Promise<typeof import("@/lib/nativeSmoke")> | null = null;
+let nativePluginSmokeModule: Promise<typeof import("@/lib/nativePluginSmoke")> | null = null;
+let nativeSmokeStarted = false;
+let nativePluginSmokeStarted = false;
+
+function loadNativeSmoke() {
+  nativeSmokeModule ??= import("@/lib/nativeSmoke");
+  return nativeSmokeModule;
+}
+
+function loadNativePluginSmoke() {
+  nativePluginSmokeModule ??= import("@/lib/nativePluginSmoke");
+  return nativePluginSmokeModule;
+}
+
+function failureDetail(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+async function emitNativeSmokeBootstrapFailure(
+  start: NativeSmokeStart,
+  stage: "module load" | "runner",
+  error: unknown,
+): Promise<void> {
+  const message = `native smoke ${stage} failed: ${failureDetail(error)}`;
+  try {
+    await emit("native-smoke-result", {
+      scenario: "native-tauri-all-tools",
+      commit: start.commit,
+      version: start.version,
+      total: 0,
+      passed: 0,
+      failed: 1,
+      durationMs: 0,
+      failures: [{ id: "bootstrap", message }],
+      artifacts: [],
+      checks: [],
+      registryActionCount: 0,
+      expectedMinimum: 0,
+      uniqueFailureIds: ["bootstrap"],
+      nativeCapabilities: {
+        registryIpcPassed: false,
+        sqlitePersistedFromPreviousRun: false,
+        sqliteFavoritesPassed: false,
+        sqliteRecentPassed: false,
+        clipboardPassed: false,
+        mediaFileOpened: false,
+        mediaExportPassed: false,
+        startupDeepLinkPassed: false,
+        ffmpegAvailable: false,
+        ffprobeAvailable: false,
+        mpvAvailable: false,
+        betaFeedbackExportPassed: false,
+        isolatedPortableData: false,
+      },
+    });
+  } catch {
+    // The terminal event was attempted once. Never surface transport rejection
+    // as an unhandled promise from a fire-and-forget Tauri event listener.
+  }
+}
+
+async function emitNativePluginSmokeBootstrapFailure(
+  start: NativePluginSmokeStart,
+  stage: "module load" | "runner",
+  error: unknown,
+): Promise<void> {
+  const failures = [
+    ...start.bootstrapFailures.map((message) => ({ id: "bootstrap", message })),
+    {
+      id: "bootstrap",
+      message: `native plugin smoke ${stage} failed: ${failureDetail(error)}`,
+    },
+  ];
+  try {
+    await emit("native-plugin-smoke-result", {
+      scenario: "native-tauri-plugin-lifecycle",
+      commit: start.commit,
+      version: start.version,
+      total: start.plugins.length,
+      passed: 0,
+      failed: failures.length,
+      durationMs: 0,
+      failures,
+      checks: [],
+    });
+  } catch {
+    // See emitNativeSmokeBootstrapFailure: event listeners must never leak a
+    // rejected promise even if the Tauri event channel itself is unavailable.
+  }
+}
+
+async function runNativeSmokeOnce(start: NativeSmokeStart): Promise<void> {
+  if (nativeSmokeStarted) return;
+  nativeSmokeStarted = true;
+  let stage: "module load" | "runner" = "module load";
+  try {
+    const { runNativeSmoke } = await loadNativeSmoke();
+    stage = "runner";
+    await runNativeSmoke(router, start);
+  } catch (error) {
+    await emitNativeSmokeBootstrapFailure(start, stage, error);
+  }
+}
+
+async function runNativePluginSmokeOnce(start: NativePluginSmokeStart): Promise<void> {
+  if (nativePluginSmokeStarted) return;
+  nativePluginSmokeStarted = true;
+  let stage: "module load" | "runner" = "module load";
+  try {
+    const { runNativePluginSmoke } = await loadNativePluginSmoke();
+    stage = "runner";
+    await runNativePluginSmoke(router, appStore, start);
+  } catch (error) {
+    await emitNativePluginSmokeBootstrapFailure(start, stage, error);
+  }
+}
 
 function onKeydown(e: KeyboardEvent): void {
   // Ctrl+K 打开命令面板
@@ -77,13 +206,15 @@ onMounted(async () => {
     unlistenNativeSmoke = await listen<NativeSmokeStart>(
       "native-smoke-start",
       (event) => {
-        void runNativeSmoke(router, event.payload);
+        // Register eagerly, load once on demand, and consume only the first
+        // request so duplicate native events cannot run destructive cleanup twice.
+        void runNativeSmokeOnce(event.payload);
       },
     );
     unlistenNativePluginSmoke = await listen<NativePluginSmokeStart>(
       "native-plugin-smoke-start",
       (event) => {
-        void runNativePluginSmoke(router, appStore, event.payload);
+        void runNativePluginSmokeOnce(event.payload);
       },
     );
     unlistenNativeReceipts = await listen("native-action-receipts-enabled", () => {
@@ -112,7 +243,7 @@ onUnmounted(() => {
         <component :is="Component" />
       </router-view>
     </main>
-    <CommandPalette />
+    <CommandPalette v-if="commandPaletteLoaded" />
   </div>
 </template>
 

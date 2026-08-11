@@ -133,9 +133,51 @@ function runLines(step) {
     .filter((line) => line.length > 0 && !line.startsWith("#"));
 }
 
+function uploadPathLines(step) {
+  if (typeof step?.with?.path !== "string") return [];
+  return step.with.path
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+}
+
+function inspectUploadPathClosure(file, workflow, expectedUploads, code) {
+  const actualUploads = [];
+  for (const [jobId, job] of Object.entries(workflow.jobs ?? {})) {
+    for (const step of job?.steps ?? []) {
+      if (!String(step?.uses ?? "").startsWith("actions/upload-artifact@")) continue;
+      actualUploads.push({
+        jobId,
+        name: String(step?.with?.name ?? ""),
+        paths: uploadPathLines(step),
+      });
+    }
+  }
+  const closed = actualUploads.length === expectedUploads.length && expectedUploads.every((expected) => {
+    const matches = actualUploads.filter((actual) => (
+      actual.jobId === expected.jobId && actual.name === expected.name
+    ));
+    return matches.length === 1 && JSON.stringify(matches[0].paths) === JSON.stringify(expected.paths);
+  });
+  if (!closed) violations.push({ file, code });
+}
+
 function stepRunsExact(step, command) {
   const lines = runLines(step);
   return runnableStep(step) && lines.length === 1 && lines[0] === command;
+}
+
+function stepRunsExactLines(step, expectedLines, options = undefined) {
+  return runnableStep(step, options) && JSON.stringify(runLines(step)) === JSON.stringify(expectedLines);
+}
+
+function stepEnvIsExact(step, expected) {
+  const env = step?.env;
+  if (!env || typeof env !== "object" || Array.isArray(env)) return false;
+  const byKey = ([left], [right]) => left < right ? -1 : left > right ? 1 : 0;
+  const actualEntries = Object.entries(env).sort(byKey);
+  const expectedEntries = Object.entries(expected).sort(byKey);
+  return JSON.stringify(actualEntries) === JSON.stringify(expectedEntries);
 }
 
 function stepRunsPrefix(step, prefix, options = undefined) {
@@ -273,11 +315,52 @@ function inspectCiWorkflow(file, workflow) {
   if (!uploadNames.includes("useful-sbom")) {
     violations.push({ file, code: "ci-useful-sbom-artifact-name-invalid" });
   }
+  inspectUploadPathClosure(file, workflow, [
+    {
+      jobId: "build-and-test",
+      name: "useful-portable-lite-x64-development-trust-unsigned-preview",
+      paths: ["dist-release/Useful-Portable-Lite-x64.zip", "dist-release/SHA256SUMS.txt"],
+    },
+    {
+      jobId: "build-and-test",
+      name: "useful-sbom",
+      paths: ["dist-sbom/sbom.cdx.json", "THIRD_PARTY_NOTICES.md"],
+    },
+  ], "ci-size-report-upload-forbidden");
   const source = Object.values(workflow.jobs ?? {}).flatMap((job) => job?.steps ?? [])
     .map((step) => `${String(step?.name ?? "")}\n${String(step?.with?.path ?? "")}`)
     .join("\n");
   if (!source.includes("dist-release/Useful-Portable-Lite-x64.zip") || source.includes("Portable-Full")) {
     violations.push({ file, code: "ci-portable-lite-preview-path-invalid" });
+  }
+  const ciPackageCommand = "powershell -ExecutionPolicy Bypass -File scripts/package-release.ps1 -Edition Lite";
+  const packageIndexes = buildSteps
+    .map((step, index) => stepRunsExact(step, ciPackageCommand) ? index : -1)
+    .filter((index) => index >= 0);
+  const ciSizeLines = [
+    "$ErrorActionPreference = 'Stop'",
+    "& ./scripts/measure-size.ps1 -ExpectedCommit $env:USEFUL_SIZE_EXPECTED_COMMIT",
+    "pnpm size:check --profile ci --json",
+    "if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }",
+  ];
+  const sizeIndexes = buildSteps
+    .map((step, index) => runLines(step).includes("pnpm size:check --profile ci --json") ? index : -1)
+    .filter((index) => index >= 0);
+  const sizeIndex = sizeIndexes.length === 1 ? sizeIndexes[0] : -1;
+  const sizeStep = sizeIndex >= 0 ? buildSteps[sizeIndex] : undefined;
+  const uploadBuildIndex = buildSteps.findIndex((step) => (
+    runnableStep(step) && String(step?.uses ?? "").startsWith("actions/upload-artifact@")
+  ));
+  if (
+    packageIndexes.length !== 1
+    || sizeIndexes.length !== 1
+    || uploadBuildIndex < 0
+    || !(packageIndexes[0] < sizeIndex && sizeIndex < uploadBuildIndex)
+    || !stepRunsExactLines(sizeStep, ciSizeLines)
+    || String(sizeStep?.shell ?? "") !== "pwsh"
+    || !stepEnvIsExact(sizeStep, { USEFUL_SIZE_EXPECTED_COMMIT: "${{ github.sha }}" })
+  ) {
+    violations.push({ file, code: "ci-size-budget-production-gate-invalid" });
   }
 }
 
@@ -740,6 +823,58 @@ function inspectReleaseWorkflow(file, workflow) {
   if (windowsPackageRun.includes("Sort-Object FullName")) {
     violations.push({ file, code: "release-windows-culture-sensitive-zip-order-forbidden" });
   }
+  const windowsPackageIndex = buildSteps.indexOf(windowsPackage);
+  const releaseSizeLines = [
+    "$ErrorActionPreference = 'Stop'",
+    "& ./scripts/measure-size.ps1 -OutDir release-assets -Target $env:TARGET -ExpectedCommit $env:USEFUL_SIZE_EXPECTED_COMMIT",
+    "pnpm size:check --profile release --json",
+    "if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }",
+  ];
+  const sizeIndexes = buildSteps
+    .map((step, index) => runLines(step).includes("pnpm size:check --profile release --json") ? index : -1)
+    .filter((index) => index >= 0);
+  const sizeIndex = sizeIndexes.length === 1 ? sizeIndexes[0] : -1;
+  const sizeStep = sizeIndex >= 0 ? buildSteps[sizeIndex] : undefined;
+  const uploadBuildIndex = buildSteps.findIndex((step) => (
+    runnableStep(step) && String(step?.uses ?? "").startsWith("actions/upload-artifact@")
+  ));
+  if (
+    windowsPackageIndex < 0
+    || sizeIndexes.length !== 1
+    || uploadBuildIndex < 0
+    || !(windowsPackageIndex < sizeIndex && sizeIndex < uploadBuildIndex)
+    || !stepRunsExactLines(sizeStep, releaseSizeLines, { allowedCondition: "matrix.platform == 'windows'" })
+    || String(sizeStep?.shell ?? "") !== "pwsh"
+    || !stepEnvIsExact(sizeStep, {
+      USEFUL_SIZE_EXPECTED_COMMIT: "${{ github.sha }}",
+      TARGET: "${{ matrix.target }}",
+    })
+  ) {
+    violations.push({ file, code: "release-size-budget-production-gate-invalid" });
+  }
+  inspectUploadPathClosure(file, workflow, [
+    {
+      jobId: "source-agent-kit",
+      name: "useful-source-agent-kit-candidate-${{ needs.identity.outputs.version }}",
+      paths: ["source-release-candidate/*"],
+    },
+    { jobId: "sbom", name: "useful-sbom", paths: ["dist-sbom/sbom.cdx.json"] },
+    {
+      jobId: "agent-kit",
+      name: "useful-agent-kit",
+      paths: ["${{ runner.temp }}/useful-agent-kit/*"],
+    },
+    {
+      jobId: "build",
+      name: "useful-build-${{ matrix.platform }}-${{ matrix.arch }}",
+      paths: ["release-assets/*", "signing-${{ matrix.platform }}-${{ matrix.arch }}.json"],
+    },
+    {
+      jobId: "assemble",
+      name: "useful-release-candidate-${{ needs.identity.outputs.version }}",
+      paths: ["release-candidate/*"],
+    },
+  ], "release-size-report-asset-forbidden");
   const windowsImport = buildSteps.find((step) => step?.id === "windows-cert");
   const windowsCleanup = buildSteps.find((step) => String(step?.name ?? "").includes("Remove ephemeral Windows certificate material"));
   const windowsImportRun = String(windowsImport?.run ?? "");

@@ -10,6 +10,10 @@
       "types": "./src/browser.d.ts",
       "import": "./src/browser.mjs"
     },
+    "./catalog": {
+      "types": "./src/catalog.d.ts",
+      "import": "./src/catalog.mjs"
+    },
     "./builtins": "./src/builtins.mjs"
   },
   "dependencies": {
@@ -22,7 +26,7 @@
   },
   "scripts": {
     "test": "node --test",
-    "typecheck": "node --check src/index.mjs && node --check src/executor.mjs && node --check src/builtins.mjs && node --check src/browser.mjs && node --check src/semantics.mjs && node --check src/action-suggest.mjs && node --check src/recipe.mjs && node --check src/utility-actions.mjs && node --check src/node-regex.mjs && node --check src/regex-worker-thread.mjs && node --check src/office-actions.mjs && node --check src/node-office.mjs && node --check src/office-worker-thread.mjs"
+    "typecheck": "node --check src/index.mjs && node --check src/executor.mjs && node --check src/builtins.mjs && node --check src/browser.mjs && node --check src/catalog.mjs && node --check src/semantics.mjs && node --check src/action-suggest.mjs && node --check src/recipe.mjs && node --check src/utility-actions.mjs && node --check src/node-regex.mjs && node --check src/regex-worker-thread.mjs && node --check src/office-actions.mjs && node --check src/node-office.mjs && node --check src/office-worker-thread.mjs"
   },
   "license": "MPL-2.0"
 }

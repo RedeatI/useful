@@ -1,4 +1,7 @@
+import { createBuiltinDescriptorMetadata, OFFICE_ACTION_IDS } from "./catalog.mjs";
 import { ERROR_CODES } from "./semantics.mjs";
+
+export { OFFICE_ACTION_IDS };
 
 const DRAFT = "https://json-schema.org/draft/2020-12/schema";
 export const OFFICE_ACTION_LIMITS = Object.freeze({
@@ -37,14 +40,6 @@ const array = (items, maxItems, minItems = undefined) => ({
   items,
   maxItems,
   ...(minItems === undefined ? {} : { minItems }),
-});
-
-export const OFFICE_ACTION_IDS = Object.freeze({
-  DOCX: "builtin.office.docx",
-  PPTX: "builtin.office.pptx",
-  SPREADSHEET: "builtin.office.spreadsheet",
-  PDF: "builtin.office.pdf",
-  MARKDOWN: "builtin.office.markdown",
 });
 
 const warningList = array(string(256), 256);
@@ -96,20 +91,9 @@ const pdfPageDetail = nestedObject({
 });
 
 function descriptor(sourceDigest, options) {
+  const metadata = createBuiltinDescriptorMetadata(options.actionId, sourceDigest);
   return {
-    contractVersion: "1.0",
-    actionId: options.actionId,
-    version: "1.0.0",
-    source: {
-      kind: "builtin",
-      toolId: "builtin.office",
-      publisher: { id: "useful.project", name: "Useful" },
-      digest: sourceDigest,
-    },
-    title: options.title,
-    description: options.description,
-    keywords: options.keywords,
-    aliases: options.aliases ?? [],
+    ...metadata,
     inputSchema: options.inputSchema,
     outputSchema: options.outputSchema,
     examples: [],
@@ -119,31 +103,17 @@ function descriptor(sourceDigest, options) {
       expectedErrorCode: ERROR_CODES.INPUT_INVALID,
     }],
     execution: {
-      mode: "worker",
+      ...metadata.execution,
       handler: options.actionId,
       timeoutMs: 15000,
       maxInputBytes: OFFICE_ACTION_LIMITS.maxInputJsonBytes,
       maxOutputBytes: OFFICE_ACTION_LIMITS.maxOutputJsonBytes,
       supportsCancellation: true,
     },
-    behavior: {
-      readOnly: true,
-      destructive: false,
-      idempotent: options.idempotent ?? true,
-      openWorld: false,
-      sideEffects: [],
-      requiresConfirmation: false,
-    },
-    permissions: { required: [], capabilities: [] },
     sensitive: {
       input: options.sensitiveInput,
       output: options.sensitiveOutput,
       redactLogs: true,
-    },
-    presentation: {
-      route: `/tools/office/${options.route}`,
-      icon: options.icon,
-      category: "office",
     },
   };
 }
@@ -152,10 +122,6 @@ export function createOfficeActionDescriptors(sourceDigest) {
   if (!/^[a-f0-9]{64}$/.test(sourceDigest)) throw new TypeError("sourceDigest must be SHA-256 hex");
   const docx = descriptor(sourceDigest, {
     actionId: OFFICE_ACTION_IDS.DOCX,
-    title: "Word / DOCX",
-    description: "Compose, extract, inspect, or convert a bounded local DOCX document without executing macros, embedded objects, or external relationships.",
-    keywords: ["word", "docx", "document", "markdown"],
-    aliases: ["word"], route: "docx", icon: "document",
     sensitiveInput: ["/dataBase64", "/blocks", "/markdown", "/title"],
     sensitiveOutput: ["/dataBase64", "/document", "/markdown", "/summary"],
     inputSchema: object({
@@ -177,10 +143,6 @@ export function createOfficeActionDescriptors(sourceDigest) {
   });
   const pptx = descriptor(sourceDigest, {
     actionId: OFFICE_ACTION_IDS.PPTX,
-    title: "PowerPoint / PPTX",
-    description: "Compose, extract, inspect, or convert a bounded local PPTX presentation without executing macros, embedded objects, or external relationships.",
-    keywords: ["powerpoint", "pptx", "slides", "presentation", "markdown"],
-    aliases: ["powerpoint", "slides"], route: "pptx", icon: "presentation",
     sensitiveInput: ["/dataBase64", "/slides", "/markdown", "/title"],
     sensitiveOutput: ["/dataBase64", "/presentation", "/markdown", "/summary"],
     inputSchema: object({
@@ -202,10 +164,6 @@ export function createOfficeActionDescriptors(sourceDigest) {
   });
   const spreadsheet = descriptor(sourceDigest, {
     actionId: OFFICE_ACTION_IDS.SPREADSHEET,
-    title: "Spreadsheet / CSV / XLSX",
-    description: "Compose, extract, inspect, or convert bounded XLSX, CSV, and simple Markdown tables locally; formulas are returned as text and are never evaluated.",
-    keywords: ["excel", "xlsx", "csv", "spreadsheet", "table"],
-    aliases: ["excel", "csv"], route: "spreadsheet", icon: "spreadsheet",
     sensitiveInput: ["/dataBase64", "/sheets", "/rows", "/text", "/markdown"],
     sensitiveOutput: ["/dataBase64", "/workbook", "/rows", "/text", "/markdown", "/summary"],
     inputSchema: object({
@@ -229,10 +187,6 @@ export function createOfficeActionDescriptors(sourceDigest) {
   });
   const pdf = descriptor(sourceDigest, {
     actionId: OFFICE_ACTION_IDS.PDF,
-    title: "PDF pages",
-    description: "Inspect structure or locally merge, split, extract, delete, reorder, rotate, or sanitize bounded PDF pages using unique zero-based page indexes; inspection does not assess content safety or prove redaction.",
-    keywords: ["pdf", "merge", "split", "rotate", "metadata"],
-    aliases: ["pdf-pages"], route: "pdf", icon: "pdf", idempotent: false,
     sensitiveInput: ["/dataBase64", "/documentsBase64"],
     sensitiveOutput: ["/dataBase64", "/documentsBase64"],
     inputSchema: object({
@@ -257,10 +211,6 @@ export function createOfficeActionDescriptors(sourceDigest) {
   });
   const markdown = descriptor(sourceDigest, {
     actionId: OFFICE_ACTION_IDS.MARKDOWN,
-    title: "Markdown office outline",
-    description: "Parse a bounded Markdown outline or turn it into a local DOCX or PPTX file.",
-    keywords: ["markdown", "md", "outline", "docx", "pptx"],
-    aliases: ["md"], route: "markdown", icon: "markdown",
     sensitiveInput: ["/markdown", "/title"],
     sensitiveOutput: ["/dataBase64", "/blocks"],
     inputSchema: object({ operation: enumeration("parse", "to-docx", "to-pptx"), markdown: string(OFFICE_ACTION_LIMITS.maxTextChars), title: string(512) }, ["operation", "markdown"]),

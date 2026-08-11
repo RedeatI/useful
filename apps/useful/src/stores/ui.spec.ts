@@ -1,6 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { flushPromises } from "@vue/test-utils";
 import { createPinia, setActivePinia } from "pinia";
 import { nextTick } from "vue";
+import { getLocale, resetLocaleForTests, t } from "@/i18n";
+import enUS from "@/i18n/en-US";
 
 const setNativeTheme = vi.hoisted(() => vi.fn().mockResolvedValue(undefined));
 const ipcMock = vi.hoisted(() => ({
@@ -17,6 +20,7 @@ describe("UI settings", () => {
     vi.clearAllMocks();
     localStorage.clear();
     Reflect.deleteProperty(window, "__TAURI_INTERNALS__");
+    resetLocaleForTests(async () => ({ default: enUS }));
     setActivePinia(createPinia());
   });
 
@@ -84,6 +88,108 @@ describe("UI settings", () => {
     await nextTick();
     expect(setNativeTheme).toHaveBeenLastCalledWith(null);
     expect(ipcMock.updateSetting).toHaveBeenCalledWith("theme", "system");
+  });
+
+  it("waits for the persisted English locale before completing hydration", async () => {
+    let resolveEnglish!: (module: { default: Record<string, unknown> }) => void;
+    const loader = vi.fn(() => new Promise<{ default: Record<string, unknown> }>((resolve) => {
+      resolveEnglish = resolve;
+    }));
+    resetLocaleForTests(loader);
+    ipcMock.getSettings.mockResolvedValueOnce({ theme: "system", language: "en-US", developerMode: false, sidebarCollapsed: false });
+    const store = useUiStore();
+
+    const loading = store.load();
+    await flushPromises();
+    expect(loader).toHaveBeenCalledTimes(1);
+    expect(store.loaded).toBe(false);
+    expect(store.requestedLanguage).toBe("en-US");
+    expect(t("nav.home")).toBe("首页");
+
+    resolveEnglish({ default: enUS });
+    await loading;
+    expect(store.loaded).toBe(true);
+    expect(store.language).toBe("en-US");
+    expect(store.requestedLanguage).toBe("en-US");
+    expect(getLocale()).toBe("en-US");
+    expect(t("nav.home")).toBe("Home");
+    expect(document.documentElement.lang).toBe("en-US");
+    expect(ipcMock.updateSetting).not.toHaveBeenCalled();
+  });
+
+  it("keeps an explicit same-value Chinese intent over late English hydration", async () => {
+    let resolveEnglish!: (module: { default: Record<string, unknown> }) => void;
+    const loader = vi.fn(() => new Promise<{ default: Record<string, unknown> }>((resolve) => {
+      resolveEnglish = resolve;
+    }));
+    resetLocaleForTests(loader);
+    ipcMock.getSettings.mockResolvedValueOnce({ theme: "system", language: "en-US", developerMode: false, sidebarCollapsed: false });
+    const store = useUiStore();
+
+    const loading = store.load();
+    await flushPromises();
+    expect(loader).toHaveBeenCalledTimes(1);
+    expect(store.loaded).toBe(false);
+    expect(store.language).toBe("zh-CN");
+    expect(store.requestedLanguage).toBe("en-US");
+
+    await expect(store.setLanguage("zh-CN")).resolves.toBe(true);
+    expect(store.requestedLanguage).toBe("zh-CN");
+    expect(getLocale()).toBe("zh-CN");
+    expect(document.documentElement.lang).toBe("zh-CN");
+
+    resolveEnglish({ default: enUS });
+    await loading;
+    await flushPromises();
+
+    expect(store.loaded).toBe(true);
+    expect(store.language).toBe("zh-CN");
+    expect(store.requestedLanguage).toBe("zh-CN");
+    expect(getLocale()).toBe("zh-CN");
+    expect(t("nav.home")).toBe("首页");
+    expect(document.documentElement.lang).toBe("zh-CN");
+    expect(ipcMock.updateSetting.mock.calls.filter(([key]) => key === "language")).toEqual([
+      ["language", "zh-CN"],
+    ]);
+  });
+
+  it("keeps the previous locale and remains usable when the English chunk fails", async () => {
+    resetLocaleForTests(vi.fn().mockRejectedValue(new Error("chunk unavailable")));
+    ipcMock.getSettings.mockResolvedValueOnce({ theme: "dark", language: "en-US", developerMode: true, sidebarCollapsed: true });
+    const store = useUiStore();
+
+    await expect(store.load()).resolves.toBeUndefined();
+    expect(store.loaded).toBe(true);
+    expect(store.language).toBe("zh-CN");
+    expect(store.requestedLanguage).toBe("zh-CN");
+    expect(getLocale()).toBe("zh-CN");
+    expect(t("nav.home")).toBe("首页");
+    expect(document.documentElement.lang).toBe("zh-CN");
+    expect(ipcMock.updateSetting).not.toHaveBeenCalledWith("language", "en-US");
+  });
+
+  it("does not let a late English watcher overwrite or persist after a newer Chinese switch", async () => {
+    let resolveEnglish!: (module: { default: Record<string, unknown> }) => void;
+    const loader = vi.fn(() => new Promise<{ default: Record<string, unknown> }>((resolve) => {
+      resolveEnglish = resolve;
+    }));
+    resetLocaleForTests(loader);
+    const store = useUiStore();
+    await store.load();
+
+    store.setLanguage("en-US");
+    expect(loader).toHaveBeenCalledTimes(1);
+    store.setLanguage("zh-CN");
+    await flushPromises();
+    resolveEnglish({ default: enUS });
+    await flushPromises();
+
+    expect(store.language).toBe("zh-CN");
+    expect(getLocale()).toBe("zh-CN");
+    expect(t("nav.home")).toBe("首页");
+    expect(document.documentElement.lang).toBe("zh-CN");
+    expect(ipcMock.updateSetting).toHaveBeenCalledWith("language", "zh-CN");
+    expect(ipcMock.updateSetting).not.toHaveBeenCalledWith("language", "en-US");
   });
 
 });

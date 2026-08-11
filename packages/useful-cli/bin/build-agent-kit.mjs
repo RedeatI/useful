@@ -99,6 +99,7 @@ const COMPUTER_USE_BROWSER_ADAPTER_PROVENANCE_FILES = Object.freeze([
 const ACTION_RUNTIME_PROVENANCE_FILES = Object.freeze([
   "action-suggest.mjs",
   "builtins.mjs",
+  "catalog.mjs",
   "recipe.mjs",
   "semantics.mjs",
   "node-hash.mjs",

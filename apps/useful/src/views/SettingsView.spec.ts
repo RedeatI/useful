@@ -3,9 +3,11 @@ import { flushPromises, mount } from "@vue/test-utils";
 import { createPinia, setActivePinia } from "pinia";
 import { createRouter, createWebHistory } from "vue-router";
 import type { AppUpdateSourceInfo } from "@/lib/types";
-import { setLocale } from "@/i18n";
+import { getLocale, resetLocaleForTests, t } from "@/i18n";
+import enUS from "@/i18n/en-US";
 
 const ipcMock = vi.hoisted(() => ({
+  getSettings: vi.fn().mockResolvedValue({ theme: "system", language: "zh-CN", developerMode: false, sidebarCollapsed: false }),
   updateSetting: vi.fn().mockResolvedValue(undefined),
   openPath: vi.fn().mockResolvedValue(undefined),
   diagnosticsPreview: vi.fn().mockResolvedValue([]),
@@ -62,7 +64,7 @@ describe("SettingsView", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     localStorage.clear();
-    setLocale("zh-CN");
+    resetLocaleForTests(async () => ({ default: enUS }));
     ipcMock.appUpdateSourceGet.mockResolvedValue(updateSource());
     setActivePinia(createPinia());
   });
@@ -81,9 +83,11 @@ describe("SettingsView", () => {
     const ui = useUiStore();
     const locale = wrapper.get("select.useful-select");
     await locale.setValue("en-US");
+    await flushPromises();
     expect(ui.language).toBe("en-US");
     expect(wrapper.get("h1").text()).toBe("Settings");
     expect(document.documentElement.lang).toBe("en-US");
+    expect(ipcMock.updateSetting).toHaveBeenCalledWith("language", "en-US");
 
     const layout = wrapper.get('[data-testid="navigation-layout-settings"]');
     const settingsRow = layout.findAll("li").find((row) => row.text().includes("Settings"))!;
@@ -95,6 +99,71 @@ describe("SettingsView", () => {
     await moveHomeDown.trigger("click");
     expect(ui.navigationLayout.nav.slice(0, 2).map((item) => item.id)).toEqual(["library", "home"]);
     expect(JSON.parse(localStorage.getItem("useful.navigation-layout.v1")!).nav.slice(0, 2).map((item: { id: string }) => item.id)).toEqual(["library", "home"]);
+  });
+
+  it("lets a visible pending English hydration be changed back to Chinese", async () => {
+    let resolveEnglish!: (module: { default: Record<string, unknown> }) => void;
+    resetLocaleForTests(vi.fn(() => new Promise<{ default: Record<string, unknown> }>((resolve) => {
+      resolveEnglish = resolve;
+    })));
+    ipcMock.getSettings.mockResolvedValueOnce({ theme: "system", language: "en-US", developerMode: false, sidebarCollapsed: false });
+    const wrapper = mountView();
+    const ui = useUiStore();
+    const loading = ui.load();
+
+    await flushPromises();
+    const locale = wrapper.get("select.useful-select");
+    expect((locale.element as HTMLSelectElement).value).toBe("en-US");
+    expect(ui.requestedLanguage).toBe("en-US");
+    expect(ui.language).toBe("zh-CN");
+
+    await locale.setValue("zh-CN");
+    await flushPromises();
+    expect(ui.requestedLanguage).toBe("zh-CN");
+    expect(ipcMock.updateSetting).toHaveBeenCalledWith("language", "zh-CN");
+
+    resolveEnglish({ default: enUS });
+    await loading;
+    await flushPromises();
+
+    expect((locale.element as HTMLSelectElement).value).toBe("zh-CN");
+    expect(ui.language).toBe("zh-CN");
+    expect(ui.requestedLanguage).toBe("zh-CN");
+    expect(getLocale()).toBe("zh-CN");
+    expect(t("nav.home")).toBe("首页");
+    expect(document.documentElement.lang).toBe("zh-CN");
+    expect(ipcMock.updateSetting.mock.calls.filter(([key]) => key === "language")).toEqual([
+      ["language", "zh-CN"],
+    ]);
+  });
+
+  it("rolls the native select back after persisted English hydration fails", async () => {
+    let rejectEnglish!: (reason: Error) => void;
+    resetLocaleForTests(vi.fn(() => new Promise<{ default: Record<string, unknown> }>((_resolve, reject) => {
+      rejectEnglish = reject;
+    })));
+    ipcMock.getSettings.mockResolvedValueOnce({ theme: "system", language: "en-US", developerMode: false, sidebarCollapsed: false });
+    const wrapper = mountView();
+    const ui = useUiStore();
+    const loading = ui.load();
+
+    await flushPromises();
+    const locale = wrapper.get("select.useful-select");
+    expect((locale.element as HTMLSelectElement).value).toBe("en-US");
+    expect(ui.requestedLanguage).toBe("en-US");
+    expect(ui.language).toBe("zh-CN");
+
+    rejectEnglish(new Error("chunk unavailable"));
+    await loading;
+    await flushPromises();
+
+    expect((locale.element as HTMLSelectElement).value).toBe("zh-CN");
+    expect(ui.language).toBe("zh-CN");
+    expect(ui.requestedLanguage).toBe("zh-CN");
+    expect(getLocale()).toBe("zh-CN");
+    expect(t("nav.home")).toBe("首页");
+    expect(document.documentElement.lang).toBe("zh-CN");
+    expect(ipcMock.updateSetting).not.toHaveBeenCalledWith("language", "en-US");
   });
 
   it("offers the nightly update channel", async () => {
