@@ -46,6 +46,11 @@ Windows 进程观测和第三方工具扩展能力。
   `documentAuthenticated: false`：Schema/parser 通过只校验结构与 endpoint 绑定，不认证执行。verifier 不会
   执行生成的宿主 `commandArgv`，也不读写宿主配置；不认证 Codex/Claude 已安装、已配置或会接受候选。
   V1 拒绝 `USEFUL_PROFILE`，也不宣称 profile 绑定、签名、来源、sidecar、发布状态或 launcher 无网络访问。
+- **全宿主候选验证：** `agent verify-all --launcher <fixed-entry> --json` 只运行一次 MCP self-probe，并按
+  `codex`、`claude-code`、`claude-desktop`、`mcp-servers-json` 固定顺序生成四个 user-scope 候选；要么四项
+  全部返回，要么整体失败，不产生部分集合。candidate-ready 与所有值为 true 的 claim 也只是本进程自报，
+  Schema/parser 通过不认证执行。verifier 不执行 Codex、Claude、browser 或 input 命令，不读写宿主配置，
+  不接受 profile，也不认证外部 Agent 已安装、已配置、已连接或会接受候选。
 - **离线 Computer Use 能力自检：** `computer-use probe --json` 校验包内 `useful.computer-use.v1`
   合同、固定 9 项动作类型闭集、默认 controller 仍禁用、`host-desktop` 被拒绝，以及宿主注入 browser adapter
   接口存在。`useful.computer-use-probe.v1` 的 claims 只是本机自报，且
@@ -117,6 +122,8 @@ pnpm useful -- agent export --target codex --launcher C:\ABSOLUTE\useful-mcp.mjs
 pnpm useful -- computer-use probe --json
 pnpm useful -- agent probe --json
 pnpm useful -- agent verify --target codex --launcher C:\ABSOLUTE\PATH\TO\tools\packages\useful-mcp\bin\useful-mcp.mjs --json
+pnpm useful -- agent verify-all --launcher C:\ABSOLUTE\PATH\TO\tools\packages\useful-mcp\bin\useful-mcp.mjs --json
+C:\ABSOLUTE\KIT\bin\useful.cmd agent verify-all --launcher C:\ABSOLUTE\KIT\lib\useful-mcp.mjs --json
 ```
 
 plan/export 的 target 闭集为 `codex`、`claude-code`、`claude-desktop`、`mcp-servers-json`。导出仅写 stdout、
@@ -130,6 +137,10 @@ plan/export 的 target 闭集为 `codex`、`claude-code`、`claude-desktop`、`m
 parser 通过也不认证任何自报的本地执行，
 也不会让 current-host 路径变得可移植。endpoint 只绑定 node/launcher 路径和安装身份，不绑定 env/cwd，
 也不会执行或应用候选。
+`agent verify-all` 只接受固定 launcher 与 `--json`，没有 target、scope、project、env、profile、config、apply 或
+install 参数。它只运行一次 MCP self-probe，再把上述固定顺序的四项 user-scope 验证作为一个 all-or-nothing
+`useful.agent-connection-verification-set.v1` 文档输出。40/36/4 数量与工具名哈希和 `agent verify` 使用同一闭集；
+所有 claims（包括值为 true 的 claims）都只是 self-reported。
 
 `packages/useful-runtime` 提供 JSON 运行时，`packages/useful-mcp` 通过 stdio 暴露同一份 Action
 注册表。两者目前都属于需要 Node.js 的开发入口，尚未作为独立二进制发布。MCP 另外保留

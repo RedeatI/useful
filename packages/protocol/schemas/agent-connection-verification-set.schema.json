@@ -1,0 +1,169 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.useful.example/agent/useful.agent-connection-verification-set.v1.schema.json",
+  "title": "Useful Agent Connection Verification Set V1",
+  "description": "A portable, self-reported set of exactly four Useful MCP stdio connection candidates bound to one canonical local probe. It is not authenticated and does not prove execution, external-Agent installation, configuration or connection, or host-configuration reads or writes.",
+  "$comment": "This JSON Schema and parseAgentConnectionVerificationSet validate a closed document shape, ordered canonical target coverage, nested verification structure and fixed claims. They do not authenticate that create/verify execution occurred or that any external Agent is installed, configured or connected. They do not read or write host configuration. The true in-current-process fields are self-reported document semantics, not authenticated evidence.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "kind", "status", "claimScope", "claims", "verifications"],
+  "properties": {
+    "schemaVersion": { "const": "useful.agent-connection-verification-set.v1" },
+    "kind": { "const": "mcp-stdio-connection-verification-set" },
+    "status": { "const": "candidate-ready" },
+    "claimScope": { "const": "useful-mcp-local-stdio-connection-candidates-self-reported" },
+    "claims": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["documentAuthenticated", "setGeneratedInCurrentProcess", "singleProbeUsedForAllCandidatesInCurrentProcess", "fixedUsefulLauncherMatchedInCurrentProcess", "hostCommandExecutedByVerifier", "hostConfigReadByVerifier", "hostConfigWrittenByVerifier", "externalAgentInstalledAttested", "externalAgentConfiguredAttested", "externalAgentConnectedAttested"],
+      "properties": {
+        "documentAuthenticated": { "const": false },
+        "setGeneratedInCurrentProcess": { "const": true },
+        "singleProbeUsedForAllCandidatesInCurrentProcess": { "const": true },
+        "fixedUsefulLauncherMatchedInCurrentProcess": { "const": true },
+        "hostCommandExecutedByVerifier": { "const": false },
+        "hostConfigReadByVerifier": { "const": false },
+        "hostConfigWrittenByVerifier": { "const": false },
+        "externalAgentInstalledAttested": { "const": false },
+        "externalAgentConfiguredAttested": { "const": false },
+        "externalAgentConnectedAttested": { "const": false }
+      }
+    },
+    "verifications": {
+      "type": "array",
+      "minItems": 4,
+      "maxItems": 4,
+      "prefixItems": [
+        {
+          "allOf": [
+            { "$ref": "https://schemas.useful.example/agent/useful.agent-connection-verification.v1.schema.json" },
+            {
+              "type": "object",
+              "required": ["connection"],
+              "properties": {
+                "connection": {
+                  "type": "object",
+                  "required": ["plan"],
+                  "properties": {
+                    "plan": {
+                      "type": "object",
+                      "required": ["target", "scope", "server"],
+                      "properties": {
+                        "target": { "const": "codex" },
+                        "scope": { "const": "user" },
+                        "server": {
+                          "type": "object",
+                          "required": ["env"],
+                          "properties": {
+                            "env": { "type": "object", "maxProperties": 0 }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            { "$ref": "https://schemas.useful.example/agent/useful.agent-connection-verification.v1.schema.json" },
+            {
+              "type": "object",
+              "required": ["connection"],
+              "properties": {
+                "connection": {
+                  "type": "object",
+                  "required": ["plan"],
+                  "properties": {
+                    "plan": {
+                      "type": "object",
+                      "required": ["target", "scope", "server"],
+                      "properties": {
+                        "target": { "const": "claude-code" },
+                        "scope": { "const": "user" },
+                        "server": {
+                          "type": "object",
+                          "required": ["env"],
+                          "properties": {
+                            "env": { "type": "object", "maxProperties": 0 }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            { "$ref": "https://schemas.useful.example/agent/useful.agent-connection-verification.v1.schema.json" },
+            {
+              "type": "object",
+              "required": ["connection"],
+              "properties": {
+                "connection": {
+                  "type": "object",
+                  "required": ["plan"],
+                  "properties": {
+                    "plan": {
+                      "type": "object",
+                      "required": ["target", "scope", "server"],
+                      "properties": {
+                        "target": { "const": "claude-desktop" },
+                        "scope": { "const": "user" },
+                        "server": {
+                          "type": "object",
+                          "required": ["env"],
+                          "properties": {
+                            "env": { "type": "object", "maxProperties": 0 }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            { "$ref": "https://schemas.useful.example/agent/useful.agent-connection-verification.v1.schema.json" },
+            {
+              "type": "object",
+              "required": ["connection"],
+              "properties": {
+                "connection": {
+                  "type": "object",
+                  "required": ["plan"],
+                  "properties": {
+                    "plan": {
+                      "type": "object",
+                      "required": ["target", "scope", "server"],
+                      "properties": {
+                        "target": { "const": "mcp-servers-json" },
+                        "scope": { "const": "user" },
+                        "server": {
+                          "type": "object",
+                          "required": ["env"],
+                          "properties": {
+                            "env": { "type": "object", "maxProperties": 0 }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          ]
+        }
+      ],
+      "items": false
+    }
+  }
+}

@@ -19,6 +19,10 @@
       "types": "./src/agent-connection-verification.d.ts",
       "import": "./src/agent-connection-verification.mjs"
     },
+    "./agent-connection-verification-set": {
+      "types": "./src/agent-connection-verification-set.d.ts",
+      "import": "./src/agent-connection-verification-set.mjs"
+    },
     "./agent-integration": {
       "types": "./src/agent-integration.d.ts",
       "import": "./src/agent-integration.mjs"
@@ -39,6 +43,7 @@
     "*": {
       "agent-connection": ["src/agent-connection.d.ts"],
       "agent-connection-verification": ["src/agent-connection-verification.d.ts"],
+      "agent-connection-verification-set": ["src/agent-connection-verification-set.d.ts"],
       "agent-integration": ["src/agent-integration.d.ts"],
       "agent-probe": ["src/agent-probe.d.ts"],
       "computer-use-probe": ["src/computer-use-probe.d.ts"]
