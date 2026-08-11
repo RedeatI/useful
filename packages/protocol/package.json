@@ -27,6 +27,10 @@
       "types": "./src/agent-probe.d.ts",
       "import": "./src/agent-probe.mjs"
     },
+    "./computer-use-probe": {
+      "types": "./src/computer-use-probe.d.ts",
+      "import": "./src/computer-use-probe.mjs"
+    },
     "./schemas/*": "./schemas/*",
     "./openapi/*": "./openapi/*",
     "./src/*": "./src/*"
@@ -36,7 +40,8 @@
       "agent-connection": ["src/agent-connection.d.ts"],
       "agent-connection-verification": ["src/agent-connection-verification.d.ts"],
       "agent-integration": ["src/agent-integration.d.ts"],
-      "agent-probe": ["src/agent-probe.d.ts"]
+      "agent-probe": ["src/agent-probe.d.ts"],
+      "computer-use-probe": ["src/computer-use-probe.d.ts"]
     }
   },
   "scripts": {

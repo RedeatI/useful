@@ -236,6 +236,12 @@ importers:
       '@useful/agent-integrations':
         specifier: workspace:^
         version: link:../agent-integrations
+      '@useful/computer-use-browser-adapter':
+        specifier: workspace:^
+        version: link:../computer-use-browser-adapter
+      '@useful/computer-use-contract':
+        specifier: workspace:^
+        version: link:../computer-use-contract
       '@useful/plugin-actions':
         specifier: workspace:^
         version: link:../plugin-actions

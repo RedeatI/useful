@@ -79,6 +79,45 @@ close state，每次 acquisition 分别持有 driver/guard claim。guard pending
 唯一共享 close promise 并调用 raw close。共享 identity、跨角色引用环和并发 reap 因此
 只能保留/推进 tombstone，不能绕过 driver→guard 顺序提前释放。
 
+## 离线能力自检
+
+源码工作树可运行：
+
+```powershell
+pnpm useful -- computer-use probe --json
+```
+
+Agent Kit 解压后可运行：
+
+```powershell
+& "<ABS_KIT>\bin\useful.cmd" computer-use probe --json
+```
+
+```bash
+"<ABS_KIT>/bin/useful" computer-use probe --json
+```
+
+命令的能力检查只针对包内 `@useful/computer-use-contract`、
+`@useful/computer-use-browser-adapter` 接口和协议 parser，检查 `useful.computer-use.v1`、
+`isolated-browser`/`isolated-vm` 闭集、9 项动作类型及其 SHA-256
+`a9bce07e51d533f830833d94ddc5fd53ae7f0b837da31edc8b68f64394a10cf7`、默认空域名
+allowlist、默认 controller 的 `COMPUTER_USE_DISABLED` 拒绝，以及 `host-desktop` 的固定拒绝。
+browser adapter factory 只检查为接口存在，不会被调用。输出是严格的
+`useful.computer-use-probe.v1`，其中 `capabilities.cliExecutionAvailable`、
+`defaultProviderEnabled`、`executableBrowserProviderPresent`、`isolatedVmAdapterPresent`、
+`modelAdapterPresent`、`actionRegistered`、`mcpRegistered` 和 `guiRegistered` 均为 `false`。
+这些字段表示默认 provider 未启用，且不提供自包含 browser/VM provider；包内仅含必须由宿主注入、
+probe 只检查接口而不会调用的 browser-adapter factory。
+
+该自检只证明本次进程观察到的离线、默认禁用能力面。其 `claimScope` 明确为 local
+self-reported，`claims.documentAuthenticated` 固定为 `false`；Schema/parser 通过不会认证文档或执行。
+命令不接受 provider、URL、launcher、module、profile、env、action、apply、config 或 output 覆盖，
+不启动浏览器、不联网、不注入鼠标/键盘输入、不读写 Agent/浏览器宿主配置、不启用默认 provider，也不调用
+宿主注入 adapter factory；它不注册 Action、MCP 工具或 GUI。它不证明真实浏览器/VM 隔离、DNS/socket/redirect 强制、操作系统级
+输入隔离、外部模型或 Agent 已集成，也不扩大默认 36 个 Action 与 40 个 MCP tool 的闭集。
+source 模式的 `artifactVerified` 固定为 `false`；Agent Kit 中的 `true` 仍只表示本地 MANIFEST
+字节数/哈希闭集匹配，不表示签名、来源、sidecar 或发布授权。运行后默认 provider 仍保持 disabled。
+
 ```js
 import { createComputerUseController } from "@useful/computer-use-contract";
 

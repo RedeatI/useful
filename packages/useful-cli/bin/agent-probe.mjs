@@ -33,8 +33,14 @@ const REQUIRED_AGENT_KIT_FILES = Object.freeze([
   "bin/useful-runtime",
   "bin/useful-runtime.cmd",
   "lib/office-worker-thread.mjs",
+  "lib/provenance/computer-use-browser-adapter/index.d.ts",
+  "lib/provenance/computer-use-browser-adapter/index.mjs",
+  "lib/provenance/computer-use-contract/index.d.ts",
+  "lib/provenance/computer-use-contract/index.mjs",
   "lib/provenance/protocol/agent-probe.d.ts",
   "lib/provenance/protocol/agent-probe.mjs",
+  "lib/provenance/protocol/computer-use-probe.d.ts",
+  "lib/provenance/protocol/computer-use-probe.mjs",
   "lib/regex-worker-thread.mjs",
   "lib/useful-mcp.mjs",
   "lib/useful-runtime.mjs",
@@ -46,6 +52,7 @@ const REQUIRED_AGENT_KIT_FILES = Object.freeze([
   "licenses/README.md",
   "package.json",
   "schemas/agent-probe.schema.json",
+  "schemas/computer-use-probe.schema.json",
 ]);
 const EXPECTED_HELPER_ORDER = Object.freeze([
   "useful.actions.search",
@@ -674,6 +681,7 @@ export const agentProbeTesting = Object.freeze({
   executeProbe,
   expectedActionNames: EXPECTED_ACTION_NAMES,
   expectedHelperOrder: EXPECTED_HELPER_ORDER,
+  requiredAgentKitFiles: REQUIRED_AGENT_KIT_FILES,
   verifyAgentKit,
   verifySourceLayout,
 });

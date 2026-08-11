@@ -201,12 +201,14 @@ allowlist，不会注册缺失 entry、授予权限或生成确认。CLI 只从�
 ```powershell
 & "<ABS_KIT>\bin\useful.cmd" agent-contract --json
 & "<ABS_KIT>\bin\useful-runtime.cmd" actions list --json
+& "<ABS_KIT>\bin\useful.cmd" computer-use probe --json
 & "<ABS_KIT>\bin\useful.cmd" agent verify --target codex --launcher "<ABS_KIT>\lib\useful-mcp.mjs" --json
 ```
 
 ```bash
 "<ABS_KIT>/bin/useful" agent-contract --json
 "<ABS_KIT>/bin/useful-runtime" actions list --json
+"<ABS_KIT>/bin/useful" computer-use probe --json
 "<ABS_KIT>/bin/useful" agent verify --target codex --launcher "<ABS_KIT>/lib/useful-mcp.mjs" --json
 ```
 
@@ -224,10 +226,11 @@ MCP host 推荐绕过 shell launcher，直接配置 `node <ABS_KIT>/lib/useful-m
 ```
 
 归档包含 5 个自包含 bundle：3 个命令入口 `useful.mjs`、`useful-runtime.mjs`、`useful-mcp.mjs`，以及
-`regex-worker-thread.mjs`、`office-worker-thread.mjs` 两个固定 worker。descriptor/source digest 使用
-`lib/provenance/action-runtime`、`lib/provenance/office-core`、`lib/provenance/host-actions` 和
-`lib/provenance/protocol` 中随包保存的
-规范化源码字节，不对压缩后的 bundle 自身或本机路径取摘要。构建器还会根据实际 bundle 输入生成
+`regex-worker-thread.mjs`、`office-worker-thread.mjs` 两个固定 worker。Action descriptor/source digest 仍只使用
+`lib/provenance/action-runtime`、`lib/provenance/office-core` 与 `lib/provenance/host-actions` 中随包保存的
+规范化源码字节，不对压缩后的 bundle 自身或本机路径取摘要。Computer Use contract、browser-adapter 与
+protocol probe provenance 则只作为 MANIFEST 闭集文件保存，并逐项绑定 size/SHA-256；它们不参与
+descriptor/source digest。构建器还会根据实际 bundle 输入生成
 `THIRD_PARTY-LICENSES.json`，并把每个依赖包的许可证/notice 原文放在
 `third-party/<package>/<version>/`；缺少包名、版本、license metadata 或许可证文件会 fail closed。
 
@@ -300,6 +303,38 @@ point，要求 node/launcher 为常规文件、当前 Node 为 20 或更高版�
 秘密型环境变量和未列入安全闭集的 env 都会失败。
 唯一允许的可选 env 是 `NO_COLOR=1`、`USEFUL_LOG_LEVEL=error|warn|info`，或受限格式的 `USEFUL_PROFILE`；
 密钥、token、密码、PATH 和任意自定义环境变量均不接受。
+
+## Computer Use 离线能力自检（Computer Use Probe V1）
+
+源码入口：
+
+```powershell
+pnpm useful -- computer-use probe --json
+```
+
+Agent Kit 入口见上文的 `bin/useful` / `bin\useful.cmd` 示例。该命令的能力检查只针对当前安装中固定的
+Computer Use contract、host-injected browser adapter 接口与协议 parser，并返回严格的
+`useful.computer-use-probe.v1`。`useful agent-contract --json` 的
+`commands.computerUseProbe` 与 `commandSequence` 同时公布固定命令
+`useful computer-use probe --json`。Schema 与 parser 位于
+`packages/protocol/schemas/computer-use-probe.schema.json` 和
+`packages/protocol/src/computer-use-probe.mjs`。
+
+probe 固定检查 `useful.computer-use.v1`、`isolated-browser`/`isolated-vm`、9 项动作类型及
+SHA-256 `a9bce07e51d533f830833d94ddc5fd53ae7f0b837da31edc8b68f64394a10cf7`、默认空域名
+allowlist、默认 controller 返回 `COMPUTER_USE_DISABLED`，以及 `host-desktop` 被拒绝。它只确认
+browser adapter factory 接口存在；该 factory 必须由宿主注入，probe 绝不调用。能力字段明确报告：CLI 只有
+probe、没有执行能力；默认 provider 未启用，不提供自包含 browser/VM provider；isolated-VM adapter、模型
+adapter、Action/MCP/GUI 注册均不存在。运行前后默认 provider 仍为 disabled，默认 Action/MCP
+闭集仍是 36/40，不增加第 37 个 Action、第 41 个 MCP tool 或新的 Agent Kit bundle。
+
+结果的 `claimScope` 固定为 local self-reported，`claims.documentAuthenticated` 为 `false`。
+Schema/parser 通过不认证执行；`artifactVerified` 在 source 为 `false`，在 Agent Kit 为 `true` 时也只表示本地
+MANIFEST 字节数/哈希闭集，不表示签名、来源、sidecar 或发布授权。命令不接受 provider、URL、launcher、
+module、profile、env、action、apply、config 或 output 覆盖，不启动浏览器、不联网、不注入输入、不读写宿主
+配置、不启用默认 provider，也不调用唯一的宿主注入 adapter factory；它不注册 Action、MCP 工具或 GUI，
+也不证明真实 browser/VM 隔离、网络
+强制、外部模型/Agent 集成或操作系统级阻断；这些仍需要精确 provider、sandbox、网络层与目标平台证据。
 
 ## 当前 MCP 自检（Agent Probe V1）
 

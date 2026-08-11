@@ -57,6 +57,14 @@ Agent host.
   read/write host configuration. It does not attest that Codex/Claude is installed, configured, or
   will accept the candidate; V1 rejects `USEFUL_PROFILE` and makes no profile-bound, signature,
   origin, sidecar, publication, or launcher-network claim.
+- **Offline Computer Use capability probe:** `computer-use probe --json` validates the bundled
+  `useful.computer-use.v1` contract, fixed nine-action-type closure, disabled default controller,
+  host-desktop rejection, and the presence of the host-injected browser-adapter interface. Its
+  `useful.computer-use-probe.v1` claims are local and self-reported with
+  `documentAuthenticated: false`. It does not start a browser, use the network, inject input,
+  read or write host configuration, enable a provider, or register an Action, MCP tool, or GUI feature.
+  There is no enabled or self-contained browser/VM provider: only a host-injected browser-adapter
+  factory is included, and the probe checks its interface without calling it.
 
 The interface is available in Simplified Chinese and English, with light and dark themes. Portable
 mode is supported on Windows by placing `portable.flag` next to `Useful.exe`; data is then stored in
@@ -122,6 +130,7 @@ Generate or diagnose a host-specific stdio configuration without writing it:
 pnpm useful -- agent plan --target codex --launcher C:\ABSOLUTE\useful-mcp.mjs --json
 pnpm useful -- agent doctor --target claude-code --launcher C:\ABSOLUTE\useful-mcp.mjs --json
 pnpm useful -- agent export --target codex --launcher C:\ABSOLUTE\useful-mcp.mjs --json
+pnpm useful -- computer-use probe --json
 pnpm useful -- agent probe --json
 pnpm useful -- agent verify --target codex --launcher C:\ABSOLUTE\PATH\TO\tools\packages\useful-mcp\bin\useful-mcp.mjs --json
 ```
@@ -172,8 +181,13 @@ default 36. A source checkout can opt in with `--host-config`: the CLI also requ
 never invents user confirmation. The pack still needs real-platform and release-candidate validation.
 
 The repository also contains a provider-neutral [Computer Use contract](docs/COMPUTER-USE.md) for
-future isolated-browser or isolated-VM adapters. It is disabled by default, has no executable
-provider, is not registered as an Action or MCP tool, and cannot control the host desktop.
+future isolated-browser or isolated-VM adapters. It is disabled by default and has no enabled or
+self-contained browser/VM provider; it contains only the host-injected adapter factory that the probe
+does not call. It is not registered as an Action or MCP tool and cannot control the host desktop. The
+offline capability probe reports the exact action-type closure SHA-256
+`a9bce07e51d533f830833d94ddc5fd53ae7f0b837da31edc8b68f64394a10cf7`; parser or probe success
+does not authenticate the document or prove real isolation, network enforcement, external-model
+integration, or platform execution. The default MCP surface remains 40 tools = 36 Actions + 4 helpers.
 
 The Agent Kit builder produces a local candidate with `publicationAuthorized: false`; building it
 does not grant release authority. An Agent Kit is officially available only when the controlled
