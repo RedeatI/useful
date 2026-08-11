@@ -399,6 +399,7 @@ describe("Useful Agent Kit builder", () => {
       "lib/provenance/protocol/computer-use-probe.mjs",
       "lib/provenance/action-runtime/action-suggest.mjs",
       "lib/provenance/action-runtime/builtins.mjs",
+      "lib/provenance/action-runtime/catalog.mjs",
       "lib/provenance/action-runtime/office-worker-thread.mjs",
       "lib/provenance/action-runtime/recipe.mjs",
       "lib/provenance/action-runtime/regex-worker-thread.mjs",
@@ -416,6 +417,20 @@ describe("Useful Agent Kit builder", () => {
       "schemas/computer-use-probe.schema.json",
       "schemas/package-manifest.schema.json",
     ]));
+    expect(listed.filter((entry) => entry.startsWith("lib/provenance/action-runtime/"))).toEqual([
+      "lib/provenance/action-runtime/action-suggest.mjs",
+      "lib/provenance/action-runtime/builtins.mjs",
+      "lib/provenance/action-runtime/catalog.mjs",
+      "lib/provenance/action-runtime/node-hash.mjs",
+      "lib/provenance/action-runtime/node-office.mjs",
+      "lib/provenance/action-runtime/node-regex.mjs",
+      "lib/provenance/action-runtime/office-actions.mjs",
+      "lib/provenance/action-runtime/office-worker-thread.mjs",
+      "lib/provenance/action-runtime/recipe.mjs",
+      "lib/provenance/action-runtime/regex-worker-thread.mjs",
+      "lib/provenance/action-runtime/semantics.mjs",
+      "lib/provenance/action-runtime/utility-actions.mjs",
+    ]);
     expect(listed.filter((entry) => /^lib\/[^/]+\.mjs$/.test(entry)).sort()).toEqual([
       "lib/office-worker-thread.mjs",
       "lib/regex-worker-thread.mjs",
@@ -490,6 +505,10 @@ describe("Useful Agent Kit builder", () => {
     const kitRoot = path.join(fixture.outer, "中文 解压 目录");
     fs.mkdirSync(kitRoot);
     extract(inspected.entries, kitRoot);
+    expect(fs.readFileSync(path.join(kitRoot, "lib/provenance/action-runtime/catalog.mjs"))).toEqual(Buffer.from(
+      fs.readFileSync(path.join(fixture.fixtureRoot, "packages/action-runtime/src/catalog.mjs"), "utf8").replace(/\r\n?/g, "\n"),
+      "utf8",
+    ));
     const contract = runLauncher(kitRoot, "useful", ["agent-contract", "--json"]);
     const contractData = expectJsonSuccess(contract);
     expect(contractData.product).toBeUndefined();

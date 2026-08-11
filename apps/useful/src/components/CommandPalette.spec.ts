@@ -24,7 +24,7 @@ import { useUiStore } from "@/stores/ui";
 
 let mounted: ReturnType<typeof mount> | null = null;
 
-async function openPalette() {
+async function openPalette(initiallyOpen = false) {
   const router = createRouter({
     history: createWebHistory(),
     routes: [
@@ -39,8 +39,9 @@ async function openPalette() {
   });
   await router.push("/");
   await router.isReady();
+  useUiStore().commandPaletteOpen = initiallyOpen;
   mounted = mount(CommandPalette, { global: { plugins: [router] } });
-  useUiStore().commandPaletteOpen = true;
+  if (!initiallyOpen) useUiStore().commandPaletteOpen = true;
   await nextTick();
   await nextTick();
   return { router, input: document.body.querySelector<HTMLInputElement>(".palette__input")! };
@@ -232,6 +233,20 @@ describe("CommandPalette accessibility contract", () => {
     input = document.body.querySelector<HTMLInputElement>(".palette__input")!;
     document.body.querySelector<HTMLElement>(".palette-overlay")!
       .dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    await nextTick();
+    await nextTick();
+    expect(document.activeElement).toBe(opener);
+  });
+
+  it("focuses correctly when the lazy component mounts into an already-open state", async () => {
+    const opener = document.createElement("button");
+    document.body.append(opener);
+    opener.focus();
+
+    const { input } = await openPalette(true);
+    expect(document.activeElement).toBe(input);
+
+    input.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
     await nextTick();
     await nextTick();
     expect(document.activeElement).toBe(opener);

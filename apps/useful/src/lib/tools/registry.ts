@@ -3,7 +3,7 @@
 // 新增工具只需在此登记一条 + 写一个组件 + 纯逻辑（+单测），互不影响——“各是一把刀”。
 import type { Component } from "vue";
 import { defineAsyncComponent } from "vue";
-import { BUILTIN_ACTION_DESCRIPTORS } from "@useful/action-runtime/browser";
+import { BUILTIN_ACTION_CATALOG } from "@useful/action-runtime/catalog";
 
 export type UtilCategory = "encode" | "convert" | "generate" | "text" | "web";
 
@@ -388,7 +388,7 @@ const UTIL_RECOMMENDED_ORDER: Readonly<Record<string, number>> = Object.freeze(
   Object.fromEntries(UTIL_TOOLS.map((tool, index) => [tool.id, (index + 1) * 10])),
 );
 const builtinDescriptorById = new Map(
-  BUILTIN_ACTION_DESCRIPTORS.map((descriptor) => [descriptor.actionId, descriptor]),
+  BUILTIN_ACTION_CATALOG.map((descriptor) => [descriptor.actionId, descriptor]),
 );
 
 export function findTool(id: string): UtilTool | undefined {

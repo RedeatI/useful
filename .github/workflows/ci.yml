@@ -82,6 +82,15 @@ jobs:
       - name: 打包 Useful Portable Lite development-trust unsigned preview
         shell: pwsh
         run: powershell -ExecutionPolicy Bypass -File scripts/package-release.ps1 -Edition Lite
+      - name: Measure and enforce CI production size budgets
+        shell: pwsh
+        env:
+          USEFUL_SIZE_EXPECTED_COMMIT: ${{ github.sha }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          & ./scripts/measure-size.ps1 -ExpectedCommit $env:USEFUL_SIZE_EXPECTED_COMMIT
+          pnpm size:check --profile ci --json
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: 上传 Useful Portable Lite development-trust unsigned preview
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:

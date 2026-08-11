@@ -15,6 +15,10 @@ Set-StrictMode -Version Latest
 $RepoRoot = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)
 $OutDir = Join-Path $RepoRoot "dist-release"
 $Cli = Join-Path $RepoRoot "packages\useful-cli\bin\useful.mjs"
+$ExpectedCommit = (& git -C $RepoRoot rev-parse HEAD).Trim()
+if ($LASTEXITCODE -ne 0 -or $ExpectedCommit -cnotmatch '^[0-9a-f]{40}$') {
+  throw "无法读取精确的 40-hex Git HEAD"
+}
 
 function Write-Head($m) { Write-Host "==== $m ====" -ForegroundColor Cyan }
 function Write-Ok($m) { Write-Host "[ OK ] $m" -ForegroundColor Green }
@@ -46,7 +50,9 @@ Track "Rust release build" {
   $prevTrust = $env:USEFUL_ALLOW_DEVELOPMENT_UPDATE_TRUST
   $env:USEFUL_ALLOW_DEVELOPMENT_UPDATE_TRUST = "1"
   try {
-    cargo build --release --locked -p useful-app -p useful-bootstrap
+    pnpm --filter @useful/app tauri build --no-bundle
+    if ($LASTEXITCODE -ne 0) { throw "Tauri release build failed with exit code $LASTEXITCODE" }
+    cargo build --release --locked -p useful-bootstrap
   } finally {
     if ($null -eq $prevTrust) {
       Remove-Item Env:USEFUL_ALLOW_DEVELOPMENT_UPDATE_TRUST -ErrorAction SilentlyContinue
@@ -69,10 +75,14 @@ Track "打包 Useful Portable Lite" {
   }
 }
 
-# 2b. 尺寸报告（写入 artifacts/size，不进入 dist-release 闭集）
-Track "measure size budget baseline" {
-  if (Test-Path (Join-Path $RepoRoot "scripts\measure-size.ps1")) {
-    & (Join-Path $RepoRoot "scripts\measure-size.ps1")
+# 2b. 尺寸报告与生产预算（写入 artifacts/size，不进入 dist-release 闭集）
+Track "measure and enforce production size budget" {
+  Push-Location $RepoRoot
+  try {
+    & (Join-Path $RepoRoot "scripts\measure-size.ps1") -ExpectedCommit $ExpectedCommit
+    pnpm size:check --profile ci --expected-commit $ExpectedCommit --json
+  } finally {
+    Pop-Location
   }
 }
 

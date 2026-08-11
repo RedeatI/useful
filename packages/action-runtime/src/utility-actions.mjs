@@ -1,7 +1,8 @@
 // Browser-safe semantics for the remaining built-in utilities. Node-only adapters
 // (CSPRNG provenance and the terminable regex worker) are injected by builtins.mjs.
 import YAML from "yaml";
-import { ACTION_IDS, ERROR_CODES } from "./semantics.mjs";
+import { ACTION_IDS, createBuiltinDescriptorMetadata } from "./catalog.mjs";
+import { ERROR_CODES } from "./semantics.mjs";
 
 const DRAFT = "https://json-schema.org/draft/2020-12/schema";
 const MAX_TEXT = 1048576;
@@ -43,49 +44,25 @@ function assertExactObject(input, required, optional = []) {
 }
 
 function descriptor(sourceDigest, options) {
+  const metadata = createBuiltinDescriptorMetadata(options.actionId, sourceDigest);
   return {
-    contractVersion: "1.0",
-    actionId: options.actionId,
-    version: "1.0.0",
-    source: {
-      kind: "builtin",
-      toolId: "builtin.utilities",
-      publisher: { id: "useful.project", name: "Useful" },
-      digest: sourceDigest,
-    },
-    title: options.title,
-    description: options.description,
-    keywords: options.keywords,
-    aliases: options.aliases ?? [],
+    ...metadata,
     inputSchema: options.inputSchema,
     outputSchema: options.outputSchema,
     examples: options.examples ?? [],
     testVectors: options.testVectors,
     execution: {
-      mode: options.executionMode ?? "pure",
+      ...metadata.execution,
       handler: options.actionId,
       timeoutMs: options.timeoutMs ?? 2000,
       maxInputBytes: options.maxInputBytes ?? 1048576,
       maxOutputBytes: options.maxOutputBytes ?? MAX_OUTPUT,
       supportsCancellation: options.supportsCancellation ?? false,
     },
-    behavior: {
-      readOnly: true,
-      destructive: false,
-      idempotent: options.idempotent ?? true,
-      openWorld: false,
-      sideEffects: [],
-      requiresConfirmation: false,
-    },
-    permissions: { required: [], capabilities: [] },
     sensitive: {
       input: options.sensitiveInput ?? [],
       output: options.sensitiveOutput ?? [],
       redactLogs: true,
-    },
-    presentation: {
-      route: `/tools/utilities/${options.actionId.split(".").at(-1)}`,
-      category: options.category,
     },
   };
 }
@@ -101,80 +78,77 @@ export function createAdditionalBuiltinDescriptors(sourceDigest) {
   if (!/^[a-f0-9]{64}$/.test(sourceDigest)) throw new TypeError("sourceDigest must be SHA-256 hex");
   const entries = [
     descriptor(sourceDigest, {
-      actionId: ACTION_IDS.URL, title: "URL encode/decode", description: "Encode text as a URL component or decode percent-encoded text.",
-      keywords: ["url", "percent", "encode", "decode"], category: "encode", sensitiveInput: ["/text"],
+      actionId: ACTION_IDS.URL,
+      sensitiveInput: ["/text"],
       inputSchema: operationTextInput(["encode", "decode"]), outputSchema: object({ text: string(12582912) }), maxOutputBytes: 16777216,
       testVectors: [{ name: "encode", input: { operation: "encode", text: "a b" }, expectedOutput: { text: "a%20b" } }],
     }),
     descriptor(sourceDigest, {
-      actionId: ACTION_IDS.UUID, title: "UUID generator", description: "Generate cryptographically random UUID v4 values.",
-      keywords: ["uuid", "guid", "random"], aliases: ["guid"], category: "generate", idempotent: false,
+      actionId: ACTION_IDS.UUID,
       inputSchema: object({ count: integer(1, 1000) }), outputSchema: object({ values: array(string(36), 1000) }),
       testVectors: [{ name: "reject zero", input: { count: 0 }, expectedErrorCode: ERROR_CODES.INPUT_INVALID }],
     }),
     descriptor(sourceDigest, {
-      actionId: ACTION_IDS.PASSWORD, title: "Password generator", description: "Generate a password with a cryptographically secure random source.",
-      keywords: ["password", "random", "secret"], aliases: ["pwd"], category: "generate", idempotent: false,
+      actionId: ACTION_IDS.PASSWORD,
       sensitiveOutput: ["/password"],
       inputSchema: object({ length: integer(4, 256), lower: boolean(), upper: boolean(), digits: boolean(), symbols: boolean(), excludeAmbiguous: boolean() }),
       outputSchema: object({ password: string(256), entropyBits: integer(0, 4096) }),
       testVectors: [{ name: "reject empty alphabet", input: { length: 16, lower: false, upper: false, digits: false, symbols: false, excludeAmbiguous: false }, expectedErrorCode: ERROR_CODES.INPUT_INVALID }],
     }),
     descriptor(sourceDigest, {
-      actionId: ACTION_IDS.TIMESTAMP, title: "Timestamp converter", description: "Convert a Unix timestamp or strict ISO-8601 UTC string to stable UTC representations.",
-      keywords: ["timestamp", "unix", "iso", "utc"], aliases: ["epoch"], category: "convert", sensitiveInput: ["/value"],
+      actionId: ACTION_IDS.TIMESTAMP,
+      sensitiveInput: ["/value"],
       inputSchema: object({ operation: enumeration("from-unix", "from-iso"), value: string(128) }),
       outputSchema: object({ unixSeconds: integer(-8640000000000, 8640000000000), unixMillis: integer(-8640000000000000, 8640000000000000), iso: string(64), utc: string(64) }),
       testVectors: [{ name: "unix epoch", input: { operation: "from-unix", value: "0" }, expectedOutput: { unixSeconds: 0, unixMillis: 0, iso: "1970-01-01T00:00:00.000Z", utc: "Thu, 01 Jan 1970 00:00:00 GMT" } }],
     }),
     descriptor(sourceDigest, {
-      actionId: ACTION_IDS.BASE_CONVERT, title: "Base converter", description: "Convert an integer between bases 2, 8, 10, and 16 without precision loss.",
-      keywords: ["base", "binary", "octal", "hex"], aliases: ["bin"], category: "convert", sensitiveInput: ["/value"],
+      actionId: ACTION_IDS.BASE_CONVERT,
+      sensitiveInput: ["/value"],
       inputSchema: object({ value: string(4096), fromBase: { type: "integer", enum: [2, 8, 10, 16] }, toBase: { type: "integer", enum: [2, 8, 10, 16] } }),
       outputSchema: object({ value: string(16385) }),
       testVectors: [{ name: "hex to decimal", input: { value: "ff", fromBase: 16, toBase: 10 }, expectedOutput: { value: "255" } }],
     }),
     descriptor(sourceDigest, {
-      actionId: ACTION_IDS.COLOR, title: "Color converter", description: "Convert a HEX color to normalized HEX, RGB, and HSL values.",
-      keywords: ["color", "hex", "rgb", "hsl"], category: "convert",
+      actionId: ACTION_IDS.COLOR,
       inputSchema: object({ hex: string(16) }),
       outputSchema: object({ hex: string(7), rgb: nestedObject({ r: integer(0, 255), g: integer(0, 255), b: integer(0, 255) }), hsl: nestedObject({ h: integer(0, 360), s: integer(0, 100), l: integer(0, 100) }) }),
       testVectors: [{ name: "red", input: { hex: "#f00" }, expectedOutput: { hex: "#ff0000", rgb: { r: 255, g: 0, b: 0 }, hsl: { h: 0, s: 100, l: 50 } } }],
     }),
     descriptor(sourceDigest, {
-      actionId: ACTION_IDS.CASE, title: "Case converter", description: "Convert text between common identifier naming conventions.",
-      keywords: ["case", "camel", "snake", "kebab"], category: "text", sensitiveInput: ["/text"],
+      actionId: ACTION_IDS.CASE,
+      sensitiveInput: ["/text"],
       inputSchema: object({ text: string(), style: enumeration("camel", "pascal", "snake", "kebab", "constant", "title") }), outputSchema: textOutput,
       testVectors: [{ name: "snake", input: { text: "helloWorld", style: "snake" }, expectedOutput: { text: "hello_world" } }],
     }),
     descriptor(sourceDigest, {
-      actionId: ACTION_IDS.REGEX, title: "Regular expression", description: "Test or replace text with a bounded regular expression worker.",
-      keywords: ["regex", "regexp", "match", "replace"], category: "text", sensitiveInput: ["/text"], executionMode: "worker", supportsCancellation: true, timeoutMs: 1000,
+      actionId: ACTION_IDS.REGEX,
+      sensitiveInput: ["/text"], supportsCancellation: true, timeoutMs: 1000,
       inputSchema: object({ operation: enumeration("test", "replace"), pattern: string(4096), flags: string(16), text: string(), replacement: string() }, ["operation", "pattern", "flags", "text"]),
       outputSchema: object({ matches: array(nestedObject({ index: integer(0, MAX_TEXT), match: string(), groups: array(string(), 100) }), 10000), text: string() }, []),
       testVectors: [{ name: "match words", input: { operation: "test", pattern: "a+", flags: "", text: "caaab" }, expectedOutput: { matches: [{ index: 1, match: "aaa", groups: [] }] } }],
     }),
     descriptor(sourceDigest, {
-      actionId: ACTION_IDS.JWT, title: "JWT decoder", description: "Decode JWT header and payload JSON without verifying the signature.",
-      keywords: ["jwt", "token", "decode"], category: "web", sensitiveInput: ["/token"], sensitiveOutput: ["/headerJson", "/payloadJson", "/signature"],
+      actionId: ACTION_IDS.JWT,
+      sensitiveInput: ["/token"], sensitiveOutput: ["/headerJson", "/payloadJson", "/signature"],
       inputSchema: object({ token: string() }), outputSchema: object({ headerJson: string(), payloadJson: string(), signature: string() }),
       testVectors: [{ name: "decode", input: { token: "eyJhbGciOiJub25lIn0.eyJzdWIiOiIxIn0." }, expectedOutput: { headerJson: "{\"alg\":\"none\"}", payloadJson: "{\"sub\":\"1\"}", signature: "" } }],
     }),
     descriptor(sourceDigest, {
-      actionId: ACTION_IDS.HTML, title: "HTML entities", description: "Encode, decode, or strip a bounded set of HTML entities and tags.",
-      keywords: ["html", "entity", "escape"], category: "encode", sensitiveInput: ["/text"],
+      actionId: ACTION_IDS.HTML,
+      sensitiveInput: ["/text"],
       inputSchema: operationTextInput(["encode", "decode", "strip"]), outputSchema: object({ text: string(6291456) }), maxOutputBytes: 8388608,
       testVectors: [{ name: "encode", input: { operation: "encode", text: "<a>" }, expectedOutput: { text: "&lt;a&gt;" } }],
     }),
     descriptor(sourceDigest, {
-      actionId: ACTION_IDS.HEX_TEXT, title: "HEX text", description: "Convert UTF-8 text to hexadecimal bytes or decode hexadecimal bytes to text.",
-      keywords: ["hex", "text", "bytes"], category: "encode", sensitiveInput: ["/text"],
+      actionId: ACTION_IDS.HEX_TEXT,
+      sensitiveInput: ["/text"],
       inputSchema: operationTextInput(["encode", "decode"], { separator: string(8) }), outputSchema: object({ text: string(12582912) }), maxOutputBytes: 16777216,
       testVectors: [{ name: "encode", input: { operation: "encode", text: "A" }, expectedOutput: { text: "41" } }],
     }),
     descriptor(sourceDigest, {
-      actionId: ACTION_IDS.MORSE, title: "Morse code", description: "Encode supported text as Morse code or decode Morse symbols.",
-      keywords: ["morse", "encode", "decode"], category: "encode", sensitiveInput: ["/text"],
+      actionId: ACTION_IDS.MORSE,
+      sensitiveInput: ["/text"],
       inputSchema: operationTextInput(["encode", "decode"]), outputSchema: object({ text: string(8388608) }), maxOutputBytes: 10485760,
       testVectors: [
         { name: "encode", input: { operation: "encode", text: "sos!" }, expectedOutput: { text: "... --- ... -.-.--" } },
@@ -182,50 +156,47 @@ export function createAdditionalBuiltinDescriptors(sourceDigest) {
       ],
     }),
     descriptor(sourceDigest, {
-      actionId: ACTION_IDS.TEXT_STATS, title: "Text statistics", description: "Count characters, non-space characters, words, lines, and UTF-8 bytes.",
-      keywords: ["text", "count", "words", "lines"], category: "text", sensitiveInput: ["/text"],
+      actionId: ACTION_IDS.TEXT_STATS,
+      sensitiveInput: ["/text"],
       inputSchema: object({ text: string() }), outputSchema: object({ chars: integer(0, MAX_TEXT), charsNoSpaces: integer(0, MAX_TEXT), words: integer(0, MAX_TEXT), lines: integer(0, MAX_TEXT), bytes: integer(0, 4194304) }),
       testVectors: [{ name: "counts", input: { text: "a b\n" }, expectedOutput: { chars: 4, charsNoSpaces: 2, words: 2, lines: 2, bytes: 4 } }],
     }),
     descriptor(sourceDigest, {
-      actionId: ACTION_IDS.TEXT_LINES, title: "Text line operations", description: "Trim, filter, deduplicate, sort, and reverse text lines deterministically.",
-      keywords: ["lines", "sort", "dedupe"], category: "text", sensitiveInput: ["/text"],
+      actionId: ACTION_IDS.TEXT_LINES,
+      sensitiveInput: ["/text"],
       inputSchema: object({ text: string(), trim: boolean(), dropEmpty: boolean(), dedupe: boolean(), sort: enumeration("none", "asc", "desc"), reverse: boolean() }), outputSchema: textOutput,
       testVectors: [{ name: "sort", input: { text: "b\na\nb", trim: false, dropEmpty: false, dedupe: true, sort: "asc", reverse: false }, expectedOutput: { text: "a\nb" } }],
     }),
     descriptor(sourceDigest, {
-      actionId: ACTION_IDS.SLUG, title: "Slug generator", description: "Convert text to a lowercase ASCII URL slug.",
-      keywords: ["slug", "url", "kebab"], category: "text", sensitiveInput: ["/text"],
+      actionId: ACTION_IDS.SLUG,
+      sensitiveInput: ["/text"],
       inputSchema: object({ text: string() }), outputSchema: textOutput,
       testVectors: [{ name: "slug", input: { text: "Hello, World!" }, expectedOutput: { text: "hello-world" } }],
     }),
     descriptor(sourceDigest, {
-      actionId: ACTION_IDS.BYTE_SIZE, title: "Byte size", description: "Format a non-negative byte count and return binary-unit breakdowns.",
-      keywords: ["byte", "size", "kib", "mib"], category: "convert",
+      actionId: ACTION_IDS.BYTE_SIZE,
       inputSchema: object({ bytes: number(0, Number.MAX_SAFE_INTEGER) }), outputSchema: object({ text: string(64), breakdown: array(nestedObject({ unit: string(8), value: string(64) }), 8) }),
       testVectors: [{ name: "kibibyte", input: { bytes: 1024 }, expectedOutput: { text: "1 KiB", breakdown: [{ unit: "B", value: "1024" }, { unit: "KiB", value: "1" }, { unit: "MiB", value: "0.000977" }, { unit: "GiB", value: "0.000001" }] } }],
     }),
     descriptor(sourceDigest, {
-      actionId: ACTION_IDS.LOREM, title: "Lorem ipsum", description: "Generate deterministic placeholder paragraphs.",
-      keywords: ["lorem", "ipsum", "placeholder"], category: "generate",
+      actionId: ACTION_IDS.LOREM,
       inputSchema: object({ paragraphs: integer(1, 50), sentences: integer(1, 20) }), outputSchema: textOutput,
       testVectors: [{ name: "reject zero", input: { paragraphs: 0, sentences: 1 }, expectedErrorCode: ERROR_CODES.INPUT_INVALID }],
     }),
     descriptor(sourceDigest, {
-      actionId: ACTION_IDS.DURATION, title: "Duration", description: "Calculate the absolute duration between two strict ISO-8601 UTC instants.",
-      keywords: ["duration", "date", "time"], category: "convert", sensitiveInput: ["/start", "/end"],
+      actionId: ACTION_IDS.DURATION,
+      sensitiveInput: ["/start", "/end"],
       inputSchema: object({ start: string(64), end: string(64) }), outputSchema: object({ totalSeconds: integer(0, Number.MAX_SAFE_INTEGER), negative: boolean(), days: integer(0, Number.MAX_SAFE_INTEGER), hours: integer(0, 23), minutes: integer(0, 59), seconds: integer(0, 59) }),
       testVectors: [{ name: "one day", input: { start: "2020-01-01T00:00:00.000Z", end: "2020-01-02T01:02:03.000Z" }, expectedOutput: { totalSeconds: 90123, negative: false, days: 1, hours: 1, minutes: 2, seconds: 3 } }],
     }),
     descriptor(sourceDigest, {
-      actionId: ACTION_IDS.BYTE_UNIT, title: "Unit converter", description: "Convert length, weight, or temperature units.",
-      keywords: ["unit", "length", "weight", "temperature"], category: "convert",
+      actionId: ACTION_IDS.BYTE_UNIT,
       inputSchema: object({ kind: enumeration("length", "weight", "temperature"), value: number(-1e15, 1e15), from: string(16), to: string(16) }), outputSchema: object({ value: number(-1e25, 1e25) }),
       testVectors: [{ name: "meters", input: { kind: "length", value: 1, from: "km", to: "m" }, expectedOutput: { value: 1000 } }],
     }),
     descriptor(sourceDigest, {
-      actionId: ACTION_IDS.NUMBER_FORMAT, title: "Number formatter", description: "Format a finite decimal number with en-US grouping or scientific notation.",
-      keywords: ["number", "format", "scientific"], category: "convert", sensitiveInput: ["/value"],
+      actionId: ACTION_IDS.NUMBER_FORMAT,
+      sensitiveInput: ["/value"],
       inputSchema: object({ operation: enumeration("group", "scientific"), value: string(256), decimals: integer(0, 20) }, ["operation", "value"]), outputSchema: textOutput,
       testVectors: [
         { name: "group", input: { operation: "group", value: "1234.5", decimals: 2 }, expectedOutput: { text: "1,234.50" } },
@@ -233,38 +204,36 @@ export function createAdditionalBuiltinDescriptors(sourceDigest) {
       ],
     }),
     descriptor(sourceDigest, {
-      actionId: ACTION_IDS.UNICODE, title: "Unicode escape", description: "Escape text as JavaScript Unicode sequences or decode Unicode escape sequences.",
-      keywords: ["unicode", "escape", "codepoint"], category: "encode", sensitiveInput: ["/text"],
+      actionId: ACTION_IDS.UNICODE,
+      sensitiveInput: ["/text"],
       inputSchema: operationTextInput(["escape", "unescape"], { asciiOnly: boolean() }), outputSchema: object({ text: string(6291456) }), maxOutputBytes: 8388608,
       testVectors: [{ name: "escape", input: { operation: "escape", text: "中", asciiOnly: true }, expectedOutput: { text: "\\u4e2d" } }],
     }),
     descriptor(sourceDigest, {
-      actionId: ACTION_IDS.CAESAR, title: "Caesar cipher", description: "Apply a Caesar shift or ROT13 to ASCII letters.",
-      keywords: ["caesar", "rot13", "cipher"], category: "text", sensitiveInput: ["/text"],
+      actionId: ACTION_IDS.CAESAR,
+      sensitiveInput: ["/text"],
       inputSchema: object({ operation: enumeration("shift", "rot13"), text: string(), shift: integer(-1000000, 1000000) }, ["operation", "text"]), outputSchema: textOutput,
       testVectors: [{ name: "rot13", input: { operation: "rot13", text: "Hello" }, expectedOutput: { text: "Uryyb" } }],
     }),
     descriptor(sourceDigest, {
-      actionId: ACTION_IDS.LUHN, title: "Luhn checksum", description: "Validate a numeric Luhn checksum or calculate a check digit.",
-      keywords: ["luhn", "checksum", "card"], category: "web", sensitiveInput: ["/input"],
+      actionId: ACTION_IDS.LUHN,
+      sensitiveInput: ["/input"],
       inputSchema: object({ operation: enumeration("validate", "check-digit"), input: string(4096) }), outputSchema: object({ valid: boolean(), checkDigit: integer(0, 9) }, []),
       testVectors: [{ name: "validate", input: { operation: "validate", input: "79927398713" }, expectedOutput: { valid: true } }],
     }),
     descriptor(sourceDigest, {
-      actionId: ACTION_IDS.CONTRAST, title: "Color contrast", description: "Calculate WCAG contrast ratio and threshold results for two HEX colors.",
-      keywords: ["contrast", "wcag", "a11y"], category: "web",
+      actionId: ACTION_IDS.CONTRAST,
       inputSchema: object({ foreground: string(16), background: string(16) }), outputSchema: object({ ratio: number(1, 21), aaNormal: boolean(), aaLarge: boolean(), aaaNormal: boolean(), aaaLarge: boolean() }),
       testVectors: [{ name: "black white", input: { foreground: "#000000", background: "#ffffff" }, expectedOutput: { ratio: 21, aaNormal: true, aaLarge: true, aaaNormal: true, aaaLarge: true } }],
     }),
     descriptor(sourceDigest, {
-      actionId: ACTION_IDS.RANDOM_NUMBER, title: "Random integers", description: "Generate cryptographically random integers in a closed interval without modulo bias.",
-      keywords: ["random", "integer", "number"], category: "generate", idempotent: false,
+      actionId: ACTION_IDS.RANDOM_NUMBER,
       inputSchema: object({ min: integer(-1000000000, 1000000000), max: integer(-1000000000, 1000000000), count: integer(1, 1000) }), outputSchema: object({ values: array(integer(-1000000000, 1000000000), 1000) }),
       testVectors: [{ name: "reject zero", input: { min: 1, max: 2, count: 0 }, expectedErrorCode: ERROR_CODES.INPUT_INVALID }],
     }),
     descriptor(sourceDigest, {
-      actionId: ACTION_IDS.DATA_FORMAT, title: "JSON / YAML converter", description: "Convert one bounded JSON or YAML document with deterministic output and no aliases or custom tags.",
-      keywords: ["json", "yaml", "format", "convert"], aliases: ["yml"], category: "convert", sensitiveInput: ["/text"],
+      actionId: ACTION_IDS.DATA_FORMAT,
+      sensitiveInput: ["/text"],
       inputSchema: object({ operation: enumeration("json-to-yaml", "yaml-to-json"), text: string(262144), indent: integer(2, 8) }, ["operation", "text"]),
       outputSchema: object({ text: string(1048576), format: enumeration("json", "yaml") }), maxInputBytes: 524288, maxOutputBytes: 1572864,
       testVectors: [
@@ -277,8 +246,8 @@ export function createAdditionalBuiltinDescriptors(sourceDigest) {
       ],
     }),
     descriptor(sourceDigest, {
-      actionId: ACTION_IDS.TEXT_DIFF, title: "Text diff", description: "Create a deterministic bounded line diff with structured hunks and readable text.",
-      keywords: ["diff", "compare", "text", "lines"], category: "text", sensitiveInput: ["/before", "/after"],
+      actionId: ACTION_IDS.TEXT_DIFF,
+      sensitiveInput: ["/before", "/after"],
       inputSchema: object({ before: string(262144), after: string(262144), context: integer(0, 10) }, ["before", "after"]),
       outputSchema: object({
         summary: nestedObject({ added: integer(0, 2000), removed: integer(0, 2000), unchanged: integer(0, 2000), hunks: integer(0, 2000) }),
@@ -297,8 +266,7 @@ export function createAdditionalBuiltinDescriptors(sourceDigest) {
       ],
     }),
     descriptor(sourceDigest, {
-      actionId: ACTION_IDS.IPV4, title: "IPv4 / CIDR", description: "Inspect an IPv4 address or CIDR and test exact address containment without network access.",
-      keywords: ["ipv4", "cidr", "subnet", "network"], aliases: ["ip"], category: "web",
+      actionId: ACTION_IDS.IPV4,
       inputSchema: object({
         operation: enumeration("inspect", "contains"),
         value: string(64),

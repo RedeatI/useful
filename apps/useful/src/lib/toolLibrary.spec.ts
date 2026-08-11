@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { buildLibraryItems, filterLibraryItems } from "./toolLibrary";
-import { BUILTIN_ACTION_DESCRIPTORS } from "@useful/action-runtime/browser";
+import { BUILTIN_ACTION_CATALOG } from "@useful/action-runtime/catalog";
 import { BUILTIN_GUI_ACTIONS } from "@/lib/actionCatalog";
 
 const tools = [{
@@ -25,13 +25,13 @@ describe("Tool Library unified view-model", () => {
       pins: ["builtin.utilities.base64"],
     });
     expect(items.filter((item) => item.agentConfigurable).map((item) => item.id)).toEqual(
-      BUILTIN_GUI_ACTIONS.filter((action) => BUILTIN_ACTION_DESCRIPTORS.some((descriptor) => descriptor.actionId === action.id))
+      BUILTIN_GUI_ACTIONS.filter((action) => BUILTIN_ACTION_CATALOG.some((descriptor) => descriptor.actionId === action.id))
         .map((action) => action.id),
     );
     expect(items.find((item) => item.id === "builtin.utilities.base64")).toMatchObject({
       favorite: true, pinned: true, surfaces: ["gui", "cli", "mcp"], readOnly: true,
     });
-    for (const descriptor of BUILTIN_ACTION_DESCRIPTORS) {
+    for (const descriptor of BUILTIN_ACTION_CATALOG) {
       const item = items.find((candidate) => candidate.id === descriptor.actionId);
       expect(item?.readOnly).toBe(descriptor.behavior.readOnly);
       expect(item?.publisherId).toBe(descriptor.source.publisher.id);
@@ -49,7 +49,7 @@ describe("Tool Library unified view-model", () => {
   it("filters Agent/favorites and searches translated labels", () => {
     const items = buildLibraryItems({ tools, toolFavorites: [], actionFavorites: [], pins: [] });
     const translate = (key: string) => key === "util.base64.name" ? "Base64 编解码" : key;
-    expect(filterLibraryItems(items, "agent", "", translate)).toHaveLength(BUILTIN_ACTION_DESCRIPTORS.length);
+    expect(filterLibraryItems(items, "agent", "", translate)).toHaveLength(BUILTIN_ACTION_CATALOG.length);
     expect(filterLibraryItems(items, "favorites", "", translate)).toHaveLength(0);
     expect(filterLibraryItems(items, "all", "编解码", translate).map((item) => item.id)).toEqual([
       "builtin.utilities.base64",
