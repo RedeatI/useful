@@ -201,11 +201,13 @@ allowlist，不会注册缺失 entry、授予权限或生成确认。CLI 只从�
 ```powershell
 & "<ABS_KIT>\bin\useful.cmd" agent-contract --json
 & "<ABS_KIT>\bin\useful-runtime.cmd" actions list --json
+& "<ABS_KIT>\bin\useful.cmd" agent verify --target codex --launcher "<ABS_KIT>\lib\useful-mcp.mjs" --json
 ```
 
 ```bash
 "<ABS_KIT>/bin/useful" agent-contract --json
 "<ABS_KIT>/bin/useful-runtime" actions list --json
+"<ABS_KIT>/bin/useful" agent verify --target codex --launcher "<ABS_KIT>/lib/useful-mcp.mjs" --json
 ```
 
 MCP host 推荐绕过 shell launcher，直接配置 `node <ABS_KIT>/lib/useful-mcp.mjs`：
@@ -276,6 +278,7 @@ name `useful`、空的 V1 扩展 args、安全闭集 env 与 scope。严格 JSON
   --json
 
 & "<ABS_KIT>\bin\useful.cmd" agent probe --json
+& "<ABS_KIT>\bin\useful.cmd" agent verify --target codex --launcher "<ABS_KIT>\lib\useful-mcp.mjs" --json
 ```
 
 `commandArgv` 是命令型输出的唯一规范表示。Codex user scope 的顺序固定为
@@ -320,6 +323,36 @@ JSON 模式的 stdout 恰好输出一个成功或失败 envelope；child MCP 的
 还原原文。退出码 `0` 表示完整 self-probe 成功；`2` 表示命令用法错误，`3` 表示协议或探测验证失败，
 `4` 表示本地路径、MANIFEST、I/O 或安全边界失败，`5` 保留给意外内部错误。任一非零退出码都必须停止，
 不能把 failure envelope 当作部分通过。
+
+## 连接候选验证（Agent Connection Verification V1）
+
+源码入口可运行：
+
+```powershell
+pnpm useful -- agent verify --target codex `
+  --launcher "C:\ABSOLUTE\PATH\TO\tools\packages\useful-mcp\bin\useful-mcp.mjs" `
+  --json
+```
+
+Agent Kit 入口见上文的 `bin/useful` / `bin\useful.cmd` 示例。`agent verify` 要求 `--launcher` 解析为当前
+source checkout 或 Agent Kit 的固定 Useful MCP 入口；不同入口会 fail closed。命令在本进程重新生成
+`useful.agent-connection.v1` 候选，
+运行同一次 `useful.agent-probe.v1`，再把二者封装为严格的
+`useful.agent-connection-verification.v1` 文档。`endpoint` 逐字绑定 `connection.plan.server` 与
+`probe.installation` 中对应的 node/launcher 路径与安装身份；它不绑定 connection 的 env 或 cwd。嵌入的默认
+probe 必须报告 40 个工具 = 36 个 Action + 4 个 helper，并匹配固定工具名 SHA-256
+`2740f646530580de5ad2079f3290c01517e8b37f58c6d624293ae74e665c6f17`。严格 Schema 位于
+`packages/protocol/schemas/agent-connection-verification.schema.json`，但不可信 JSON 在 Schema 通过后仍须通过
+协议 parser。
+
+V1 的 `claimScope` 固定带 `self-reported`，`claims` 是本次 CLI 自报而不是认证 proof，其中
+`documentAuthenticated: false`。即使 JSON 被复制到另一台机器并通过 Schema/parser，也只说明文档结构、内部
+connection/probe/endpoint 绑定和固定工具闭集有效；不认证所述执行实际发生，也不会让 current-host 路径
+变得可移植。命令绝不执行 `connection.output.commandArgv` 或应用 merge fragment；claims 还明确自报 verifier
+未读取或写入宿主配置。它不认证 Codex、Claude 或其他宿主已经安装、配置完成、连通或会接受候选；不认证
+签名、发布者、来源、sidecar 或发布授权；固定 launcher 匹配也不等于“launcher 无网络访问”。V1 拒绝
+`--env USEFUL_PROFILE=...`，也不读取 `--agent-profile`，因此不产生 profile-bound 证明。宿主仍必须按官方
+流程人工复核和应用候选。
 
 MCP 是 Useful 对外的公共执行面，而不是宿主权限的替代者。Codex、Claude 和其他宿主各自决定审批、沙箱、
 日志、配置位置与配置变更确认；Useful 只提供本地 stdio server 及其已有的 action/profile 信任边界。始终先审阅

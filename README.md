@@ -48,6 +48,15 @@ Agent host.
   signature, provenance, sidecar, or publication-authorization claim. Its 30-second deadline starts
   after synchronous local path/MANIFEST preflight and covers MCP execution plus transport closure; it
   does not bound that preflight.
+- **Bound connection verification:** `agent verify --target <target> --launcher <fixed-entry> --json`
+  requires the current installation's fixed Useful MCP entry, generates a fresh
+  `useful.agent-connection.v1` candidate, runs the local probe, and binds both into
+  `useful.agent-connection-verification.v1`. Its `claimScope` and `claims` are explicitly
+  self-reported, including `documentAuthenticated: false`: Schema/parser success checks structure and
+  endpoint binding, not execution. The verifier does not execute the generated host `commandArgv` or
+  read/write host configuration. It does not attest that Codex/Claude is installed, configured, or
+  will accept the candidate; V1 rejects `USEFUL_PROFILE` and makes no profile-bound, signature,
+  origin, sidecar, publication, or launcher-network claim.
 
 The interface is available in Simplified Chinese and English, with light and dark themes. Portable
 mode is supported on Windows by placing `portable.flag` next to `Useful.exe`; data is then stored in
@@ -114,6 +123,7 @@ pnpm useful -- agent plan --target codex --launcher C:\ABSOLUTE\useful-mcp.mjs -
 pnpm useful -- agent doctor --target claude-code --launcher C:\ABSOLUTE\useful-mcp.mjs --json
 pnpm useful -- agent export --target codex --launcher C:\ABSOLUTE\useful-mcp.mjs --json
 pnpm useful -- agent probe --json
+pnpm useful -- agent verify --target codex --launcher C:\ABSOLUTE\PATH\TO\tools\packages\useful-mcp\bin\useful-mcp.mjs --json
 ```
 
 The plan/export target is one of `codex`, `claude-code`, `claude-desktop`, or `mcp-servers-json`.
@@ -122,6 +132,13 @@ start the launcher, use the network, or prove an MCP handshake. Claude Desktop o
 use its official Connectors for remote services.
 Codex and Claude keep their own approval and sandbox policies; Useful does not generate bypass or
 always-allow settings. See [AI Integration](docs/AI-INTEGRATION.md) for scope and merge semantics.
+`agent verify` requires `--launcher` to resolve to the fixed source or Agent Kit MCP entry; a different
+launcher fails closed. Its embedded probe must report the complete default surface as 40 tools = 36
+Actions + 4 helpers and tool-name SHA-256
+`2740f646530580de5ad2079f3290c01517e8b37f58c6d624293ae74e665c6f17`. The portable JSON can be
+copied and parsed, but that does not authenticate any claimed local execution or make its current-host
+paths portable. Its endpoint binds only the node/launcher paths and installation identity; it does not
+bind environment or working directory, execute, or apply the candidate.
 
 `packages/useful-runtime` provides the JSON runtime, and `packages/useful-mcp` exposes the same
 registry over stdio. Both are development entry points that currently require Node.js; they are not

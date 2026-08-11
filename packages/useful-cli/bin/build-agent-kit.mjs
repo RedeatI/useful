@@ -74,6 +74,10 @@ const PROTOCOL_AGENT_PROBE_PROVENANCE_FILES = Object.freeze([
   "agent-probe.mjs",
   "agent-probe.d.ts",
 ]);
+const PROTOCOL_AGENT_CONNECTION_VERIFICATION_PROVENANCE_FILES = Object.freeze([
+  "agent-connection-verification.mjs",
+  "agent-connection-verification.d.ts",
+]);
 const ACTION_RUNTIME_PROVENANCE_FILES = Object.freeze([
   "action-suggest.mjs",
   "builtins.mjs",
@@ -669,6 +673,7 @@ function workspaceResolver(repoRoot) {
     "@useful/protocol/agent-connection": "packages/protocol/src/agent-connection.mjs",
     "@useful/protocol/agent-integration": "packages/protocol/src/agent-integration.mjs",
     "@useful/protocol/agent-probe": "packages/protocol/src/agent-probe.mjs",
+    "@useful/protocol/agent-connection-verification": "packages/protocol/src/agent-connection-verification.mjs",
     "@useful/protocol/src/schemas.mjs": "packages/protocol/src/schemas.mjs",
   };
   return {
@@ -896,6 +901,10 @@ async function addRuntimeResources(entries, repoRoot) {
     const source = `packages/protocol/src/${relative}`;
     addEntry(entries, `lib/provenance/protocol/${relative}`, normalizedText(await readSourceFile(repoRoot, source)));
   }
+  for (const relative of PROTOCOL_AGENT_CONNECTION_VERIFICATION_PROVENANCE_FILES) {
+    const source = `packages/protocol/src/${relative}`;
+    addEntry(entries, `lib/provenance/protocol/${relative}`, normalizedText(await readSourceFile(repoRoot, source)));
+  }
   for (const relative of ACTION_RUNTIME_PROVENANCE_FILES) {
     const source = `packages/action-runtime/src/${relative}`;
     addEntry(entries, `lib/provenance/action-runtime/${relative}`, normalizedText(await readSourceFile(repoRoot, source)));
@@ -972,7 +981,7 @@ async function createPayload(repoRoot, dependencyRoot, version) {
   for (const legal of REQUIRED_LEGAL_FILES) addEntry(entries, legal, normalizedText(await readSourceFile(repoRoot, legal, `root ${legal}`)));
   for (const legal of FIRST_PARTY_LICENSE_FILES) addEntry(entries, legal, normalizedText(await readSourceFile(repoRoot, legal, legal)));
   addEntry(entries, "README.txt", Buffer.from(
-    `Useful Agent Kit ${version}\n\nRequires Node.js 20 or newer.\nCompatible commands: useful, useful-runtime, useful-mcp.\nThe @useful package names and useful/useful schema identities remain compatibility interfaces.\nNo global install or monorepo-relative runtime path is required.\nBundled dependency license texts and notices are indexed by THIRD_PARTY-LICENSES.json.\nRun the local MCP self-probe on POSIX: bin/useful agent probe --json\nRun the local MCP self-probe on Windows: bin\\useful.cmd agent probe --json\nThe self-probe proves only this extracted directory's local MANIFEST closed set and bundled Useful MCP protocol surface; it does not attest an external Agent, signature, publisher, origin, sidecar, or publication authorization.\nIts 30-second deadline covers MCP execution and transport closure after synchronous MANIFEST preflight; it does not bound that preflight.\nAgent integration exports are manual-review-only and secret-free: they do not write host configuration, start a launcher, or make network connections.\nThe Claude Desktop JSON fragment is for local mcpServers merging only; remote/managed configuration is not generated.\nComputer Use has no default provider or host registration in this kit.\nThe component map is owner-approved, but this build remains an internal candidate and does not authorize publication of any specific snapshot.\n`,
+    `Useful Agent Kit ${version}\n\nRequires Node.js 20 or newer.\nCompatible commands: useful, useful-runtime, useful-mcp.\nThe @useful package names and useful/useful schema identities remain compatibility interfaces.\nNo global install or monorepo-relative runtime path is required.\nBundled dependency license texts and notices are indexed by THIRD_PARTY-LICENSES.json.\nRun the local MCP self-probe on POSIX: bin/useful agent probe --json\nRun the local MCP self-probe on Windows: bin\\useful.cmd agent probe --json\nVerify a Codex connection candidate on POSIX: bin/useful agent verify --target codex --launcher <ABS_KIT>/lib/useful-mcp.mjs --json\nVerify a Codex connection candidate on Windows: bin\\useful.cmd agent verify --target codex --launcher <ABS_KIT>\\lib\\useful-mcp.mjs --json\nThe self-probe proves only this extracted directory's local MANIFEST closed set and bundled Useful MCP protocol surface; it does not attest an external Agent, signature, publisher, origin, sidecar, or publication authorization.\nIts 30-second deadline covers MCP execution and transport closure after synchronous MANIFEST preflight; it does not bound that preflight.\nAgent verify requires the current installation's fixed Useful MCP entry and fails closed for another launcher.\nIts claimScope and claims are self-reported, with documentAuthenticated false; parsing validates JSON structure, endpoint binding, and the fixed 40 = 36 + 4 tool-name closure SHA-256 2740f646530580de5ad2079f3290c01517e8b37f58c6d624293ae74e665c6f17, but it does not authenticate execution.\nThe JSON can be copied, but parsing it does not make current-host paths portable; the endpoint binds only node/launcher paths and installation identity, not environment or working directory.\nVerify does not execute output commandArgv or apply merge output, and its claims self-report no host configuration read/write by the verifier.\nV1 rejects USEFUL_PROFILE and makes no Agent Profile binding claim.\nIt does not attest Codex/Claude installation, configuration, or acceptance, a signature, publisher, origin, sidecar, publication authorization, or that the fixed launcher has no network access.\nAgent integration exports are manual-review-only and secret-free: they do not write host configuration, start a launcher, or make network connections.\nThe Claude Desktop JSON fragment is for local mcpServers merging only; remote/managed configuration is not generated.\nComputer Use has no default provider or host registration in this kit.\nThe component map is owner-approved, but this build remains an internal candidate and does not authorize publication of any specific snapshot.\n`,
     "utf8",
   ));
   addEntry(entries, "package.json", jsonBytes({

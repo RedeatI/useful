@@ -174,6 +174,7 @@ function runLauncher(kitRoot, name, args, options = {}) {
   const result = spawnSync(command, commandArgs, {
     cwd: options.cwd ?? kitRoot,
     encoding: "utf8",
+    env: options.env ? { ...process.env, ...options.env } : undefined,
     input: options.input,
     windowsHide: true,
   });
@@ -339,6 +340,8 @@ describe("Useful Agent Kit builder", () => {
       "lib/provenance/agent-integrations/integration.mjs",
       "lib/provenance/protocol/agent-connection.d.ts",
       "lib/provenance/protocol/agent-connection.mjs",
+      "lib/provenance/protocol/agent-connection-verification.d.ts",
+      "lib/provenance/protocol/agent-connection-verification.mjs",
       "lib/provenance/protocol/agent-integration.d.ts",
       "lib/provenance/protocol/agent-integration.mjs",
       "lib/provenance/protocol/agent-probe.d.ts",
@@ -355,6 +358,7 @@ describe("Useful Agent Kit builder", () => {
       "lib/provenance/office-core/table-markdown.mjs",
       "lib/useful.plugin-action.v1.schema.json",
       "schemas/agent-connection.schema.json",
+      "schemas/agent-connection-verification.schema.json",
       "schemas/agent-integration.schema.json",
       "schemas/agent-probe.schema.json",
       "schemas/package-manifest.schema.json",
@@ -376,8 +380,17 @@ describe("Useful Agent Kit builder", () => {
     const kitReadme = inspected.entries.get("README.txt").data.toString("utf8");
     expect(kitReadme).toContain("bin/useful agent probe --json");
     expect(kitReadme).toContain("bin\\useful.cmd agent probe --json");
+    expect(kitReadme).toContain("bin/useful agent verify --target codex --launcher <ABS_KIT>/lib/useful-mcp.mjs --json");
+    expect(kitReadme).toContain("bin\\useful.cmd agent verify --target codex --launcher <ABS_KIT>\\lib\\useful-mcp.mjs --json");
     expect(kitReadme).toContain("does not attest an external Agent, signature, publisher, origin, sidecar, or publication authorization");
     expect(kitReadme).toContain("does not bound that preflight");
+    expect(kitReadme).toContain("claimScope and claims are self-reported, with documentAuthenticated false");
+    expect(kitReadme).toContain("2740f646530580de5ad2079f3290c01517e8b37f58c6d624293ae74e665c6f17");
+    expect(kitReadme).toContain("does not authenticate execution");
+    expect(kitReadme).toContain("endpoint binds only node/launcher paths and installation identity, not environment or working directory");
+    expect(kitReadme).toContain("does not execute output commandArgv or apply merge output");
+    expect(kitReadme).toContain("V1 rejects USEFUL_PROFILE and makes no Agent Profile binding claim");
+    expect(kitReadme).toContain("does not attest Codex/Claude installation, configuration, or acceptance, a signature, publisher, origin, sidecar, publication authorization, or that the fixed launcher has no network access");
     const thirdPartyLicenses = JSON.parse(inspected.entries.get("THIRD_PARTY-LICENSES.json").data.toString("utf8"));
     expect(thirdPartyLicenses.schemaVersion).toBe("useful.agent-kit.third-party-licenses.v1");
     expect(thirdPartyLicenses.packages.map((dependency) => dependency.name)).toEqual(expect.arrayContaining([
@@ -413,6 +426,8 @@ describe("Useful Agent Kit builder", () => {
     expect(contractData.templates.map((template) => template.id)).toEqual(["minimal-web", "minimal-action", "starter-web"]);
     expect(contractData.commandSequence.slice(0, 7).every((command) => command.startsWith("useful "))).toBe(true);
     expect(contractData.commandSequence.join("\n")).not.toMatch(/\b(?:npx|pnpm\s+dlx)\b/);
+    expect(contractData.commands.agentVerify).toBe("useful agent verify --target <codex|claude-code|claude-desktop|mcp-servers-json> --launcher <current-installation-fixed-useful-mcp-entry> [--scope user|project] [--project-dir <host-native-absolute-directory>] [--env NO_COLOR=1] [--env USEFUL_LOG_LEVEL=<error|warn|info>] --json");
+    expect(contractData.commandSequence[6]).toBe("useful agent verify --target mcp-servers-json --launcher \"<ABS_FIXED_USEFUL_MCP_LAUNCHER>\" --json");
 
     const agentProbeRun = runLauncher(kitRoot, "useful", ["agent", "probe", "--json"]);
     const agentProbe = expectJsonSuccess(agentProbeRun);
@@ -477,6 +492,104 @@ describe("Useful Agent Kit builder", () => {
       plan: { target: "codex", transport: "stdio" },
     });
     expect(integrationExport.output.commandArgv).toEqual(integrationPlan.output.commandArgv);
+
+    const fakeHostBin = path.join(fixture.outer, "fake host bin");
+    const hostCommandSentinel = path.join(fixture.outer, "host command executed.txt");
+    fs.mkdirSync(fakeHostBin);
+    const fakeCodex = path.join(fakeHostBin, process.platform === "win32" ? "codex.cmd" : "codex");
+    fs.writeFileSync(
+      fakeCodex,
+      process.platform === "win32"
+        ? "@ECHO off\r\n>\"%USEFUL_AGENT_VERIFY_HOST_SENTINEL%\" ECHO executed\r\nEXIT /B 0\r\n"
+        : "#!/bin/sh\nprintf 'executed\\n' > \"$USEFUL_AGENT_VERIFY_HOST_SENTINEL\"\n",
+      "utf8",
+    );
+    if (process.platform !== "win32") fs.chmodSync(fakeCodex, 0o755);
+    const agentVerificationRun = runLauncher(kitRoot, "useful", [
+      "agent", "verify",
+      "--target", "codex",
+      "--launcher", agentMcpLauncher,
+      "--json",
+    ], {
+      env: {
+        PATH: `${fakeHostBin}${path.delimiter}${process.env.PATH ?? ""}`,
+        USEFUL_AGENT_VERIFY_HOST_SENTINEL: hostCommandSentinel,
+      },
+    });
+    const agentVerification = expectJsonSuccess(agentVerificationRun);
+    expect(agentVerificationRun.stderr).toBe("");
+    expect(Object.keys(agentVerification).sort()).toEqual([
+      "claimScope", "claims", "connection", "endpoint", "kind", "probe", "schemaVersion", "status",
+    ]);
+    expect(agentVerification).toMatchObject({
+      schemaVersion: "useful.agent-connection-verification.v1",
+      kind: "mcp-stdio-connection-verification",
+      status: "success",
+      claimScope: "useful-mcp-local-stdio-connection-candidate-self-reported",
+      connection: {
+        schemaVersion: "useful.agent-connection.v1",
+        plan: { target: "codex", server: { nodePath: process.execPath, launcherPath: agentMcpLauncher } },
+        output: { kind: "host-command", writesHostConfigWhenExecuted: true },
+      },
+      probe: {
+        schemaVersion: "useful.agent-probe.v1",
+        installation: {
+          mode: "agent-kit",
+          sourceRevision: inspected.manifest.source.revision,
+          version: inspected.manifest.product.version,
+        },
+        tools: {
+          count: 40,
+          actionCount: 36,
+          helperCount: 4,
+          namesSha256: "2740f646530580de5ad2079f3290c01517e8b37f58c6d624293ae74e665c6f17",
+        },
+      },
+      endpoint: {
+        nodePath: process.execPath,
+        launcherPath: agentMcpLauncher,
+        installationMode: "agent-kit",
+        sourceRevision: inspected.manifest.source.revision,
+        productVersion: inspected.manifest.product.version,
+      },
+      claims: {
+        documentAuthenticated: false,
+        connectionGeneratedInCurrentProcess: true,
+        fixedUsefulLauncherMatchedInCurrentProcess: true,
+        hostCommandExecutedByVerifier: false,
+        hostConfigReadByVerifier: false,
+        hostConfigWrittenByVerifier: false,
+        externalAgentInstalledAttested: false,
+        externalAgentConfiguredAttested: false,
+      },
+    });
+    expect(agentVerification.connection.output.commandArgv[0]).toBe("codex");
+    expect(agentVerification.endpoint.nodePath).toBe(agentVerification.connection.plan.server.nodePath);
+    expect(agentVerification.endpoint.launcherPath).toBe(agentVerification.connection.plan.server.launcherPath);
+    expect(agentVerification.endpoint.installationMode).toBe(agentVerification.probe.installation.mode);
+    expect(agentVerification.endpoint.sourceRevision).toBe(agentVerification.probe.installation.sourceRevision);
+    expect(agentVerification.endpoint.productVersion).toBe(agentVerification.probe.installation.version);
+    expect(agentVerification.probe.tools).toEqual({
+      count: 40,
+      actionCount: 36,
+      helperCount: 4,
+      namesSha256: "2740f646530580de5ad2079f3290c01517e8b37f58c6d624293ae74e665c6f17",
+    });
+    expect(Object.keys(agentVerification.endpoint).sort()).toEqual([
+      "installationMode", "launcherPath", "nodePath", "productVersion", "sourceRevision",
+    ]);
+    expect(agentVerification.claims).toEqual({
+      documentAuthenticated: false,
+      connectionGeneratedInCurrentProcess: true,
+      fixedUsefulLauncherMatchedInCurrentProcess: true,
+      hostCommandExecutedByVerifier: false,
+      hostConfigReadByVerifier: false,
+      hostConfigWrittenByVerifier: false,
+      externalAgentInstalledAttested: false,
+      externalAgentConfiguredAttested: false,
+    });
+    expect(fs.existsSync(hostCommandSentinel)).toBe(false);
+
     const integrationDoctor = expectJsonSuccess(runLauncher(kitRoot, "useful", [
       "agent", "doctor",
       "--target", "mcp-servers-json",
