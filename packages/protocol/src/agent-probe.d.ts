@@ -75,6 +75,10 @@ export const AGENT_PROBE_SCHEMA_FILE: "agent-probe.schema.json";
 export const AGENT_PROBE_SCHEMA_ID: "https://schemas.useful.example/agent/useful.agent-probe.v1.schema.json";
 export const AGENT_PROBE_SCOPE: "useful-mcp-local-stdio";
 export const AGENT_PROBE_INSTALLATION_MODES: readonly AgentProbeInstallationMode[];
+/** The snapshot root has depth 1; every property value or array item adds 1. */
+export const AGENT_PROBE_MAX_DEPTH: 64;
+/** The snapshot root counts as 1 node, as does every visited JSON value. */
+export const AGENT_PROBE_MAX_NODES: 4096;
 
 export function snapshotAgentProbeData<T>(value: T, field?: string): T;
 export function deepFreezeAgentProbeData<T>(value: T): Readonly<T>;

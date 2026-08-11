@@ -2,10 +2,14 @@ import assert from "node:assert/strict";
 import process from "node:process";
 import test from "node:test";
 import {
+  AGENT_PROBE_MAX_DEPTH,
+  AGENT_PROBE_MAX_NODES,
   AGENT_PROBE_SCHEMA_VERSION,
   AgentProbeProtocolError,
   createAgentProbe,
   parseAgentProbe,
+  snapshotAgentProbeData,
+  validateAgentProbe,
 } from "../src/agent-probe.mjs";
 import { parseAgentIntegrationPlan } from "../src/agent-integration.mjs";
 import { buildAjv, getValidator } from "../src/schemas.mjs";
@@ -53,6 +57,17 @@ function makeProbe(overrides = {}) {
     ...overrides,
   };
 }
+
+function makeNestedValue(depth) {
+  let value = null;
+  for (let level = 1; level < depth; level += 1) value = { next: value };
+  return value;
+}
+
+test("exports fixed snapshot resource budgets", () => {
+  assert.equal(AGENT_PROBE_MAX_DEPTH, 64);
+  assert.equal(AGENT_PROBE_MAX_NODES, 4096);
+});
 
 test("creates a deep-frozen closed local-MCP success proof", () => {
   const probe = createAgentProbe(makeProbe());
@@ -123,6 +138,30 @@ test("plain-data capture rejects proxy, accessors, hidden fields, symbols and cy
   const cyclic = structuredClone(valid);
   cyclic.proof.loop = cyclic;
   assert.throws(() => parseAgentProbe(cyclic), (error) => error.code === "CYCLIC_INPUT_FORBIDDEN");
+});
+
+test("snapshot counts the root at depth one and parse rejects excessive depth", () => {
+  assert.equal(typeof snapshotAgentProbeData(makeNestedValue(AGENT_PROBE_MAX_DEPTH)), "object");
+  assert.throws(
+    () => parseAgentProbe(makeNestedValue(AGENT_PROBE_MAX_DEPTH + 1)),
+    (error) => error instanceof AgentProbeProtocolError
+      && error.code === "MAX_DEPTH_EXCEEDED"
+      && error.details.maximumDepth === AGENT_PROBE_MAX_DEPTH
+      && error.details.observedDepth === AGENT_PROBE_MAX_DEPTH + 1,
+  );
+});
+
+test("snapshot counts the root as one node and validate rejects excessive nodes", () => {
+  const atLimit = Array.from({ length: AGENT_PROBE_MAX_NODES - 1 }, () => null);
+  assert.equal(snapshotAgentProbeData(atLimit).length, AGENT_PROBE_MAX_NODES - 1);
+  const overLimit = Array.from({ length: AGENT_PROBE_MAX_NODES }, () => null);
+  assert.throws(
+    () => validateAgentProbe(overLimit),
+    (error) => error instanceof AgentProbeProtocolError
+      && error.code === "MAX_NODES_EXCEEDED"
+      && error.details.maximumNodes === AGENT_PROBE_MAX_NODES
+      && error.details.observedNodes === AGENT_PROBE_MAX_NODES + 1,
+  );
 });
 
 function platformPath() {
