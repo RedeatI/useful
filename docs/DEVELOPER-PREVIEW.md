@@ -1,5 +1,7 @@
 # Useful 插件开发者预览
 
+简体中文 · [English](DEVELOPER-PREVIEW.en.md)
+
 外部 Agent 的非交互 `create → doctor → validate → pack → publisher init → publisher sign →
 publisher verify` 流程，以 [`agent/BUILD-A-TOOL.md`](agent/BUILD-A-TOOL.md) 为唯一事实源。本页只为
 人类开发者补充本地 Preview 入口，不能覆盖、缩短或重新解释 Agent 流程。

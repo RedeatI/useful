@@ -1,5 +1,7 @@
 # Useful 人类维护者与发布者指南
 
+简体中文 · [English](DEVELOPER-GUIDE.en.md)
+
 > 本文面向人工维护者和自托管源管理员，包含交互式、本地服务和网络发布命令；不得作为
 > Agent 自动化流程输入。任何外部 Agent 构建第三方工具时，必须以
 > [`agent/BUILD-A-TOOL.md`](agent/BUILD-A-TOOL.md) 为唯一流程事实源，只运行其中的非交互

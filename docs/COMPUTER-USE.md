@@ -1,5 +1,7 @@
 # Computer Use 安全合同 V1
 
+简体中文 · [English](COMPUTER-USE.en.md)
+
 Useful 的 Computer Use 合同是 provider-neutral 的安全边界，不是桌面自动化实现。它的 schema identity 固定为 `useful.computer-use.v1`，默认 provider 永久关闭并返回稳定错误 `COMPUTER_USE_DISABLED`。本包不会生成 ActionDescriptor、注册 MCP 工具、连接模型 API，或控制用户的鼠标、键盘和桌面。
 
 ## 信任边界

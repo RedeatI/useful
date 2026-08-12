@@ -1,5 +1,7 @@
 # 插件开发 SDK
 
+简体中文 · [English](PLUGIN_SDK.en.md)
+
 本文档介绍如何为 Useful 开发插件。简单的 web 工具**无需编写 Rust**。`useful-cli`、
 `@useful/sdk`、`useful.*` schema 和 `.useful` 是保留的兼容开发者接口。
 

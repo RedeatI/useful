@@ -1,5 +1,7 @@
 # 用 Agent 构建并签名一个 Useful 工具
 
+简体中文 · [English](BUILD-A-TOOL.en.md)
+
 Useful 是公开产品与仓库名称。`useful`、`useful-runtime`、`useful-mcp` 命令和包名、
 `useful.*` schema/protocol 标识、`.useful` 扩展名以及兼容占位符
 `<USEFUL_REPOSITORY_URL>` 是既有开发者接口；为保持生态兼容，本文命令示例和机器可读标识不改名。

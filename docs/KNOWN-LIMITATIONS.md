@@ -1,5 +1,7 @@
 # 已知限制
 
+简体中文 · [English](KNOWN-LIMITATIONS.en.md)
+
 本文件描述 Useful 源码候选适用的功能和验证边界。它不表示任一候选已经上传 GitHub、完成正式签名
 或公证，也不表示已经通过目标平台的真实 runner 与原生验收。
 
