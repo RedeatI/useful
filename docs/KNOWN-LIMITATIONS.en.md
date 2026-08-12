@@ -64,7 +64,7 @@ that a remote job ran. It does not show that a platform binary works.
 ### Distribution
 
 - Public repository: `https://github.com/RedeatI/useful`.
-- Source and Agent Kit preview releases exist (for example `v0.1.0-beta.3`).
+- Source/Agent Kit and unsigned Windows desktop preview releases exist (for example `v0.1.0-beta.3`, `v0.1.0-beta.4`).
 - Official **signed** desktop installers and a production update feed are not available unless a
   later release explicitly provides signature evidence.
 - Development-trust Windows installers or portable packages are preview artifacts. They are not a
