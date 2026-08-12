@@ -1,4 +1,4 @@
-# README and docs language map
+﻿# README and docs language map
 
 This page lists English entry documents for readers who start from the default English README.
 
@@ -17,10 +17,12 @@ This page lists English entry documents for readers who start from the default E
 | Agent tool build path | [agent/BUILD-A-TOOL.en.md](agent/BUILD-A-TOOL.en.md) | [agent/BUILD-A-TOOL.md](agent/BUILD-A-TOOL.md) |
 | Computer Use contract | [COMPUTER-USE.en.md](COMPUTER-USE.en.md) | [COMPUTER-USE.md](COMPUTER-USE.md) |
 | Security assurance | [SECURITY-ASSURANCE.en.md](SECURITY-ASSURANCE.en.md) | [SECURITY-ASSURANCE.md](SECURITY-ASSURANCE.md) |
-| Open-source release checklist | [OPEN-SOURCE-RELEASE.md](OPEN-SOURCE-RELEASE.md) (English) | — |
+| Open-source release checklist | [OPEN-SOURCE-RELEASE.md](OPEN-SOURCE-RELEASE.md) (English) | 鈥?|
 
 English pages use short technical English. Chinese pages remain the full source for many protocol
 details. When the two differ in depth, treat the Chinese page as the longer reference and keep
 claims aligned with both.
 
 Do not invent English-only product claims that Chinese docs reject.
+| Open-source remaining gates | [OPEN-SOURCE-REMAINING-GATES.md](OPEN-SOURCE-REMAINING-GATES.md) | — |
+

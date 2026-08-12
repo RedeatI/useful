@@ -92,15 +92,23 @@ Windows 为主要验证目标的能力。macOS/Linux 应明确降级或报告不
   这些是本地合同，不等同于已在主流企业杀毒产品和真实只读介质上完成兼容认证。
 - **Full 公开分发受 GPL 对应源码与许可证证据硬门约束。** 在对应源码包、精确版本映射、许可证与
   notice、校验和及可复现分发证据齐备并经所有者复核前，不得公开发布 Full 资产。
-- 规范 GitHub 目标、公开引用、生产代码签名身份、生产更新根、法律发布主体及 macOS 签名/公证材料
-  都必须在首次公开或发布前由 Owner 配置，并针对精确候选验证。
-- 根许可证与第三方许可证闭集必须以最终公开快照为准；本文件不能代替法律审查或许可证确认。
+- 规范公开仓库已为 `https://github.com/RedeatI/useful`。生产代码签名身份、生产更新根、macOS
+  签名/公证材料与正式安装包发布仍须由 Owner 配置并针对精确候选验证。
+- 根许可证与第三方许可证闭集必须以当前公开快照为准；本文件不能代替法律审查或许可证确认。
 
-## 仍需所有者提供
+## 已公开与仍缺项
 
-- 规范 GitHub 目标、公开引用、可见性与 Release 授权；
-- 法律发布主体、版权/商标授权确认及最终公开许可证文件；
-- Windows/macOS 正式签名身份、macOS 公证凭据与生产更新根；
-- Full edition 的 GPL 对应源码和许可证证据；
-- [`SECURITY.md`](../SECURITY.md) 中可实际使用的私下报告方式；
-- 精确候选的真实 macOS/Linux runner 执行，以及 Windows 原生视觉与运行验收。
+### 已完成
+
+- 公开仓库：`https://github.com/RedeatI/useful`
+- 源码与 Agent Kit 预览 Release（例如 `v0.1.0-beta.3`）
+- 双语 README 与英文入口文档
+
+### 仍需 Owner / 平台证据
+
+- Windows/macOS 正式代码签名身份与 macOS 公证凭据
+- 生产更新根与 HTTPS 更新 feed
+- Full edition 的 GPL 对应源码和许可证证据
+- [`SECURITY.md`](../SECURITY.md) 中已启用并实测的 Private Vulnerability Reporting
+- 精确候选的真实 macOS/Linux runner 执行，以及绑定候选的 Windows 原生视觉与运行验收
+- 社区投稿入口（Issues / PR intake）在私报通道与 CoC 执法路径就绪前保持关闭

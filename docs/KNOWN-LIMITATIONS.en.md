@@ -63,11 +63,26 @@ that a remote job ran. It does not show that a platform binary works.
 
 ### Distribution
 
-- Official signed desktop installers and a production update feed are not available.
+- Public repository: `https://github.com/RedeatI/useful`.
+- Source and Agent Kit preview releases exist (for example `v0.1.0-beta.3`).
+- Official **signed** desktop installers and a production update feed are not available unless a
+  later release explicitly provides signature evidence.
+- Development-trust Windows installers or portable packages are preview artifacts. They are not a
+  signed production channel.
 - Full media editions that ship `ffmpeg`, `ffprobe`, and `mpv` stay blocked until GPL
   corresponding-source and license evidence are complete.
 - An Agent Kit ZIP is official only when the controlled release workflow attaches it to a matching
   GitHub Release. A local kit build does not authorize publication.
+
+### Still missing owner or platform evidence
+
+- Windows/macOS production code-signing identity and macOS notarization credentials
+- Production update root and HTTPS update feed
+- Full edition GPL corresponding-source evidence
+- Enabled and tested GitHub Private Vulnerability Reporting ([SECURITY.md](../SECURITY.md))
+- Real macOS/Linux runner results and candidate-bound Windows native visual acceptance
+- Public contribution intake (Issues/PR) remains closed until private reporting and CoC enforcement
+  routes are ready
 
 ## Related documents
 
