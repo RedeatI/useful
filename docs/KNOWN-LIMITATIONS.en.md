@@ -77,12 +77,18 @@ that a remote job ran. It does not show that a platform binary works.
 ### Still missing owner or platform evidence
 
 - Windows/macOS production code-signing identity and macOS notarization credentials
-- Production update root and HTTPS update feed
+- Production update root and HTTPS update feed with real signed manifests
 - Full edition GPL corresponding-source evidence
-- Enabled and tested GitHub Private Vulnerability Reporting ([SECURITY.md](../SECURITY.md))
 - Real macOS/Linux runner results and candidate-bound Windows native visual acceptance
-- Public contribution intake (Issues/PR) remains closed until private reporting and CoC enforcement
-  routes are ready
+- Named CoC enforcement contact before broad drive-by contribution intake
+  ([CODE_OF_CONDUCT.md](../CODE_OF_CONDUCT.md))
+- One open Rust Dependabot medium on `glib` 0.18.x (GHSA-wrw7-89jp-8q8g), blocked on the
+  gtk 0.18 / Tauri Linux path until an upstream-compatible upgrade; see
+  [OPEN-SOURCE-REMAINING-GATES.md](OPEN-SOURCE-REMAINING-GATES.md) §7
+
+### Recently completed evidence
+
+- GitHub Private Vulnerability Reporting enabled on `RedeatI/useful` ([SECURITY.md](../SECURITY.md))
 
 ## Related documents
 
