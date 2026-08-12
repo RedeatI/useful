@@ -71,7 +71,12 @@ export function keyInitRoot(dir, opts) {
     throw new Error(`threshold(${threshold}) 必须在 1..rootCount(${rootCount}) 之间`);
   }
 
-  if (env === "production" && !opts.ownerGateAcknowledged) {
+  const ownerGateAcknowledged =
+    opts.ownerGateAcknowledged === true
+    || opts.ownerGateAcknowledged === "true"
+    || opts["owner-gate-acknowledged"] === true
+    || opts["owner-gate-acknowledged"] === "true";
+  if (env === "production" && !ownerGateAcknowledged) {
     // Owner Gate：拒绝自动生成生产根，产出离线仪式清单
     const checklist = productionCeremonyChecklist(threshold, rootCount);
     ensureDir(dir);
