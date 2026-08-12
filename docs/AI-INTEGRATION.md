@@ -1,5 +1,7 @@
 # 外部 Agent 调用 Useful（GUI profile / 开发态 CLI / MCP）
 
+简体中文 · [English](AI-INTEGRATION.en.md)
+
 外部 Agent 可通过 `useful-runtime` JSON CLI 或本地 stdio `useful-mcp` 调用同一个
 `ActionRegistry` / `ActionExecutor`。Useful 不包含模型、不读取模型配置、不采样，也不会替 Agent 联网。
 

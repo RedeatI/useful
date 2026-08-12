@@ -1,5 +1,7 @@
 # 工具 Actions
 
+简体中文 · [English](TOOL-ACTIONS.en.md)
+
 默认内建注册表共有 36 个 AI-callable Action：下面 31 个 Utility Action，加上 5 个 Office action family。
 这个数字不包含 MCP 的 4 个 helper，也不包含必须显式加载配置的可选 native host pack。默认 MCP
 `tools/list` 因此共有 40 项。

@@ -1,5 +1,7 @@
 # 安全保证（Security Assurance）
 
+简体中文 · [English](SECURITY-ASSURANCE.en.md)
+
 > 从攻击者与运维视角记录已实现的防御与对应证据。配合 SECURITY.md 与 ADR-008/011/012/013/014。
 
 ## 信任链分层（绝不合并为单一 safe 布尔）
