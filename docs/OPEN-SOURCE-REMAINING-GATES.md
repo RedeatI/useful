@@ -71,11 +71,16 @@ It is not a publication authorization.
 ## Minimum next Owner actions
 
 1. Enable and test GitHub Private Vulnerability Reporting on `RedeatI/useful`.
-2. Configure production Windows signing certificate and update-root ceremony.
-3. Set repository vars for `release.yml` publish gate (`USEFUL_EXPECTED_REPOSITORY`,
-   `USEFUL_RELEASE_ACTORS`, update-root keys and feed).
+2. Follow the fill-in worksheet in [OWNER-SIGNING-GATE-CHECKLIST.md](OWNER-SIGNING-GATE-CHECKLIST.md)
+   (update-root ceremony, Windows/Apple secrets, feed template).
+3. Run `node scripts/check-owner-signing-gates.mjs --json` until `signedBetaPublishReady` is true.
 4. Run real macOS and Linux build jobs; store logs and artifact digests with the candidate SHA.
 5. Decide whether public Issues open after (1) and CoC enforcement contacts are named.
+
+## Related
+
+- [OWNER-SIGNING-GATE-CHECKLIST.md](OWNER-SIGNING-GATE-CHECKLIST.md) — variables, secrets, verification commands
+- [OWNER-GATES.md](OWNER-GATES.md) — commercial Owner gates
 
 ## Current desktop packaging claim boundary
 
