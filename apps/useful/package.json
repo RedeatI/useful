@@ -20,6 +20,7 @@
     "@useful/agent-profile": "workspace:^",
     "@useful/action-runtime": "workspace:^",
     "@useful/office-core": "workspace:^",
+    "@useful/protocol": "workspace:^",
     "@useful/sdk": "workspace:*",
     "pinia": "^2.3.1",
     "vue": "^3.5.13",

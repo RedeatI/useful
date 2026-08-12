@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, defineAsyncComponent, onErrorCaptured, onMounted, ref } from "vue";
+import { computed, defineAsyncComponent, defineComponent, onErrorCaptured, onMounted, ref } from "vue";
 import { useUiStore } from "@/stores/ui";
 import { useAppStore } from "@/stores/app";
 import { t } from "@/i18n";
@@ -13,6 +13,19 @@ const uiStore = useUiStore();
 const appStore = useAppStore();
 const pageError = ref<string | null>(null);
 const agentPanelError = ref<string | null>(null);
+const agentConnectionPanelError = ref<string | null>(null);
+
+const PanelErrorBoundary = defineComponent({
+  name: "PanelErrorBoundary",
+  emits: { error: (message: string) => typeof message === "string" },
+  setup(_props, { emit, slots }) {
+    onErrorCaptured((error) => {
+      emit("error", error instanceof Error ? error.message : String(error));
+      return false;
+    });
+    return () => slots.default?.();
+  },
+});
 
 // 异步加载 Agent 面板，避免依赖包加载失败时整页设置无法打开。
 const AgentProfilePanel = defineAsyncComponent({
@@ -25,14 +38,20 @@ const AgentProfilePanel = defineAsyncComponent({
   },
 });
 
+const AgentConnectionPanel = defineAsyncComponent({
+  loader: () => import("@/components/AgentConnectionPanel.vue"),
+  suspensible: false,
+  onError(error, _retry, fail) {
+    console.error("AgentConnectionPanel failed to load", error);
+    agentConnectionPanelError.value = error instanceof Error ? error.message : String(error);
+    fail();
+  },
+});
+
 onErrorCaptured((err, _instance, info) => {
-  // 子树（Agent 面板等）出错时保留设置页骨架，不让整页白屏。
+  // 其他子树出错时仍保留设置页骨架；Agent 两个异步面板各有自己的边界。
   const message = err instanceof Error ? err.message : String(err);
-  if (info.includes("AgentProfile") || info.includes("agent")) {
-    agentPanelError.value = message;
-  } else {
-    pageError.value = message;
-  }
+  pageError.value = message;
   console.error("SettingsView captured error", err, info);
   return false;
 });
@@ -247,7 +266,18 @@ onMounted(loadUpdateSource);
       <p v-if="agentPanelError" class="diag-err" role="alert">
         {{ t("settings.agentPanelFailed", { err: agentPanelError }) }}
       </p>
-      <AgentProfilePanel v-else />
+      <PanelErrorBoundary v-else @error="agentPanelError = $event">
+        <AgentProfilePanel />
+      </PanelErrorBoundary>
+    </section>
+
+    <section id="agent-connections" class="useful-card settings-section" data-testid="agent-connections-settings">
+      <p v-if="agentConnectionPanelError" class="diag-err" role="alert">
+        {{ t("settings.agentConnectionPanelFailed", { err: agentConnectionPanelError }) }}
+      </p>
+      <PanelErrorBoundary v-else @error="agentConnectionPanelError = $event">
+        <AgentConnectionPanel />
+      </PanelErrorBoundary>
     </section>
 
     <section class="useful-card settings-section">

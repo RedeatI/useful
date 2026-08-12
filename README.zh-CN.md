@@ -51,6 +51,12 @@ Windows 进程观测和第三方工具扩展能力。
   全部返回，要么整体失败，不产生部分集合。candidate-ready 与所有值为 true 的 claim 也只是本进程自报，
   Schema/parser 通过不认证执行。verifier 不执行 Codex、Claude、browser 或 input 命令，不读写宿主配置，
   不接受 profile，也不认证外部 Agent 已安装、已配置、已连接或会接受候选。
+- **Agent Connections Inspector：** 设置页只接收用户在终端运行
+  `useful agent verify-all ... --json` 后显式粘贴的 JSON。浏览器专用 parser 会先执行 1 MiB 输入预算、严格闭集
+  shape 与 cross-field 绑定校验，再显示四个 user-scope 候选；复制候选始终需要显式操作。Inspector 没有 IPC、
+  子进程、路径选择器、宿主配置读取/写入、自动剪贴板读写，也不执行 `commandArgv`。parser 通过仍是 self-reported，
+  且 `documentAuthenticated: false`：不证明 Codex/Claude 已安装、已配置、已连接或会接受候选，也不证明签名、
+  来源或发布授权。本机路径可能进入剪贴板。当前没有受信的 Node + Agent Kit 锚点，因此刻意不提供桌面一键运行。
 - **离线 Computer Use 能力自检：** `computer-use probe --json` 校验包内 `useful.computer-use.v1`
   合同、固定 9 项动作类型闭集、默认 controller 仍禁用、`host-desktop` 被拒绝，以及宿主注入 browser adapter
   接口存在。`useful.computer-use-probe.v1` 的 claims 只是本机自报，且

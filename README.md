@@ -64,6 +64,15 @@ Agent host.
   Schema/parser success does not authenticate execution. The verifier does not execute Codex,
   Claude, browser, or input commands; read or write host configuration; accept a profile; or attest
   that an external Agent is installed, configured, connected, or will accept a candidate.
+- **Agent Connections Inspector:** Settings accepts only JSON that the user explicitly pastes after
+  running `useful agent verify-all ... --json` in a terminal. A browser-only parser applies a 1 MiB
+  input budget, exact closed shapes, and cross-field bindings before showing the four user-scope
+  candidates; copying a candidate is always an explicit action. The inspector has no IPC, child
+  process, path picker, host-configuration access, automatic clipboard read/write, or `commandArgv`
+  execution. Parser success remains self-reported with `documentAuthenticated: false`: it does not
+  prove Codex/Claude is installed, configured, connected, or will accept the candidate, and does not
+  prove signature, origin, or publication authorization. Local paths may enter the clipboard. A
+  desktop one-click runner is intentionally absent until there is a trusted Node + Agent Kit anchor.
 - **Offline Computer Use capability probe:** `computer-use probe --json` validates the bundled
   `useful.computer-use.v1` contract, fixed nine-action-type closure, disabled default controller,
   host-desktop rejection, and the presence of the host-injected browser-adapter interface. Its
