@@ -90,6 +90,13 @@ that a remote job ran. It does not show that a platform binary works.
 
 - GitHub Private Vulnerability Reporting enabled on `RedeatI/useful` ([SECURITY.md](../SECURITY.md))
 
+### Desktop preview product friction (beta.4)
+
+- Some binaries attached to `v0.1.0-beta.4` may still show an in-app badge of `0.1.0-beta.1`
+  because `HOST_VERSION` is compiled from the Cargo package version at build time. Treat the
+  Release asset names and monorepo version as `0.1.0-beta.4`. Fix: rebuild the unsigned preview
+  packages from current source and replace the Release assets.
+
 ## Related documents
 
 - Full Chinese detail: [已知限制](KNOWN-LIMITATIONS.md)

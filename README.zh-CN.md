@@ -19,26 +19,34 @@ Useful 包含：
 其他 Agent 宿主的配置。
 
 > [!IMPORTANT]
-> Useful 是开发者预览版。请从源码构建。官方签名安装包和生产更新源尚不可用。Windows 是主要开发
-> 平台。部分原生功能在 macOS 或 Linux 上不可用。阅读
+> Useful 是开发者预览版。官方**签名**安装包和生产更新源尚不可用。未签名的 Windows 桌面预览包已在
+> [v0.1.0-beta.4](https://github.com/RedeatI/useful/releases/tag/v0.1.0-beta.4) 发布（推荐便携 zip）。
+> Windows 是主要开发平台。部分原生功能在 macOS 或 Linux 上不可用。阅读
 > [已知限制](docs/KNOWN-LIMITATIONS.md)。
 
 ![Useful 工具库界面](docs/assets/readme/workflow.zh-CN.svg)
 
 ### 界面截图
 
-| 工具箱 | Base64 | 哈希 |
+| 工具库 | Base64 | 哈希 |
 | --- | --- | --- |
-| ![工具箱](docs/assets/readme/utilities-grid.png) | ![Base64](docs/assets/readme/tool-base64.png) | ![哈希](docs/assets/readme/tool-hash.png) |
+| ![工具库](docs/assets/readme/utilities-grid.png) | ![Base64](docs/assets/readme/tool-base64.png) | ![哈希](docs/assets/readme/tool-hash.png) |
 
 
 ### 下载（未签名 Windows 预览）
 
 发布页：[v0.1.0-beta.4](https://github.com/RedeatI/useful/releases/tag/v0.1.0-beta.4)
 
-- **首选：** `Useful-0.1.0-beta.4-windows-x64-portable.zip` - 解压后打开 `Useful` 文件夹，运行 `Useful.exe`
-- 可选：`.msi` / `-setup.exe`，或 `Useful-0.1.0-beta.4-windows-x64-bundle.zip`
-- 可能出现 SmartScreen 警告。当前不是 Authenticode 签名的生产包。
+**首选：便携 zip**
+
+1. 下载 `Useful-0.1.0-beta.4-windows-x64-portable.zip`
+2. 解压
+3. 打开内层文件夹 `Useful`
+4. 运行 `Useful.exe`（保留旁边的 `portable.flag`）
+5. 数据目录为 `Useful\data\`
+
+可选：`.msi` / `-setup.exe`，或 `Useful-0.1.0-beta.4-windows-x64-bundle.zip`。  
+可能出现 SmartScreen 警告。当前**不是** Authenticode 签名的生产包。
 
 
 
@@ -61,7 +69,7 @@ Useful 包含：
 界面支持简体中文与 English (US)。提供浅色与深色主题。
 
 在 Windows 上，若 `Useful.exe` 旁存在 `portable.flag`，便携模式把数据写入 `./data`。否则数据写入
-`%APPDATA%\Useful`。
+`%APPDATA%\Useful`。需要便携布局时请勿删除 `portable.flag`。
 
 ## 从源码运行
 
