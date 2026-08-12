@@ -78,18 +78,29 @@ Availability and download targets are **only**:
 
 No user-supplied free-form URL fetch in the install path.
 
-## CLI surface (P0-1b target)
-
-Proposed commands (names adjustable, behavior not):
+## CLI surface (P0-1b — implemented)
 
 ```text
-useful source storage doctor   --json
-useful source storage dry-run  --source <dir> --json
-useful source storage push     --source <dir> --json
-useful source storage verify   --source <dir> --json   # remote Head matches local
+useful source storage doctor                         [--json]
+useful source storage dry-run  [源目录]              [--export <静态导出>] [--json]
+useful source storage push     [源目录]              [--export <静态导出>] [--json]
+useful source storage verify   [源目录]              [--export <静态导出>] [--json]
 ```
 
-Exit non-zero on size mismatch, missing object, or bad credentials.
+| Backend | Env |
+| --- | --- |
+| `fs` (default) | `USEFUL_STORAGE_BACKEND=fs`, `USEFUL_STORAGE_ROOT`, optional `USEFUL_STORAGE_PUBLIC_BASE_URL`, `USEFUL_STORAGE_PREFIX` |
+| `s3` | `USEFUL_STORAGE_BACKEND=s3`, `USEFUL_STORAGE_ENDPOINT`, `USEFUL_STORAGE_BUCKET`, `USEFUL_STORAGE_ACCESS_KEY`, `USEFUL_STORAGE_SECRET_KEY`, `USEFUL_STORAGE_PUBLIC_BASE_URL`, optional `USEFUL_STORAGE_REGION`, `USEFUL_STORAGE_FORCE_PATH_STYLE=1`, `USEFUL_STORAGE_PREFIX` |
+
+Upload plan:
+
+1. Run `export-static` (or use an existing static export tree).
+2. Put every file under `.well-known/`, `metadata/`, `targets/`, `catalog/`.
+3. Also put each target artifact at `sha256/{digest}` (content-addressed).
+4. Never upload `keys/` or `repository/`.
+
+Exit non-zero on size mismatch, missing object, object conflict, or bad credentials.
+Idempotent put: identical bytes → `unchanged`; different bytes at same key → refuse.
 
 ## Client surface (P0-1c target)
 
@@ -114,11 +125,12 @@ Exit non-zero on size mismatch, missing object, or bad credentials.
 
 ## Implementation checklist
 
-- [ ] Map current `export-static` tree → `sha256/` keys
-- [ ] Add storage doctor/dry-run/push/verify to CLI
-- [ ] Integration test with MinIO in CI or local compose
-- [ ] Source Center display + download verify
-- [ ] Threat note: malicious catalog pointing to wrong digest must fail pin checks
+- [x] Map current `export-static` tree → `sha256/` keys
+- [x] Add storage doctor/dry-run/push/verify to CLI (`packages/useful-cli/bin/source/storage.mjs`)
+- [x] Unit tests for fs backend (`storage.spec.mjs`)
+- [ ] Live integration test with MinIO/R2 (optional CI)
+- [ ] Source Center display + download verify (P0-1c)
+- [x] Threat note: same-key different bytes refused; keys/ never uploaded
 
 ## Related
 

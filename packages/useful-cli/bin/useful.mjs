@@ -392,7 +392,15 @@ async function main() {
   const [cmd, ...rest] = process.argv.slice(2);
   const jsonMode = process.argv.slice(2).includes("--json");
   const agentCommands = new Set(["create", "doctor", "validate", "pack", "agent-contract"]);
-  if (jsonMode && !agentCommands.has(cmd) && cmd !== "publisher" && cmd !== "agent" && cmd !== "computer-use") {
+  // source storage supports --json; other source subcommands ignore it or print text.
+  if (
+    jsonMode
+    && !agentCommands.has(cmd)
+    && cmd !== "publisher"
+    && cmd !== "agent"
+    && cmd !== "computer-use"
+    && cmd !== "source"
+  ) {
     throw usageError("JSON_UNSUPPORTED", `命令 ${cmd ?? "<none>"} 不支持 --json`, { command: cmd ?? null });
   }
   if (cmd === "agent") {
@@ -472,6 +480,13 @@ async function sourceMain(rest) {
     cmdValidate: cmdSourceValidate,
   } = await import("./source/source.mjs");
   const [sub, ...args] = rest;
+
+  // useful source storage <doctor|dry-run|push|verify> ...
+  if (sub === "storage") {
+    await sourceStorageMain(args);
+    return;
+  }
+
   const { opts, positional } = parseOpts(args);
   const dir = path.resolve(positional[0] ?? ".");
   try {
@@ -502,12 +517,78 @@ async function sourceMain(rest) {
         break;
       default:
         console.log(
-          "用法: useful source <init|add-package|remove-package|publish|rotate-root|export-static|validate|serve> [目录] [参数]",
+          "用法: useful source <init|add-package|remove-package|publish|rotate-root|export-static|validate|serve|storage> [目录] [参数]",
         );
         process.exit(sub ? 1 : 0);
     }
   } catch (e) {
     console.error(`✗ ${e instanceof Error ? e.message : e}`);
+    process.exit(1);
+  }
+}
+
+async function sourceStorageMain(rest) {
+  const {
+    StorageError,
+    doctorStorage,
+    dryRunStorage,
+    pushStorage,
+    verifyStorage,
+    printHuman,
+  } = await import("./source/storage.mjs");
+  const [action, ...args] = rest;
+  const { opts, positional } = parseOpts(args);
+  const asJson = Boolean(opts.json);
+  const sourceDir = path.resolve(positional[0] ?? ".");
+  const exportDir = opts.export ? path.resolve(String(opts.export)) : undefined;
+
+  function emit(result) {
+    if (asJson) {
+      writeJson(result);
+      if (!result.ok) process.exit(1);
+      return;
+    }
+    printHuman(result);
+    if (!result.ok) process.exit(1);
+  }
+
+  try {
+    switch (action) {
+      case "doctor":
+        emit(await doctorStorage());
+        break;
+      case "dry-run":
+        emit(await dryRunStorage(sourceDir, { exportDir }));
+        break;
+      case "push":
+        emit(await pushStorage(sourceDir, { exportDir }));
+        break;
+      case "verify":
+        emit(await verifyStorage(sourceDir, { exportDir }));
+        break;
+      default:
+        console.log(
+          "用法: useful source storage <doctor|dry-run|push|verify> [源目录] [--export <静态导出目录>] [--json]",
+        );
+        console.log("环境变量: USEFUL_STORAGE_BACKEND=fs|s3, USEFUL_STORAGE_ROOT (fs),");
+        console.log(
+          "  USEFUL_STORAGE_ENDPOINT/BUCKET/ACCESS_KEY/SECRET_KEY/PUBLIC_BASE_URL (s3)",
+        );
+        process.exit(action ? 1 : 0);
+    }
+  } catch (e) {
+    if (asJson) {
+      writeJson({
+        schemaVersion: "useful.source-storage.v1",
+        ok: false,
+        error: {
+          code: e instanceof StorageError ? e.code : "storage_error",
+          message: e instanceof Error ? e.message : String(e),
+        },
+      });
+    } else {
+      console.error(`✗ ${e instanceof Error ? e.message : e}`);
+    }
     process.exit(1);
   }
 }
