@@ -1,8 +1,11 @@
-{
+﻿{
   "$schema": "https://schema.tauri.app/config/2",
   "bundle": {
-    "targets": ["nsis"],
+    "targets": ["msi", "nsis"],
     "windows": {
+      "wix": {
+        "language": "en-US"
+      },
       "nsis": {
         "installerIcon": "icons/icon.ico",
         "compression": "lzma"
