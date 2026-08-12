@@ -51,7 +51,8 @@
 - 需填入：如项目主张已注册商标，由 Owner 提供准确的权利人、司法辖区和注册信息。
 
 ## OG-10 私密安全报告渠道与响应范围
-- 现状：`SECURITY.md` 指定 GitHub Private Vulnerability Reporting，但远端启用和实测仍是发布门禁。
+- 现状：`SECURITY.md` 指定 GitHub Private Vulnerability Reporting；远端 API 已 `enabled=true`（2026-08-12）。
+  仍建议 Owner 在 UI 点一次 **Report a vulnerability** 做实测；响应 SLA / 支持版本窗口尚未定稿。
 - 需填入：维护负责人、支持版本、响应与披露范围；若另设安全邮箱，必须由 Owner 确认并实测。
 
 ---

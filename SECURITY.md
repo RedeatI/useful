@@ -17,10 +17,13 @@ Do not include credentials, private keys, personal data, or unnecessary producti
 open a public issue for an unpatched vulnerability.
 
 The canonical publication target is `https://github.com/RedeatI/useful`. This policy does not invent
-a security email address or treat the presence of this file as proof that a private channel works.
-**Private Vulnerability Reporting must be enabled and tested before public participation or the
-first public release.** If the private reporting button is unavailable, the repository is not
-release-ready; maintainers must establish the private channel before inviting vulnerability reports.
+a security email address.
+
+**Status (2026-08-12):** GitHub Private Vulnerability Reporting is **enabled** on `RedeatI/useful`
+(API `private-vulnerability-reporting.enabled=true`). Prefer that channel for vulnerability reports.
+Maintainers should still click **Report a vulnerability** once in the UI after any repository transfer
+or security-settings change. If the private reporting button is unavailable, the repository is not
+release-ready for inviting vulnerability reports until the channel is restored.
 
 Response times, bounty eligibility, supported-version windows, and disclosure timelines will be
 published when repository ownership and maintainer coverage are finalized. No bounty is promised by

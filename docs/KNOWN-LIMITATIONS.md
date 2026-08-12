@@ -103,12 +103,14 @@ Windows 为主要验证目标的能力。macOS/Linux 应明确降级或报告不
 - 公开仓库：`https://github.com/RedeatI/useful`
 - 源码/Agent Kit 与未签名 Windows 桌面预览 Release（例如 `v0.1.0-beta.3`、`v0.1.0-beta.4`）
 - 双语 README 与英文入口文档
+- GitHub Private Vulnerability Reporting 已在 `RedeatI/useful` 启用（见 [`SECURITY.md`](../SECURITY.md)）
 
 ### 仍需 Owner / 平台证据
 
 - Windows/macOS 正式代码签名身份与 macOS 公证凭据
-- 生产更新根与 HTTPS 更新 feed
+- 生产更新根与带真实签名清单的 HTTPS 更新 feed
 - Full edition 的 GPL 对应源码和许可证证据
-- [`SECURITY.md`](../SECURITY.md) 中已启用并实测的 Private Vulnerability Reporting
 - 精确候选的真实 macOS/Linux runner 执行，以及绑定候选的 Windows 原生视觉与运行验收
-- 社区投稿入口（Issues / PR intake）在私报通道与 CoC 执法路径就绪前保持关闭
+- 命名 CoC 执法联系人后再广泛开放 drive-by 投稿（见 [`CODE_OF_CONDUCT.md`](../CODE_OF_CONDUCT.md)）
+- 一条未关闭的 Rust Dependabot medium：`glib` 0.18.x（GHSA-wrw7-89jp-8q8g），受 gtk 0.18 /
+  Tauri Linux 链路限制，需等上游可兼容升级；见 [OPEN-SOURCE-REMAINING-GATES.md](OPEN-SOURCE-REMAINING-GATES.md) §7
