@@ -101,7 +101,7 @@ Windows 为主要验证目标的能力。macOS/Linux 应明确降级或报告不
 ### 已完成
 
 - 公开仓库：`https://github.com/RedeatI/useful`
-- 源码与 Agent Kit 预览 Release（例如 `v0.1.0-beta.3`）
+- 源码/Agent Kit 与未签名 Windows 桌面预览 Release（例如 `v0.1.0-beta.3`、`v0.1.0-beta.4`）
 - 双语 README 与英文入口文档
 
 ### 仍需 Owner / 平台证据

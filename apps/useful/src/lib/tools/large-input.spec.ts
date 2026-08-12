@@ -11,8 +11,6 @@ import {
 } from "./transforms";
 import { hashText } from "./hash";
 
-const LARGE_INPUT_TIMEOUT_MS = 30_000;
-
 function makeText(size: number): string {
   const chars = "ABCDEFGHIJabcdefghij0123456789你好世界";
   let result = "";
@@ -81,27 +79,27 @@ describe("10MB 大输入性能验证", () => {
     expect(encoded.length).toBeGreaterThan(MB_10);
     const decoded = base64Decode(encoded);
     expect(decoded.length).toBe(MB_10);
-  }, LARGE_INPUT_TIMEOUT_MS);
+  });
 
   it("Base64 10MB 往返一致性", () => {
     const text = makeText(MB_10);
     const encoded = base64Encode(text);
     const decoded = base64Decode(encoded);
     expect(decoded).toBe(text);
-  }, LARGE_INPUT_TIMEOUT_MS);
+  });
 
   it("URL 10MB 编解码往返一致", () => {
     const text = makeText(MB_10);
     const encoded = urlEncode(text);
     const decoded = urlDecode(encoded);
     expect(decoded).toBe(text);
-  }, LARGE_INPUT_TIMEOUT_MS);
+  });
 
   it("SHA-256 10MB 哈希可完成", async () => {
     const text = makeText(MB_10);
     const hash = await hashText("SHA-256", text);
     expect(hash).toMatch(/^[0-9a-f]{64}$/);
-  }, LARGE_INPUT_TIMEOUT_MS);
+  });
 
   it("空输入不崩溃", () => {
     expect(() => base64Encode("")).not.toThrow();
@@ -113,5 +111,5 @@ describe("10MB 大输入性能验证", () => {
     const encoded = base64Encode(unicode);
     const decoded = base64Decode(encoded);
     expect(decoded).toBe(unicode);
-  }, LARGE_INPUT_TIMEOUT_MS);
+  }, 30_000);
 });

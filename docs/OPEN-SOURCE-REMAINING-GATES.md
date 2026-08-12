@@ -21,9 +21,9 @@ It is not a publication authorization.
 | Canonical public repo `RedeatI/useful` | done | Public |
 | Useful product identity consistency | done | README and package names use Useful |
 | Root LICENSE / LICENSES map | partial | Files present; each release still needs candidate-specific legal review |
-| Private Vulnerability Reporting enabled and tested | blocked | Must verify Security 鈫?Advisories 鈫?Report a vulnerability works |
-| Public Issues / contribution intake | blocked | Keep closed until private reporting and CoC enforcement owner are ready |
-| Branch protection and review rules | partial | Confirm default-branch protection in GitHub settings |
+| Private Vulnerability Reporting enabled and tested | done | API reports `enabled: true` (2026-08-12); still re-test the report UI manually |
+| Public Issues / contribution intake | partial | `has_issues=true` (0 open); confirm CoC enforcement contact before inviting drive-by PRs |
+| Branch protection and review rules | done | `main` has protection (linear history, no force-push); review count may still be 0 |
 
 ## 2. Source publication path
 
@@ -79,10 +79,8 @@ It is not a publication authorization.
 
 ## Related
 
-- [OWNER-WINDOWS-CODE-SIGN-GUIDE.zh-CN.md](OWNER-WINDOWS-CODE-SIGN-GUIDE.zh-CN.md) — Windows 证书购买与上传
-
-- [OWNER-SIGNING-GATE-CHECKLIST.md](OWNER-SIGNING-GATE-CHECKLIST.md) 鈥?variables, secrets, verification commands
-- [OWNER-GATES.md](OWNER-GATES.md) 鈥?commercial Owner gates
+- [OWNER-SIGNING-GATE-CHECKLIST.md](OWNER-SIGNING-GATE-CHECKLIST.md) — variables, secrets, verification commands
+- [OWNER-GATES.md](OWNER-GATES.md) — commercial Owner gates
 
 ## Current desktop packaging claim boundary
 
