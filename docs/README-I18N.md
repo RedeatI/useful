@@ -1,4 +1,4 @@
-﻿# README and docs language map
+# README and docs language map
 
 This page lists English entry documents for readers who start from the default English README.
 
@@ -25,4 +25,4 @@ claims aligned with both.
 
 Do not invent English-only product claims that Chinese docs reject.
 | Open-source remaining gates | [OPEN-SOURCE-REMAINING-GATES.md](OPEN-SOURCE-REMAINING-GATES.md) | — |
-
+| Owner signing gate checklist | [OWNER-SIGNING-GATE-CHECKLIST.md](OWNER-SIGNING-GATE-CHECKLIST.md) | — |
