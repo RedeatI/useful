@@ -3,7 +3,7 @@ import { defineStore } from "pinia";
 import { computed, nextTick, ref, watch } from "vue";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import ipc from "@/lib/ipc";
-import { setLocale } from "@/i18n";
+import { getLocale, setLocale } from "@/i18n";
 import {
   HOME_SECTION_IDS,
   NAVIGATION_ITEM_IDS,
@@ -101,11 +101,14 @@ async function applyNativeTheme(theme: Theme): Promise<void> {
 export const useUiStore = defineStore("ui", () => {
   const theme = ref<Theme>("system");
   const language = ref<Locale>("zh-CN");
+  const requestedLanguage = ref<Locale>("zh-CN");
   const sidebarCollapsed = ref(false);
   const developerMode = ref(false);
   const commandPaletteOpen = ref(false);
   const loaded = ref(false);
   const navigationLayout = ref<NavigationLayoutV1>(defaultNavigationLayout());
+  let languageIntentGeneration = 0;
+  let suppressLanguageWatch = false;
 
   const visibleNavigation = computed(() => navigationLayout.value.nav.filter((item) => item.visible).sort((a, b) => a.order - b.order));
   const visibleHomeSections = computed(() => navigationLayout.value.home.filter((item) => item.visible).sort((a, b) => a.order - b.order));
@@ -123,11 +126,35 @@ export const useUiStore = defineStore("ui", () => {
     }
   }
 
+  function syncLanguageState(locale: Locale): void {
+    if (language.value === locale) return;
+    suppressLanguageWatch = true;
+    language.value = locale;
+    suppressLanguageWatch = false;
+  }
+
+  async function applyLanguageIntent(locale: Locale, generation: number, persist: boolean): Promise<boolean> {
+    const applied = await setLocale(locale);
+    if (generation !== languageIntentGeneration) return false;
+    if (!applied) {
+      const activeLocale = getLocale();
+      syncLanguageState(activeLocale);
+      requestedLanguage.value = activeLocale;
+      return false;
+    }
+    syncLanguageState(locale);
+    requestedLanguage.value = locale;
+    if (persist) void ipc.updateSetting("language", locale).catch(() => {});
+    return true;
+  }
+
   async function load(): Promise<void> {
+    const languageIntent = ++languageIntentGeneration;
+    let persistedLanguage = language.value;
     try {
       const settings: Settings = await ipc.getSettings();
       theme.value = settings.theme;
-      language.value = settings.language;
+      persistedLanguage = settings.language;
       sidebarCollapsed.value = settings.sidebarCollapsed;
       developerMode.value = settings.developerMode;
     } catch {
@@ -135,7 +162,10 @@ export const useUiStore = defineStore("ui", () => {
     }
     applyTheme(theme.value);
     void applyNativeTheme(theme.value).catch(() => {});
-    setLocale(language.value);
+    if (languageIntent === languageIntentGeneration) {
+      requestedLanguage.value = persistedLanguage;
+      await applyLanguageIntent(persistedLanguage, languageIntent, false);
+    }
     loadNavigationLayout();
     // Flush hydration watchers while persistence is still disabled. Loaded settings
     // must not be written back or invoke the native theme contract a second time.
@@ -150,10 +180,11 @@ export const useUiStore = defineStore("ui", () => {
     void ipc.updateSetting("theme", t).catch(() => {});
   });
   watch(language, (locale) => {
-    setLocale(locale);
-    if (!loaded.value) return;
-    void ipc.updateSetting("language", locale).catch(() => {});
-  });
+    if (suppressLanguageWatch) return;
+    const generation = ++languageIntentGeneration;
+    requestedLanguage.value = locale;
+    void applyLanguageIntent(locale, generation, loaded.value).catch(() => {});
+  }, { flush: "sync" });
   watch(sidebarCollapsed, (v) => {
     if (!loaded.value) return;
     void ipc.updateSetting("sidebarCollapsed", String(v)).catch(() => {});
@@ -175,8 +206,10 @@ export const useUiStore = defineStore("ui", () => {
   function setTheme(t: Theme): void {
     theme.value = t;
   }
-  function setLanguage(locale: Locale): void {
-    language.value = locale;
+  function setLanguage(locale: Locale): Promise<boolean> {
+    const generation = ++languageIntentGeneration;
+    requestedLanguage.value = locale;
+    return applyLanguageIntent(locale, generation, true);
   }
   function setNavigationDensity(density: NavigationDensity): void {
     navigationLayout.value = { ...navigationLayout.value, density };
@@ -216,6 +249,7 @@ export const useUiStore = defineStore("ui", () => {
   return {
     theme,
     language,
+    requestedLanguage,
     sidebarCollapsed,
     developerMode,
     commandPaletteOpen,

@@ -1206,6 +1206,17 @@ jobs:
             verification = $(if ($env:WINDOWS_SIGNED -eq 'true') { 'Get-AuthenticodeSignature=Valid' } else { 'not-performed' })
           } | ConvertTo-Json -Compress
           Write-NewText (Join-Path $PWD 'signing-windows-x64.json') "$signingEvidence`n" ([Text.UTF8Encoding]::new($false))
+      - name: Measure and enforce Windows release size budgets
+        if: matrix.platform == 'windows'
+        shell: pwsh
+        env:
+          USEFUL_SIZE_EXPECTED_COMMIT: ${{ github.sha }}
+          TARGET: ${{ matrix.target }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          & ./scripts/measure-size.ps1 -OutDir release-assets -Target $env:TARGET -ExpectedCommit $env:USEFUL_SIZE_EXPECTED_COMMIT
+          pnpm size:check --profile release --json
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Remove ephemeral Windows certificate material
         if: always() && matrix.platform == 'windows'
         shell: pwsh

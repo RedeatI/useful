@@ -135,6 +135,79 @@ test("CI requires the fail-closed release-readiness command", async (t) => {
   assertViolation(runChecker(root), "ci.yml", "ci-release-readiness-gate-missing");
 });
 
+test("CI requires size measurement and production enforcement after Lite packaging", async (t) => {
+  const root = await createFixture(t);
+  await mutateWorkflow(root, "ci.yml", (workflow) => {
+    workflow.jobs["build-and-test"].steps = workflow.jobs["build-and-test"].steps
+      .filter((step) => !String(step.run ?? "").includes("pnpm size:check --profile ci --json"));
+  });
+  assertViolation(runChecker(root), "ci.yml", "ci-size-budget-production-gate-invalid");
+});
+
+test("CI rejects a size gate moved before the package it measures", async (t) => {
+  const root = await createFixture(t);
+  await mutateWorkflow(root, "ci.yml", (workflow) => {
+    const steps = workflow.jobs["build-and-test"].steps;
+    const sizeIndex = steps.findIndex((step) => String(step.run ?? "").includes("pnpm size:check --profile ci --json"));
+    const [sizeStep] = steps.splice(sizeIndex, 1);
+    const packageIndex = steps.findIndex((step) => String(step.run ?? "").includes("package-release.ps1 -Edition Lite"));
+    steps.splice(packageIndex, 0, sizeStep);
+  });
+  assertViolation(runChecker(root), "ci.yml", "ci-size-budget-production-gate-invalid");
+});
+
+test("CI size gate receives expected commit through env rather than inline shell interpolation", async (t) => {
+  const root = await createFixture(t);
+  await mutateWorkflow(root, "ci.yml", (workflow) => {
+    const step = workflow.jobs["build-and-test"].steps
+      .find((candidate) => String(candidate.run ?? "").includes("pnpm size:check --profile ci --json"));
+    delete step.env.USEFUL_SIZE_EXPECTED_COMMIT;
+    step.run = step.run.replaceAll("$env:USEFUL_SIZE_EXPECTED_COMMIT", "${{ github.sha }}");
+  });
+  assertViolation(runChecker(root), "ci.yml", "ci-size-budget-production-gate-invalid");
+});
+
+test("CI size gate rejects continue-on-error, early exit, and command substring spoofing", async (t) => {
+  for (const mutation of ["continue", "exit", "spoof"]) {
+    await t.test(mutation, async (subtest) => {
+      const root = await createFixture(subtest);
+      await mutateWorkflow(root, "ci.yml", (workflow) => {
+        const step = workflow.jobs["build-and-test"].steps
+          .find((candidate) => String(candidate.run ?? "").includes("pnpm size:check --profile ci --json"));
+        if (mutation === "continue") step["continue-on-error"] = "${{ true }}";
+        if (mutation === "exit") step.run = `exit 0\n${step.run}`;
+        if (mutation === "spoof") step.run = step.run.replace(
+          "pnpm size:check --profile ci --json",
+          "echo pnpm size:check --profile ci --json",
+        );
+      });
+      assertViolation(runChecker(root), "ci.yml", "ci-size-budget-production-gate-invalid");
+    });
+  }
+});
+
+test("CI size gate rejects extra report arguments, extra env, and upload-before-check order", async (t) => {
+  for (const mutation of ["argument", "env", "order"]) {
+    await t.test(mutation, async (subtest) => {
+      const root = await createFixture(subtest);
+      await mutateWorkflow(root, "ci.yml", (workflow) => {
+        const steps = workflow.jobs["build-and-test"].steps;
+        const size = steps.find((candidate) => String(candidate.run ?? "").includes("pnpm size:check --profile ci --json"));
+        if (mutation === "argument") {
+          size.run = size.run.replace("measure-size.ps1", "measure-size.ps1 -ReportDir release-assets");
+        }
+        if (mutation === "env") size.env.UNREVIEWED = "1";
+        if (mutation === "order") {
+          const uploadIndex = steps.findIndex((step) => String(step.uses ?? "").startsWith("actions/upload-artifact@"));
+          const [upload] = steps.splice(uploadIndex, 1);
+          steps.splice(steps.indexOf(size), 0, upload);
+        }
+      });
+      assertViolation(runChecker(root), "ci.yml", "ci-size-budget-production-gate-invalid");
+    });
+  }
+});
+
 test("release verification requires the public-release policy regression suite", async (t) => {
   const root = await createFixture(t);
   await mutateWorkflow(root, "release.yml", (workflow) => {
@@ -149,6 +222,108 @@ test("release verification requires the public-release policy regression suite",
     "release-verification-command-missing",
     "pnpm policy:test",
   );
+});
+
+test("release requires the Windows production size gate after packaging", async (t) => {
+  const root = await createFixture(t);
+  await mutateWorkflow(root, "release.yml", (workflow) => {
+    workflow.jobs.build.steps = workflow.jobs.build.steps
+      .filter((step) => !String(step.run ?? "").includes("pnpm size:check --profile release --json"));
+  });
+  assertViolation(runChecker(root), "release.yml", "release-size-budget-production-gate-invalid");
+});
+
+test("release size gate is Windows-only and binds expected commit through env", async (t) => {
+  const root = await createFixture(t);
+  await mutateWorkflow(root, "release.yml", (workflow) => {
+    const step = workflow.jobs.build.steps
+      .find((candidate) => String(candidate.run ?? "").includes("pnpm size:check --profile release --json"));
+    step.if = "matrix.platform == 'linux'";
+    step.env.USEFUL_SIZE_EXPECTED_COMMIT = "not-a-sha";
+  });
+  assertViolation(runChecker(root), "release.yml", "release-size-budget-production-gate-invalid");
+});
+
+test("release size gate rejects continue-on-error, early exit, and command substring spoofing", async (t) => {
+  for (const mutation of ["continue", "exit", "spoof"]) {
+    await t.test(mutation, async (subtest) => {
+      const root = await createFixture(subtest);
+      await mutateWorkflow(root, "release.yml", (workflow) => {
+        const step = workflow.jobs.build.steps
+          .find((candidate) => String(candidate.run ?? "").includes("pnpm size:check --profile release --json"));
+        if (mutation === "continue") step["continue-on-error"] = true;
+        if (mutation === "exit") step.run = `exit 0\n${step.run}`;
+        if (mutation === "spoof") step.run = step.run.replace(
+          "pnpm size:check --profile release --json",
+          "echo pnpm size:check --profile release --json",
+        );
+      });
+      assertViolation(runChecker(root), "release.yml", "release-size-budget-production-gate-invalid");
+    });
+  }
+});
+
+test("release size gate rejects extra report arguments, extra env, and upload-before-check order", async (t) => {
+  for (const mutation of ["argument", "env", "order"]) {
+    await t.test(mutation, async (subtest) => {
+      const root = await createFixture(subtest);
+      await mutateWorkflow(root, "release.yml", (workflow) => {
+        const steps = workflow.jobs.build.steps;
+        const size = steps.find((candidate) => String(candidate.run ?? "").includes("pnpm size:check --profile release --json"));
+        if (mutation === "argument") {
+          size.run = size.run.replace(
+            "pnpm size:check --profile release --json",
+            "pnpm size:check --profile release --report release-assets/size-report.json --json",
+          );
+        }
+        if (mutation === "env") size.env.UNREVIEWED = "1";
+        if (mutation === "order") {
+          const uploadIndex = steps.findIndex((step) => String(step.uses ?? "").startsWith("actions/upload-artifact@"));
+          const [upload] = steps.splice(uploadIndex, 1);
+          steps.splice(steps.indexOf(size), 0, upload);
+        }
+      });
+      assertViolation(runChecker(root), "release.yml", "release-size-budget-production-gate-invalid");
+    });
+  }
+});
+
+test("size reports cannot enter CI artifact uploads", async (t) => {
+  const root = await createFixture(t);
+  await mutateWorkflow(root, "ci.yml", (workflow) => {
+    const upload = workflow.jobs["build-and-test"].steps
+      .find((step) => String(step.uses ?? "").startsWith("actions/upload-artifact@"));
+    upload.with.path += "\nartifacts/size/size-report.json";
+  });
+  assertViolation(runChecker(root), "ci.yml", "ci-size-report-upload-forbidden");
+});
+
+test("CI upload paths are an exact allowlist and reject broad globs", async (t) => {
+  for (const candidate of ["artifacts/size/size-report.json", "artifacts/**", ".", "**/*"]) {
+    await t.test(candidate, async (subtest) => {
+      const root = await createFixture(subtest);
+      await mutateWorkflow(root, "ci.yml", (workflow) => {
+        const upload = workflow.jobs["build-and-test"].steps
+          .find((step) => String(step.uses ?? "").startsWith("actions/upload-artifact@"));
+        upload.with.path = candidate;
+      });
+      assertViolation(runChecker(root), "ci.yml", "ci-size-report-upload-forbidden");
+    });
+  }
+});
+
+test("release upload paths are an exact allowlist and reject broad globs", async (t) => {
+  for (const candidate of ["artifacts/size/size-report.json", "artifacts/**", ".", "**/*"]) {
+    await t.test(candidate, async (subtest) => {
+      const root = await createFixture(subtest);
+      await mutateWorkflow(root, "release.yml", (workflow) => {
+        const upload = workflow.jobs.build.steps
+          .find((step) => String(step.uses ?? "").startsWith("actions/upload-artifact@"));
+        upload.with.path = candidate;
+      });
+      assertViolation(runChecker(root), "release.yml", "release-size-report-asset-forbidden");
+    });
+  }
 });
 
 test("CI requires the Useful CLI workspace path", async (t) => {

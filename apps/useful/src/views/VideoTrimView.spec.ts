@@ -68,11 +68,11 @@ async function openVideo(): Promise<void> {
 describe("VideoTrimView preview capability", () => {
   let rectSpy: ReturnType<typeof vi.spyOn>;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.clearAllMocks();
     listeners.clear();
     routerMock.push.mockClear();
-    setLocale("zh-CN");
+    await setLocale("zh-CN");
     ipcMock.mediaSidecars.mockReset().mockResolvedValue(availableSidecars);
     ipcMock.mediaProbe.mockReset().mockResolvedValue({
       durationSec: 60,

@@ -24,6 +24,23 @@ function delay(ms: number): Promise<void> {
   return new Promise((resolve) => window.setTimeout(resolve, ms));
 }
 
+const PALETTE_OPEN_TIMEOUT_MS = 10_000;
+const PALETTE_POLL_INTERVAL_MS = 50;
+
+async function waitForPaletteInput(
+  timeoutMs = PALETTE_OPEN_TIMEOUT_MS,
+): Promise<HTMLInputElement> {
+  const deadline = performance.now() + timeoutMs;
+  let input = document.querySelector<HTMLInputElement>(".palette__input");
+  while (!input && performance.now() < deadline) {
+    const remainingMs = deadline - performance.now();
+    await delay(Math.min(PALETTE_POLL_INTERVAL_MS, remainingMs));
+    input = document.querySelector<HTMLInputElement>(".palette__input");
+  }
+  if (input) return input;
+  throw new Error(`Ctrl+K 未在 ${timeoutMs}ms 内打开命令面板`);
+}
+
 async function waitForReceipt(
   receipts: Map<string, unknown>,
   pluginId: string,
@@ -41,17 +58,35 @@ async function waitForReceipt(
 
 async function assertPaletteContains(name: string): Promise<void> {
   window.dispatchEvent(new KeyboardEvent("keydown", { key: "k", ctrlKey: true, bubbles: true }));
-  await nextTick();
-  const input = document.querySelector<HTMLInputElement>(".palette__input");
-  if (!input) throw new Error("Ctrl+K 未打开命令面板");
-  input.value = name;
-  input.dispatchEvent(new Event("input", { bubbles: true }));
-  await nextTick();
-  const labels = [...document.querySelectorAll<HTMLElement>(".palette__label")]
-    .map((node) => node.textContent?.trim());
-  if (!labels.includes(name)) throw new Error(`命令面板未出现插件: ${name}`);
-  input.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
-  await nextTick();
+  let input: HTMLInputElement | null = null;
+  try {
+    // The first Ctrl+K may need to fetch and mount the async palette chunk.
+    // Poll to a fixed deadline so a cold start is covered without hanging smoke.
+    input = await waitForPaletteInput();
+    input.value = name;
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    await nextTick();
+    const labels = [...document.querySelectorAll<HTMLElement>(".palette__label")]
+      .map((node) => node.textContent?.trim());
+    if (!labels.includes(name)) throw new Error(`命令面板未出现插件: ${name}`);
+  } finally {
+    const openInput = input?.isConnected
+      ? input
+      : document.querySelector<HTMLInputElement>(".palette__input");
+    if (openInput) {
+      openInput.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+    } else {
+      // A rejected or overdue async palette chunk has no input to receive
+      // Escape. Reuse App's global Ctrl+K toggle to close the state opened above,
+      // so a chunk that settles later cannot render a stale palette.
+      window.dispatchEvent(new KeyboardEvent("keydown", {
+        key: "k",
+        ctrlKey: true,
+        bubbles: true,
+      }));
+    }
+    await nextTick();
+  }
 }
 
 export async function runNativePluginSmoke(

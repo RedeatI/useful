@@ -14,14 +14,24 @@ test("ordinary CI publishes only a Useful Portable Lite development-trust unsign
   assert.match(ci, /package-release\.ps1 -Edition Lite/);
   assert.match(ci, /useful-portable-lite-x64-development-trust-unsigned-preview/);
   assert.match(ci, /dist-release\/Useful-Portable-Lite-x64\.zip/);
+  assert.match(ci, /USEFUL_SIZE_EXPECTED_COMMIT: \$\{\{ github\.sha \}\}/);
+  assert.match(ci, /measure-size\.ps1 -ExpectedCommit \$env:USEFUL_SIZE_EXPECTED_COMMIT/);
+  assert.match(ci, /pnpm size:check --profile ci --json/);
+  const packageIndex = ci.indexOf("package-release.ps1 -Edition Lite");
+  const measureIndex = ci.indexOf("& ./scripts/measure-size.ps1 -ExpectedCommit $env:USEFUL_SIZE_EXPECTED_COMMIT");
+  const checkIndex = ci.indexOf("pnpm size:check --profile ci --json");
+  const uploadIndex = ci.indexOf("uses: actions/upload-artifact@", checkIndex);
+  assert.ok(packageIndex < measureIndex && measureIndex < checkIndex && checkIndex < uploadIndex);
+  assert.doesNotMatch(ci, /(?:path:|dist-release\/)[^\n]*(?:artifacts[\\/]size|size-report\.json)/i);
 });
 
 test("public local packaging has explicit Lite Full All semantics and Full fails closed", async () => {
-  const [packaging, dryRun, verification, resolveTarget] = await Promise.all([
+  const [packaging, dryRun, verification, resolveTarget, measure] = await Promise.all([
     read("scripts/package-release.ps1"),
     read("scripts/useful.release.ps1"),
     read("scripts/verify-release.mjs"),
     read("scripts/resolve-cargo-target.ps1"),
+    read("scripts/measure-size.ps1"),
   ]);
   assert.match(packaging, /ValidateSet\("Lite", "Full", "All"\)/);
   assert.match(packaging, /\[string\]\$OutDir/);
@@ -52,9 +62,22 @@ test("public local packaging has explicit Lite Full All semantics and Full fails
   assert.match(resolveTarget, /"--format-version", "1"/);
   assert.match(resolveTarget, /"--no-deps"/);
   assert.match(resolveTarget, /target_directory/);
-  assert.match(dryRun, /cargo build --release --locked -p useful-app -p useful-bootstrap/);
+  assert.match(dryRun, /pnpm --filter @useful\/app tauri build --no-bundle/);
+  assert.match(dryRun, /cargo build --release --locked -p useful-bootstrap/);
   assert.match(dryRun, /package-release\.ps1"\) -Edition Lite/);
   assert.match(dryRun, /measure-size\.ps1/);
+  assert.match(dryRun, /pnpm size:check --profile ci --expected-commit \$ExpectedCommit --json/);
+  assert.ok(dryRun.indexOf('package-release.ps1") -Edition Lite') < dryRun.indexOf("pnpm size:check --profile ci"));
+  const measurementResolver = measure.slice(
+    measure.indexOf("function Resolve-MeasurementBinaries"),
+    measure.indexOf("function Get-ExactReleaseArtifactOrNull"),
+  );
+  assert.match(measurementResolver, /Join-Path \$profileDirectory "Useful\.exe"/);
+  assert.match(measurementResolver, /Join-Path \$profileDirectory "useful-bootstrap\.exe"/);
+  assert.doesNotMatch(measurementResolver, /useful-app\.exe|LastWriteTimeUtc|\$bestTime|Get-ChildItem/);
+  assert.doesNotMatch(measure, /\[string\]\$ReportDir/);
+  assert.match(measure, /releaseArtifacts\.usefulExe/);
+  assert.match(measure, /Get-FileHash -LiteralPath .* -Algorithm SHA256/);
   assert.match(verification, /"-Edition", "All"/);
   assert.match(verification, /Useful-Portable-Lite-x64\.zip/);
   assert.match(verification, /Useful-Portable-Full-x64\.zip/);
@@ -82,6 +105,15 @@ test("official Windows release uses the shared lock and exact Lite Full asset na
   assert.match(release, /Useful-\$version-windows-x64-portable-lite\.zip/);
   assert.match(release, /Useful-\$version-windows-x64-portable-full\.zip/);
   assert.match(release, /MEDIA-RUNTIMES\.json/);
+  assert.match(release, /USEFUL_SIZE_EXPECTED_COMMIT: \$\{\{ github\.sha \}\}/);
+  assert.match(release, /& \.\/scripts\/measure-size\.ps1 -OutDir release-assets -Target \$env:TARGET -ExpectedCommit \$env:USEFUL_SIZE_EXPECTED_COMMIT/);
+  assert.match(release, /pnpm size:check --profile release --json/);
+  const packageIndex = release.indexOf("Package Windows Setup Lite and deterministic Portable Lite/Full assets");
+  const measureIndex = release.indexOf("& ./scripts/measure-size.ps1 -OutDir release-assets -Target $env:TARGET -ExpectedCommit $env:USEFUL_SIZE_EXPECTED_COMMIT");
+  const checkIndex = release.indexOf("pnpm size:check --profile release --json");
+  const uploadIndex = release.indexOf("name: Upload build output for release assembly");
+  assert.ok(packageIndex < measureIndex && measureIndex < checkIndex && checkIndex < uploadIndex);
+  assert.doesNotMatch(release, /release-assets[^\n]*(?:size-report\.json|artifacts[\\/]size)/i);
   assert.match(release, /\$ErrorActionPreference = 'Stop'/);
   assert.match(release, /\$PSNativeCommandUseErrorActionPreference = \$true/);
   assert.match(release, /\[StringComparer\]::Ordinal/);

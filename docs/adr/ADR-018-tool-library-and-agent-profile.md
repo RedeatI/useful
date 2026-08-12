@@ -28,9 +28,10 @@ Source Center 只管理 TRP discovery 源。GUI 收藏/最近使用已经稳定�
 
 ## 决策一：Tool Library 是统一发现入口
 
-新增稳定 `/library`，从 utility GUI registry、已安装工具和 `@useful/action-runtime/browser` descriptor join
-出统一 view-model。GUI route/i18n 只提供展示信息；Agent Action 的 surface、readOnly、permissions、
-publisher 必须来自共享 descriptor。已安装插件在 GUI 仅标记 GUI + `runtime-required`，绝不猜测 CLI/MCP。
+新增稳定 `/library`，从 utility GUI registry、已安装工具和轻量 `@useful/action-runtime/catalog`
+descriptor 元数据 join 出统一 view-model。GUI route/i18n 只提供展示信息；Agent Action 的 surface、
+readOnly、permissions、publisher 必须来自共享 descriptor。已安装插件在 GUI 仅标记 GUI +
+`runtime-required`，绝不猜测 CLI/MCP。
 
 默认侧栏为：首页、快捷访问、工具库、发现与安装、下载与更新、设置。`navigation_pins` 是独立状态；收藏、
 最近使用与 Agent exposure 各自保留原语义。v5→v6 迁移不删除或重写 `favorites`、`recent_tools`、

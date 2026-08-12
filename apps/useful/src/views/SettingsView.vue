@@ -209,7 +209,7 @@ onMounted(loadUpdateSource);
         <div class="settings-row__control">
           <select
             class="useful-select"
-            :value="uiStore.language"
+            :value="uiStore.requestedLanguage"
             @change="uiStore.setLanguage(($event.target as HTMLSelectElement).value as 'zh-CN' | 'en-US')"
           >
             <option v-for="locale in languages" :key="locale.value" :value="locale.value">{{ t(locale.label) }}</option>

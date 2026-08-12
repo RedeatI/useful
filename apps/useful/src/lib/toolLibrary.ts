@@ -1,5 +1,5 @@
 import type { ToolDefinition } from "@/lib/types";
-import { BUILTIN_ACTION_DESCRIPTORS } from "@useful/action-runtime/browser";
+import { BUILTIN_ACTION_CATALOG } from "@useful/action-runtime/catalog";
 import { BUILTIN_GUI_ACTIONS } from "@/lib/actionCatalog";
 import { discoverItems, type DiscoverySort } from "@/lib/toolDiscovery";
 
@@ -53,7 +53,7 @@ const builtinFunctionalCategory: Record<string, LibraryItem["functionalCategory"
 };
 
 export function buildLibraryItems(input: LibraryStateInput): LibraryItem[] {
-  const descriptors = new Map(BUILTIN_ACTION_DESCRIPTORS.map((descriptor) => [descriptor.actionId, descriptor]));
+  const descriptors = new Map(BUILTIN_ACTION_CATALOG.map((descriptor) => [descriptor.actionId, descriptor]));
   const actionItems = BUILTIN_GUI_ACTIONS.map<LibraryItem>((action) => {
     const descriptor = descriptors.get(action.id);
     return {

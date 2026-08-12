@@ -30,10 +30,10 @@ vi.mock("@tauri-apps/api/event", () => ({
 import MediaRuntimeView from "@/views/MediaRuntimeView.vue";
 
 describe("MediaRuntimeView", () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.clearAllMocks();
     listeners.clear();
-    setLocale("zh-CN");
+    await setLocale("zh-CN");
     routeMock.query = { required: "transcode", returnTo: "/tools/video-trim" };
     ipcMock.mediaSidecars.mockResolvedValue({
       ffmpeg: { name: "ffmpeg", available: false },

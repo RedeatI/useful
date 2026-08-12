@@ -9,8 +9,8 @@ const runtime = vi.hoisted(() => ({ runBrowserAction: vi.fn() }));
 vi.mock("@useful/action-runtime/browser", () => runtime);
 
 describe("new utility GUI adapters", () => {
-  beforeEach(() => {
-    setLocale("zh-CN");
+  beforeEach(async () => {
+    await setLocale("zh-CN");
     runtime.runBrowserAction.mockReset();
   });
 

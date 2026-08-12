@@ -30,6 +30,7 @@ function canonicalSourceBytes(url) {
 const provenance = createHash("sha256");
 for (const relativePath of [
   "builtins.mjs",
+  "catalog.mjs",
   "semantics.mjs",
   "node-hash.mjs",
   "node-regex.mjs",
