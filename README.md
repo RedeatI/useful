@@ -1,6 +1,6 @@
 # Useful
 
-[绠€浣撲腑鏂嘳(README.zh-CN.md) 路 English
+[缁犫偓娴ｆ挷鑵戦弬鍢?README.zh-CN.md) 璺?English
 
 Useful is a desktop application that runs tools on the local computer. It groups tasks that often
 need separate browser tabs, command snippets, or small programs.
@@ -32,26 +32,30 @@ AI model. Useful does not change the configuration of Codex, Claude, or other Ag
 | --- | --- | --- |
 | ![Utilities](docs/assets/readme/utilities-grid.png) | ![Base64](docs/assets/readme/tool-base64.png) | ![Hash](docs/assets/readme/tool-hash.png) |
 
-Windows desktop preview packages (unsigned, development-trust): [v0.1.0-beta.4](https://github.com/RedeatI/useful/releases/tag/v0.1.0-beta.4). Prefer portable ZIP or MSI for evaluation only. These packages are not a signed production channel.
+**Download (unsigned Windows preview):** [v0.1.0-beta.4](https://github.com/RedeatI/useful/releases/tag/v0.1.0-beta.4)
+
+- Preferred: `Useful-0.1.0-beta.4-windows-x64-portable.zip` - extract, open folder `Useful`, run `Useful.exe`
+- Optional: `.msi` / `-setup.exe` installers, or `Useful-0.1.0-beta.4-windows-x64-bundle.zip`
+- SmartScreen may warn. These are not Authenticode-signed production builds.
 
 ## Features
 
-- **Utilities** 鈥?Format JSON. Encode and decode Base64 and URL data. Compute hashes. Create UUIDs
+- **Utilities** 閳?Format JSON. Encode and decode Base64 and URL data. Compute hashes. Create UUIDs
   and timestamps. Test regular expressions. Convert JSON and YAML. Diff text. Inspect IPv4/CIDR.
   Convert units. Edit colors. These tools work offline by default.
-- **Office files** 鈥?Create, inspect, and extract DOCX and PPTX. Convert simple Markdown to and from
+- **Office files** 閳?Create, inspect, and extract DOCX and PPTX. Convert simple Markdown to and from
   documents or slides. Inspect and convert XLSX, CSV, and simple Markdown tables. Inspect, merge,
   split, extract, delete, reorder, rotate, or clean PDF pages. These tools are not a full Office
   editor.
-- **Video** 鈥?Inspect media. Trim without re-encode when the format allows. Transcode a time range.
+- **Video** 閳?Inspect media. Trim without re-encode when the format allows. Transcode a time range.
   Extract audio. Cancel a long job.
-- **Process monitor (Windows)** 鈥?Show CPU, memory, disk, GPU, and network use. The first release is
+- **Process monitor (Windows)** 閳?Show CPU, memory, disk, GPU, and network use. The first release is
   read-only. End-process and one-click elevation are disabled. To run with administrator rights, exit
   Useful, then start Useful as administrator from Windows.
-- **Tool library** 鈥?Search, pin, and mark built-in and installed tools as favorites.
-- **Extensions** 鈥?Validate and pack web tools as `.useful` archives. Verify publisher signatures on
+- **Tool library** 閳?Search, pin, and mark built-in and installed tools as favorites.
+- **Extensions** 閳?Validate and pack web tools as `.useful` archives. Verify publisher signatures on
   trusted install. Host a compatible package source.
-- **Agent access** 鈥?Call 36 built-in Actions through a JSON command-line interface (CLI) or a local
+- **Agent access** 閳?Call 36 built-in Actions through a JSON command-line interface (CLI) or a local
   stdio Model Context Protocol (MCP) server. An Agent profile can hide Actions that a host must not
   see.
 
