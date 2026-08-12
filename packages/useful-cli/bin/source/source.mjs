@@ -707,6 +707,26 @@ useful source serve .        # http://127.0.0.1:8787
 3. \`useful source export-static . ./dist-source\`；
 4. 把 \`dist-source/\` 上传到任意静态 HTTP 服务器 / 对象存储 / CDN。
 
+或用内置 storage 命令（内容寻址 + 静态导出布局）：
+
+\`\`\`
+# 本地目录镜像（测试 / 离线）
+set USEFUL_STORAGE_BACKEND=fs
+set USEFUL_STORAGE_ROOT=D:\\object-store
+useful source storage doctor --json
+useful source storage dry-run . --json
+useful source storage push .
+useful source storage verify .
+
+# S3 兼容（R2 / MinIO / AWS）
+# USEFUL_STORAGE_BACKEND=s3
+# USEFUL_STORAGE_ENDPOINT=...
+# USEFUL_STORAGE_BUCKET=...
+# USEFUL_STORAGE_ACCESS_KEY=...
+# USEFUL_STORAGE_SECRET_KEY=...
+# USEFUL_STORAGE_PUBLIC_BASE_URL=https://cdn.example.com
+\`\`\`
+
 ## 发布工具
 
 \`\`\`

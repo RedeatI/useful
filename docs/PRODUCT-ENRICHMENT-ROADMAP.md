@@ -162,12 +162,13 @@ Client Source Center / downloader
 - [ ] 明确：客户端只接受 **源配置里的 origin + 内容寻址路径**，拒绝任意粘贴 URL 安装  
 - [ ] 与 `export-static` 布局对照表（静态源 = 零服务器云存储）
 
-#### P0-1b — CLI 上传/同步（作者路径）
+#### P0-1b — CLI 上传/同步（作者路径）— **已实现**
 
-- [ ] `useful source sync-storage`（名称可定）：把 published 制品推到 S3 兼容 endpoint  
-- [ ] 凭据仅环境变量 / 本地 config，不进 git  
-- [ ] dry-run + 校验 remote Head(size) == local  
-- [ ] 输出可机读 JSON（Agent 友好）
+- [x] `useful source storage doctor|dry-run|push|verify`
+- [x] 凭据仅环境变量（`USEFUL_STORAGE_*`），不进 git  
+- [x] dry-run + verify（remote Head size == local）  
+- [x] 输出可机读 JSON（`--json`）  
+- [x] fs 后端单测；s3 兼容 SigV4 实现（live MinIO 可选）
 
 #### P0-1c — 客户端消费
 
