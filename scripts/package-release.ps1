@@ -150,6 +150,24 @@ function New-PortableDirectory([string]$editionName, [bool]$withMedia, [string]$
     Copy-Item -LiteralPath $exe -Destination (Join-Path $directory "Useful.exe")
     Copy-Item -LiteralPath $bootstrap -Destination (Join-Path $directory "useful-bootstrap.exe")
     Write-NewText (Join-Path $directory "portable.flag") "" ([Text.UTF8Encoding]::new($false))
+    $portableReadme = @"
+Useful portable (unsigned preview)
+
+EN
+1. Keep portable.flag next to Useful.exe
+2. Run Useful.exe
+3. App data is stored in ./data
+4. Windows SmartScreen may warn — this build is not Authenticode-signed
+
+中文
+1. 保留 Useful.exe 旁的 portable.flag
+2. 运行 Useful.exe
+3. 数据目录为 ./data
+4. 可能出现 SmartScreen 警告 — 本包未 Authenticode 签名
+
+Not a production signed channel. Prefer the GitHub Release notes for the current version.
+"@
+    Write-NewText (Join-Path $directory "README.txt") $portableReadme ([Text.UTF8Encoding]::new($true))
     $updateDirectory = Join-Path $directory "update"
     New-Item -ItemType Directory -Path $updateDirectory | Out-Null
     Write-NewText (Join-Path $updateDirectory "current-version.txt") "$version`n" ([Text.Encoding]::ASCII)

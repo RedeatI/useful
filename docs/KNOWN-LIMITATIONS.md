@@ -105,6 +105,12 @@ Windows 为主要验证目标的能力。macOS/Linux 应明确降级或报告不
 - 双语 README 与英文入口文档
 - GitHub Private Vulnerability Reporting 已在 `RedeatI/useful` 启用（见 [`SECURITY.md`](../SECURITY.md)）
 
+### 桌面预览已知产品摩擦（beta.4）
+
+- `v0.1.0-beta.4` 发布包内部分二进制的**界面版本徽章**可能仍显示较早的 `0.1.0-beta.1`
+  （`HOST_VERSION` 在编译期取自 Cargo 包版本）。Release 文件名与 monorepo 源码版本以
+  `0.1.0-beta.4` 为准。修复方式：用当前源码重新打未签名预览包并替换 Release 资产。
+
 ### 仍需 Owner / 平台证据
 
 - Windows/macOS 正式代码签名身份与 macOS 公证凭据

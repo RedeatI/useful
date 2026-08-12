@@ -1,6 +1,6 @@
 # Useful
 
-[缁犫偓娴ｆ挷鑵戦弬鍢?README.zh-CN.md) 璺?English
+[简体中文](README.zh-CN.md) · English
 
 Useful is a desktop application that runs tools on the local computer. It groups tasks that often
 need separate browser tabs, command snippets, or small programs.
@@ -19,8 +19,10 @@ Unless a feature requires the network, tool input stays on the device. Useful do
 AI model. Useful does not change the configuration of Codex, Claude, or other Agent hosts.
 
 > [!IMPORTANT]
-> Useful is a developer preview. Build Useful from source. Official signed installers and a
-> production update feed are not available. Windows is the main development platform. Some native
+> Useful is a developer preview. Official **signed** installers and a production
+> update feed are not available. An **unsigned** Windows desktop preview is on the
+> [v0.1.0-beta.4](https://github.com/RedeatI/useful/releases/tag/v0.1.0-beta.4) release
+> (portable zip preferred). Windows is the main development platform. Some native
 > features do not work on macOS or Linux. Read
 > [Known limitations](docs/KNOWN-LIMITATIONS.en.md).
 
@@ -28,41 +30,49 @@ AI model. Useful does not change the configuration of Codex, Claude, or other Ag
 
 ### Screenshots
 
-| Utilities grid | Base64 tool | Hash tool |
+| Tool library | Base64 tool | Hash tool |
 | --- | --- | --- |
-| ![Utilities](docs/assets/readme/utilities-grid.png) | ![Base64](docs/assets/readme/tool-base64.png) | ![Hash](docs/assets/readme/tool-hash.png) |
+| ![Tool library](docs/assets/readme/utilities-grid.png) | ![Base64](docs/assets/readme/tool-base64.png) | ![Hash](docs/assets/readme/tool-hash.png) |
 
-**Download (unsigned Windows preview):** [v0.1.0-beta.4](https://github.com/RedeatI/useful/releases/tag/v0.1.0-beta.4)
+### Download (unsigned Windows preview)
 
-- Preferred: `Useful-0.1.0-beta.4-windows-x64-portable.zip` - extract, open folder `Useful`, run `Useful.exe`
-- Optional: `.msi` / `-setup.exe` installers, or `Useful-0.1.0-beta.4-windows-x64-bundle.zip`
-- SmartScreen may warn. These are not Authenticode-signed production builds.
+Release: [v0.1.0-beta.4](https://github.com/RedeatI/useful/releases/tag/v0.1.0-beta.4)
+
+**Preferred: portable zip**
+
+1. Download `Useful-0.1.0-beta.4-windows-x64-portable.zip`
+2. Extract the archive
+3. Open the nested folder `Useful`
+4. Run `Useful.exe` (keep `portable.flag` next to it)
+5. App data is written under `Useful\data\`
+
+Optional: `.msi` / `-setup.exe`, or `Useful-0.1.0-beta.4-windows-x64-bundle.zip`.
+Windows SmartScreen may warn. These builds are **not** Authenticode-signed production packages.
 
 ## Features
 
-- **Utilities** 閳?Format JSON. Encode and decode Base64 and URL data. Compute hashes. Create UUIDs
+- **Utilities** — Format JSON. Encode and decode Base64 and URL data. Compute hashes. Create UUIDs
   and timestamps. Test regular expressions. Convert JSON and YAML. Diff text. Inspect IPv4/CIDR.
   Convert units. Edit colors. These tools work offline by default.
-- **Office files** 閳?Create, inspect, and extract DOCX and PPTX. Convert simple Markdown to and from
+- **Office files** — Create, inspect, and extract DOCX and PPTX. Convert simple Markdown to and from
   documents or slides. Inspect and convert XLSX, CSV, and simple Markdown tables. Inspect, merge,
   split, extract, delete, reorder, rotate, or clean PDF pages. These tools are not a full Office
   editor.
-- **Video** 閳?Inspect media. Trim without re-encode when the format allows. Transcode a time range.
+- **Video** — Inspect media. Trim without re-encode when the format allows. Transcode a time range.
   Extract audio. Cancel a long job.
-- **Process monitor (Windows)** 閳?Show CPU, memory, disk, GPU, and network use. The first release is
+- **Process monitor (Windows)** — Show CPU, memory, disk, GPU, and network use. The first release is
   read-only. End-process and one-click elevation are disabled. To run with administrator rights, exit
   Useful, then start Useful as administrator from Windows.
-- **Tool library** 閳?Search, pin, and mark built-in and installed tools as favorites.
-- **Extensions** 閳?Validate and pack web tools as `.useful` archives. Verify publisher signatures on
+- **Tool library** — Search, pin, and mark built-in and installed tools as favorites.
+- **Extensions** — Validate and pack web tools as `.useful` archives. Verify publisher signatures on
   trusted install. Host a compatible package source.
-- **Agent access** 閳?Call 36 built-in Actions through a JSON command-line interface (CLI) or a local
+- **Agent access** — Call 36 built-in Actions through a JSON command-line interface (CLI) or a local
   stdio Model Context Protocol (MCP) server. An Agent profile can hide Actions that a host must not
   see.
 
 The interface supports Simplified Chinese and English (US). Light and dark themes are available.
 
-On Windows, portable mode writes data to `./data` next to `Useful.exe` when the file `portable.flag`
-exists. Without that file, data goes to `%APPDATA%\Useful`.
+On Windows, portable mode writes data to `./data` next to `Useful.exe` when the file `portable.flag` exists. Without that file, data goes to `%APPDATA%\Useful`. Do not delete `portable.flag` if you want the portable layout.
 
 ## Run from source
 
