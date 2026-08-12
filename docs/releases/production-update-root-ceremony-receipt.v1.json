@@ -1,0 +1,12 @@
+﻿{
+    "schemaVersion":  "useful.update-root-ceremony-receipt.v1",
+    "environment":  "production",
+    "rootJsonPath":  "docs/releases/production-update-root.v1.json",
+    "rootJsonSha256":  "7c2fe8943fcab3de3ac2dd32df99a4c1bbb5c2b29cc59eb82729c4ab09a4cfd5",
+    "releasePublicKeyHex":  "21b6aeef22710a5ffd12b8051f0bd50dcc97199fdf835f2430be296309d1601c",
+    "updateRootFingerprint":  "763a1a06ec52607dbc96cdc4c1a2c7a8dd87f4774315f1949c3754edb3270281",
+    "threshold":  "2/3",
+    "signedRootKeyCount":  2,
+    "createdAt":  "2026-08-12T12:52:02.6586297Z",
+    "note":  "Private keys are not included. Owner holds offline keys outside git."
+}

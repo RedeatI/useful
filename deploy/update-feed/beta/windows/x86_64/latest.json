@@ -1,0 +1,11 @@
+﻿{
+    "schemaVersion":  "useful.app-update-feed.v1",
+    "channel":  "beta",
+    "platform":  "windows",
+    "arch":  "x86_64",
+    "status":  "empty",
+    "note":  "Placeholder feed path for USEFUL_UPDATE_FEED_URL_TEMPLATE. Publish real signed manifests here after signed Release workflow succeeds.",
+    "items":  [
+
+              ]
+}

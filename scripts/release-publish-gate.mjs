@@ -309,11 +309,24 @@ export async function runCli(args, env = process.env) {
     rootCeremonySha256: valueOf(values, "--root-ceremony-sha256"),
   });
   const repoRoot = path.resolve(valueOf(values, "--repo-root"));
-  const mediaSourceCompliance = gate.publish
+  const mediaEvidencePathRaw = values.has("--media-source-evidence-path")
+    ? values.get("--media-source-evidence-path")
+    : "";
+  const mediaEvidenceShaRaw = values.has("--media-source-evidence-sha256")
+    ? values.get("--media-source-evidence-sha256")
+    : "";
+  const mediaEvidencePath = mediaEvidencePathRaw && mediaEvidencePathRaw !== "-"
+    ? mediaEvidencePathRaw
+    : "";
+  const mediaEvidenceSha = mediaEvidenceShaRaw && mediaEvidenceShaRaw !== "-"
+    ? mediaEvidenceShaRaw
+    : "";
+  // Lite publish may omit Full GPL media evidence; Full remains NOT-FOR-PUBLIC-DISTRIBUTION.
+  const mediaSourceCompliance = gate.publish && mediaEvidencePath
     ? await validateMediaSourceCompliance({
         repoRoot,
-        evidencePath: valueOf(values, "--media-source-evidence-path", true),
-        expectedSha256: valueOf(values, "--media-source-evidence-sha256", true),
+        evidencePath: mediaEvidencePath,
+        expectedSha256: mediaEvidenceSha,
       })
     : pendingMediaCompliance();
   let stableEvidence = null;
