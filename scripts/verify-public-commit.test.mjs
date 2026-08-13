@@ -60,6 +60,7 @@ async function makeRepository() {
     await write(root, relative, `${relative}\n`);
   }
   git(root, ["init", "--quiet"]);
+  git(root, ["config", "core.filemode", "false"]);
   git(root, ["add", "."]);
   git(root, [
     "-c",
