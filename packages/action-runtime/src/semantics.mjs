@@ -72,9 +72,13 @@ export function createBuiltinDescriptors(sourceDigest) {
     sourceDigest,
     actionId: ACTION_IDS.JSON,
     inputSchema: schema({
-      operation: { type: "string", enum: ["format", "minify"] },
+      operation: { type: "string", enum: ["format", "minify", "query"] },
       text: string(),
       indent: { type: "integer", minimum: 0, maximum: 8 },
+      pointer: {
+        type: "string",
+        maxLength: 4096,
+      },
     }, ["operation", "text"]),
     outputSchema: textOutput,
     examples: [{
@@ -93,6 +97,12 @@ export function createBuiltinDescriptors(sourceDigest) {
         input: { operation: "minify", text: "[ 1, 2 ]" },
         expectedOutput: { text: "[1,2]" },
       },
+      {
+        name: "query escaped pointer",
+        input: { operation: "query", text: "{\"a/b\":{\"~key\":[1,2]}}", pointer: "/a~1b/~0key/1" },
+        expectedOutput: { text: "2" },
+      },
+      { name: "query missing path", input: { operation: "query", text: "{}", pointer: "/missing" }, expectedErrorCode: ERROR_CODES.INPUT_INVALID },
       { name: "invalid json", input: { operation: "format", text: "{" }, expectedErrorCode: ERROR_CODES.INPUT_INVALID },
       { name: "reject injected field", input: { operation: "format", text: "{}", command: "calc.exe" }, expectedErrorCode: ERROR_CODES.INPUT_INVALID },
     ],
@@ -152,9 +162,16 @@ export function createBuiltinDescriptors(sourceDigest) {
 }
 
 export function jsonHandler(input) {
-  assertExactObject(input, ["operation", "text"], ["indent"]);
-  if (!["format", "minify"].includes(input.operation) || typeof input.text !== "string") {
+  assertExactObject(input, ["operation", "text"], ["indent", "pointer"]);
+  if (!["format", "minify", "query"].includes(input.operation) || typeof input.text !== "string") {
     throw actionInputError("JSON action 输入不符合契约");
+  }
+  if (input.operation === "query") {
+    if (typeof input.pointer !== "string" || input.pointer.length > 4096) {
+      throw actionInputError("JSON Pointer 不符合契约");
+    }
+  } else if (input.pointer !== undefined) {
+    throw actionInputError("只有 query 操作可声明 JSON Pointer");
   }
   if (input.indent !== undefined && (!Number.isInteger(input.indent) || input.indent < 0 || input.indent > 8)) {
     throw actionInputError("JSON 缩进不符合契约");
@@ -165,11 +182,36 @@ export function jsonHandler(input) {
   } catch (cause) {
     throw actionInputError("不是合法的 JSON", cause);
   }
+  if (input.operation === "query") value = resolveJsonPointer(value, input.pointer);
   return {
     text: input.operation === "minify"
       ? JSON.stringify(value)
       : JSON.stringify(value, null, input.indent ?? 2),
   };
+}
+
+function resolveJsonPointer(root, pointer) {
+  if (pointer === "") return root;
+  if (!pointer.startsWith("/")) throw actionInputError("JSON Pointer 不符合契约");
+  const tokens = pointer.slice(1).split("/").map((token) => {
+    if (/~(?:[^01]|$)/.test(token)) throw actionInputError("JSON Pointer 转义不合法");
+    return token.replaceAll("~1", "/").replaceAll("~0", "~");
+  });
+  let current = root;
+  for (const token of tokens) {
+    if (Array.isArray(current)) {
+      if (!/^(?:0|[1-9]\d*)$/.test(token)) throw actionInputError("JSON Pointer 数组索引不合法");
+      const index = Number(token);
+      if (!Number.isSafeInteger(index) || index >= current.length) throw actionInputError("JSON Pointer 路径不存在");
+      current = current[index];
+      continue;
+    }
+    if (current === null || typeof current !== "object" || !Object.hasOwn(current, token)) {
+      throw actionInputError("JSON Pointer 路径不存在");
+    }
+    current = current[token];
+  }
+  return current;
 }
 
 function encodeBase64(text) {

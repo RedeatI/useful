@@ -4,8 +4,10 @@ import {
   accessModeKey,
   advisoryBannerVisible,
   advisorySeverityKey,
+  availabilityDetail,
   capabilityLabels,
   conflictCount,
+  deliveryTypeKey,
   formatFingerprint,
   loginStatusKey,
   officialBadgeVisible,
@@ -30,6 +32,7 @@ function source(partial: Partial<TrpSourceInfo>): TrpSourceInfo {
     rootKeyFingerprint: "aa".repeat(32),
     trustConfirmedAt: 1750000000,
     capabilities: {},
+    deliveryType: "unknown",
     lastSyncAt: null,
     lastSyncStatus: "never",
     lastSyncError: null,
@@ -117,6 +120,26 @@ describe("syncStatusKey / accessModeKey", () => {
   });
 });
 
+describe("deliveryTypeKey", () => {
+  it("区分静态 HTTPS、动态 API 与未知旧记录", () => {
+    expect(deliveryTypeKey("static-https")).toBe("sourceCenter.deliveryStaticHttps");
+    expect(deliveryTypeKey("dynamic")).toBe("sourceCenter.deliveryDynamic");
+    expect(deliveryTypeKey("unknown")).toBe("sourceCenter.deliveryUnknown");
+  });
+});
+
+describe("availabilityDetail", () => {
+  it("同时保留检查时间与检查器来源", () => {
+    expect(
+      availabilityDetail({
+        checkedAt: "2026-08-13T10:00:00Z",
+        source: "background-check",
+      }),
+    ).toBe("2026-08-13T10:00:00Z · background-check");
+    expect(availabilityDetail({})).toBeUndefined();
+  });
+});
+
 describe("splitSources", () => {
   it("按启用状态分组且保持顺序", () => {
     const a = source({ id: "a", enabled: true });
@@ -134,6 +157,14 @@ describe("capabilityLabels", () => {
       capabilities: { catalog: true, paidDownloads: true, remoteSearch: false },
     });
     expect(capabilityLabels(s)).toEqual(["sourceCenter.capCatalog", "sourceCenter.capPaid"]);
+  });
+
+  it("对象存储静态源明确显示镜像能力", () => {
+    const s = source({ capabilities: { catalog: true, staticMirror: true } });
+    expect(capabilityLabels(s)).toEqual([
+      "sourceCenter.capCatalog",
+      "sourceCenter.capMirror",
+    ]);
   });
 });
 
@@ -188,6 +219,35 @@ describe("reviewBadges (Phase 9)", () => {
     });
     expect(badges).toHaveLength(4);
     expect(badges.every((b) => b.ok === false)).toBe(true);
+  });
+  it("来源可用性保留最后检查时间", () => {
+    const badges = reviewBadges({
+      repositorySignatureVerified: false,
+      publisherSignatureVerified: false,
+      officialReviewPassed: false,
+      securityScanPassed: false,
+      availability: {
+        status: "healthy",
+        checkedAt: "2026-08-13T10:00:00Z",
+        source: "background-check",
+      },
+    });
+    expect(badges.at(-1)).toEqual({
+      key: "sourceCenter.sourceReportedHealthy",
+      ok: false,
+      detail: "2026-08-13T10:00:00Z · background-check",
+    });
+  });
+  it("不可用状态不伪装成可用", () => {
+    const badges = reviewBadges({
+      repositorySignatureVerified: false,
+      publisherSignatureVerified: false,
+      officialReviewPassed: false,
+      securityScanPassed: false,
+      availability: { status: "unavailable", checkedAt: "2026-08-13T10:00:00Z" },
+    });
+    expect(badges.at(-1)?.key).toBe("sourceCenter.sourceReportedUnavailable");
+    expect(badges.at(-1)?.ok).toBe(false);
   });
 });
 

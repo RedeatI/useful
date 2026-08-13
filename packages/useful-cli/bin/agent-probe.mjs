@@ -352,25 +352,69 @@ function readSourceRevision(root) {
   } catch {
     fail("SOURCE_REVISION_UNAVAILABLE", "source 安装缺少固定 .git 元数据", {}, 4);
   }
-  if (!metadata.isDirectory() || metadata.isSymbolicLink()) fail("SOURCE_REVISION_UNAVAILABLE", "source .git 必须是本地普通目录", {}, 4);
-  const head = readRegularFile(path.join(gitRoot, "HEAD"), gitRoot, "SOURCE_REVISION_UNAVAILABLE").toString("utf8").trim();
+  if (metadata.isSymbolicLink() || (!metadata.isDirectory() && !metadata.isFile())) {
+    fail("SOURCE_REVISION_UNAVAILABLE", "source .git 必须是本地普通目录或 Git worktree 元数据文件", {}, 4);
+  }
+
+  let headRoot = gitRoot;
+  let refRoots = [gitRoot];
+  if (metadata.isFile()) {
+    const pointer = readRegularFile(gitRoot, root, "SOURCE_REVISION_UNAVAILABLE").toString("utf8");
+    const pointerMatch = /^gitdir: ([^\0\r\n]+)\r?\n?$/u.exec(pointer);
+    if (!pointerMatch) fail("SOURCE_REVISION_UNAVAILABLE", "source .git worktree 指针无效", {}, 4);
+    const gitDirectory = path.resolve(root, pointerMatch[1]);
+    assertNoLinkedPathComponents(gitDirectory);
+    const gitDirectoryMetadata = fs.lstatSync(gitDirectory);
+    if (!gitDirectoryMetadata.isDirectory() || gitDirectoryMetadata.isSymbolicLink()) {
+      fail("SOURCE_REVISION_UNAVAILABLE", "source worktree gitdir 必须是本地普通目录", {}, 4);
+    }
+
+    const backPointer = readRegularFile(path.join(gitDirectory, "gitdir"), gitDirectory, "SOURCE_REVISION_UNAVAILABLE")
+      .toString("utf8");
+    if (!/^[^\0\r\n]+\r?\n?$/u.test(backPointer)
+      || comparablePath(path.resolve(gitDirectory, backPointer.trim())) !== comparablePath(gitRoot)) {
+      fail("SOURCE_REVISION_UNAVAILABLE", "source worktree gitdir 未双向绑定当前检出", {}, 4);
+    }
+
+    const commonPointer = readRegularFile(path.join(gitDirectory, "commondir"), gitDirectory, "SOURCE_REVISION_UNAVAILABLE")
+      .toString("utf8");
+    if (!/^[^\0\r\n]+\r?\n?$/u.test(commonPointer)) {
+      fail("SOURCE_REVISION_UNAVAILABLE", "source worktree commondir 指针无效", {}, 4);
+    }
+    const commonDirectory = path.resolve(gitDirectory, commonPointer.trim());
+    assertNoLinkedPathComponents(commonDirectory);
+    const commonMetadata = fs.lstatSync(commonDirectory);
+    if (!commonMetadata.isDirectory()
+      || commonMetadata.isSymbolicLink()
+      || comparablePath(path.dirname(gitDirectory)) !== comparablePath(path.join(commonDirectory, "worktrees"))) {
+      fail("SOURCE_REVISION_UNAVAILABLE", "source worktree 元数据布局无效", {}, 4);
+    }
+    headRoot = gitDirectory;
+    refRoots = [gitDirectory, commonDirectory];
+  }
+
+  const head = readRegularFile(path.join(headRoot, "HEAD"), headRoot, "SOURCE_REVISION_UNAVAILABLE").toString("utf8").trim();
   if (SOURCE_REVISION.test(head)) return head;
   const match = /^ref: (refs\/(?:heads|tags)\/[A-Za-z0-9._/-]+)$/u.exec(head);
   if (!match || match[1].split("/").some((part) => !part || part === "." || part === "..")) {
     fail("SOURCE_REVISION_UNAVAILABLE", "source HEAD 引用无效", {}, 4);
   }
-  const looseRef = path.join(gitRoot, ...match[1].split("/"));
-  if (fs.existsSync(looseRef)) {
-    const revision = readRegularFile(looseRef, gitRoot, "SOURCE_REVISION_UNAVAILABLE").toString("utf8").trim();
-    if (SOURCE_REVISION.test(revision)) return revision;
+  for (const refRoot of refRoots) {
+    const looseRef = path.join(refRoot, ...match[1].split("/"));
+    if (fs.existsSync(looseRef)) {
+      const revision = readRegularFile(looseRef, refRoot, "SOURCE_REVISION_UNAVAILABLE").toString("utf8").trim();
+      if (SOURCE_REVISION.test(revision)) return revision;
+    }
   }
-  const packedRefs = path.join(gitRoot, "packed-refs");
-  if (fs.existsSync(packedRefs)) {
-    const rows = readRegularFile(packedRefs, gitRoot, "SOURCE_REVISION_UNAVAILABLE").toString("utf8").split(/\r?\n/u);
-    for (const row of rows) {
-      const separator = row.indexOf(" ");
-      if (separator > 0 && row.slice(separator + 1) === match[1] && SOURCE_REVISION.test(row.slice(0, separator))) {
-        return row.slice(0, separator);
+  for (const refRoot of refRoots) {
+    const packedRefs = path.join(refRoot, "packed-refs");
+    if (fs.existsSync(packedRefs)) {
+      const rows = readRegularFile(packedRefs, refRoot, "SOURCE_REVISION_UNAVAILABLE").toString("utf8").split(/\r?\n/u);
+      for (const row of rows) {
+        const separator = row.indexOf(" ");
+        if (separator > 0 && row.slice(separator + 1) === match[1] && SOURCE_REVISION.test(row.slice(0, separator))) {
+          return row.slice(0, separator);
+        }
       }
     }
   }
@@ -681,6 +725,7 @@ export const agentProbeTesting = Object.freeze({
   executeProbe,
   expectedActionNames: EXPECTED_ACTION_NAMES,
   expectedHelperOrder: EXPECTED_HELPER_ORDER,
+  readSourceRevision,
   requiredAgentKitFiles: REQUIRED_AGENT_KIT_FILES,
   verifyAgentKit,
   verifySourceLayout,

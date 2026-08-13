@@ -7,7 +7,7 @@ need separate browser tabs, command snippets, or small programs.
 
 Useful includes:
 
-- 31 developer utilities
+- 31 standalone developer utilities (36 built-in Actions with the Office groups)
 - local Office file operations with fixed limits
 - video trim and convert
 - Windows process inspection
@@ -26,13 +26,16 @@ AI model. Useful does not change the configuration of Codex, Claude, or other Ag
 > features do not work on macOS or Linux. Read
 > [Known limitations](docs/KNOWN-LIMITATIONS.en.md).
 
+## Choose your path
+
+| You want to… | Start here |
+| --- | --- |
+| Try the Windows desktop app | [Download the unsigned preview](#download-unsigned-windows-preview) |
+| Connect an Agent host | [CLI and MCP](#cli-and-mcp) |
+| Build a third-party tool | [Agent tool guide](docs/agent/BUILD-A-TOOL.en.md) |
+| Build or contribute to Useful | [Run from source](#run-from-source) · [Contributing](CONTRIBUTING.md) |
+
 ![Useful tool library](docs/assets/readme/product-overview.svg)
-
-### Screenshots
-
-| Tool library | Base64 tool | Hash tool |
-| --- | --- | --- |
-| ![Tool library](docs/assets/readme/utilities-grid.png) | ![Base64](docs/assets/readme/tool-base64.png) | ![Hash](docs/assets/readme/tool-hash.png) |
 
 ### Download (unsigned Windows preview)
 
@@ -49,6 +52,18 @@ Release: [v0.1.0-beta.4](https://github.com/RedeatI/useful/releases/tag/v0.1.0-b
 Optional: `.msi` / `-setup.exe`, or `Useful-0.1.0-beta.4-windows-x64-bundle.zip`.
 Windows SmartScreen may warn. These builds are **not** Authenticode-signed production packages.
 
+Verify the portable archive against `SHA256SUMS-0.1.0-beta.4.txt` from the same release:
+
+```powershell
+$asset = "Useful-0.1.0-beta.4-windows-x64-portable.zip"
+$expected = ((Select-String -Path .\SHA256SUMS-0.1.0-beta.4.txt -Pattern ([regex]::Escape($asset) + '$')).Line -split '\s+')[0].ToLowerInvariant()
+$actual = (Get-FileHash ".\$asset" -Algorithm SHA256).Hash.ToLowerInvariant()
+if ($actual -ne $expected) { throw "SHA-256 mismatch for $asset" }
+```
+
+Report reproducible bugs through [GitHub Issues](https://github.com/RedeatI/useful/issues). For a
+security vulnerability, follow [SECURITY.md](SECURITY.md) instead of opening a public issue.
+
 ## Features
 
 - **Utilities** — Format JSON. Encode and decode Base64 and URL data. Compute hashes. Create UUIDs
@@ -64,8 +79,9 @@ Windows SmartScreen may warn. These builds are **not** Authenticode-signed produ
   read-only. End-process and one-click elevation are disabled. To run with administrator rights, exit
   Useful, then start Useful as administrator from Windows.
 - **Tool library** — Search, pin, and mark built-in and installed tools as favorites.
-- **Extensions** — Validate and pack web tools as `.useful` archives. Verify publisher signatures on
-  trusted install. Host a compatible package source.
+- **Extensions** — Validate and pack web tools as `.useful` archives. Verify a tool publisher's
+  package signature during a trusted install. This is separate from the Windows app's Authenticode
+  signature status. Host a compatible package source.
 - **Agent access** — Call 36 built-in Actions through a JSON command-line interface (CLI) or a local
   stdio Model Context Protocol (MCP) server. An Agent profile can hide Actions that a host must not
   see.

@@ -321,8 +321,16 @@ export async function runCli(args, env = process.env) {
   const mediaEvidenceSha = mediaEvidenceShaRaw && mediaEvidenceShaRaw !== "-"
     ? mediaEvidenceShaRaw
     : "";
-  // Lite publish may omit Full GPL media evidence; Full remains NOT-FOR-PUBLIC-DISTRIBUTION.
-  const mediaSourceCompliance = gate.publish && mediaEvidencePath
+  // This gate is invoked only for the desktop-full workflow scope, whose
+  // closed asset set contains Portable Full alongside the Lite editions.
+  // Therefore every public channel must bind the exact committed GPL source
+  // evidence before any asset in that scope may be published.
+  if (gate.publish && !mediaEvidencePath) {
+    throw new Error(
+      "public publish 缺少 USEFUL_MEDIA_SOURCE_EVIDENCE_PATH; Full is NOT-FOR-PUBLIC-DISTRIBUTION",
+    );
+  }
+  const mediaSourceCompliance = gate.publish
     ? await validateMediaSourceCompliance({
         repoRoot,
         evidencePath: mediaEvidencePath,

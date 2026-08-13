@@ -8,6 +8,7 @@ import { formatBytes } from "@/lib/format";
 import {
   applyDownloadDone,
   applyDownloadProgress,
+  downloadErrorKey,
   downloadPercent,
   downloadStatusKey,
   isActiveDownload,
@@ -72,6 +73,13 @@ function progressText(d: DownloadRecord): string {
     ? `${formatBytes(d.receivedBytes)} / ${total}`
     : `${formatBytes(d.receivedBytes)} / ${total} (${pct}%)`;
 }
+
+function errorText(d: DownloadRecord): string {
+  const key = downloadErrorKey(d.errorCode);
+  if (!key) return d.error ?? "";
+  const summary = t(key);
+  return d.error ? `${summary} ${d.error}` : summary;
+}
 </script>
 
 <template>
@@ -117,7 +125,11 @@ function progressText(d: DownloadRecord): string {
             </div>
             <span class="dl-item__progress-text">{{ progressText(d) }}</span>
           </div>
-          <div v-if="d.error" class="dl-item__error">{{ d.error }}</div>
+          <div v-if="d.digest" class="dl-item__digest" data-testid="download-digest">
+            {{ t("downloads.digest") }}:
+            <span class="useful-mono">{{ d.digest }}</span>
+          </div>
+          <div v-if="d.error || d.errorCode" class="dl-item__error">{{ errorText(d) }}</div>
         </div>
         <div class="dl-item__actions">
           <button
@@ -197,6 +209,12 @@ function progressText(d: DownloadRecord): string {
   font-size: var(--useful-text-sm);
   margin-top: var(--useful-space-1);
   word-break: break-all;
+}
+.dl-item__digest {
+  color: var(--useful-text-tertiary);
+  font-size: var(--useful-text-sm);
+  margin-top: var(--useful-space-1);
+  overflow-wrap: anywhere;
 }
 .dl-item__actions {
   display: flex;

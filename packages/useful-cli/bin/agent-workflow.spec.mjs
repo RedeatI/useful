@@ -12,6 +12,7 @@ import { EXIT_CODES, RESULT_SCHEMA_VERSION } from "./cli-contract.mjs";
 
 const cli = fileURLToPath(new URL("./useful.mjs", import.meta.url));
 const legacyCreator = fileURLToPath(new URL("./create-useful-tool.mjs", import.meta.url));
+const currentVersion = JSON.parse(fs.readFileSync(new URL("../package.json", import.meta.url), "utf8")).version;
 const temporaryRoots = [];
 const CLI_WORKFLOW_TIMEOUT_MS = 30_000;
 
@@ -82,7 +83,7 @@ describe("Agent-first CLI workflow", () => {
 
     const doctor = runJson(["doctor", tool, "--json"]);
     expect(doctor.data.summary).toEqual(expect.objectContaining({ failed: 0, hardFailure: false }));
-    expect(doctor.data.checks.find((check) => check.id === "cli-version").message).toBe("Useful CLI 0.1.0-beta.3");
+    expect(doctor.data.checks.find((check) => check.id === "cli-version").message).toBe(`Useful CLI ${currentVersion}`);
     expect(runJson(["validate", tool, "--json"]).data.valid).toBe(true);
 
     const out = path.join(root, "输出 目录");

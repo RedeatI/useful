@@ -14,7 +14,7 @@ use serde::Serialize;
 use std::collections::{BTreeMap, HashMap};
 use std::sync::{Arc, Mutex, OnceLock};
 use std::time::Instant;
-use tauri::State;
+use tauri::{AppHandle, State};
 use useful_repository_client::catalog::{
     latest_stable_digest, max_advisory_severity, parse_catalog, CatalogEntry, MAX_CATALOG_SIZE,
 };
@@ -45,6 +45,10 @@ pub struct TrpSourcePreview {
     pub local: bool,
     pub root_key_fingerprint: String,
     pub capabilities: serde_json::Value,
+    /// Client-observed transport shape. S3-compatible public buckets are
+    /// intentionally represented as static-https; provider internals are not
+    /// a trust signal and cannot be inferred from an HTTPS URL.
+    pub delivery_type: String,
     pub requires_auth: bool,
     pub paid_downloads: bool,
     pub native_workers: bool,
@@ -66,6 +70,7 @@ pub struct TrpSourceInfo {
     pub root_key_fingerprint: String,
     pub trust_confirmed_at: i64,
     pub capabilities: serde_json::Value,
+    pub delivery_type: String,
     pub last_sync_at: Option<i64>,
     pub last_sync_status: String,
     pub last_sync_error: Option<String>,
@@ -119,21 +124,37 @@ async fn fetch_bytes_limited(
     useful_repository_client::network::validate_url(url, allow_local)
         .map_err(|error| CmdError::from(format!("URL 被网络安全策略拒绝: {error}")))?;
     if let Some(path) = file_url_path(url)? {
-        let bytes = tokio::fs::read(&path)
-            .await
-            .map_err(|e| CmdError::from(format!("读取本地文件失败: {e}")))?;
+        let bytes = tokio::fs::read(&path).await.map_err(|e| {
+            let code = if e.kind() == std::io::ErrorKind::NotFound {
+                "object_missing"
+            } else {
+                "network"
+            };
+            CmdError::coded(code, format!("读取本地文件失败: {e}"))
+        })?;
         if bytes.len() > max_size {
-            return Err(CmdError::from("文件超过大小上限"));
+            return Err(CmdError::coded("size_mismatch", "文件超过大小上限"));
         }
         return Ok(bytes);
     }
-    let resp = super::sources::secure_get(url, allow_local).await?;
+    let resp = super::sources::secure_get(url, allow_local)
+        .await
+        .map_err(|error| CmdError::coded("network", error.message))?;
+    if resp.status() == reqwest::StatusCode::NOT_FOUND {
+        return Err(CmdError::coded(
+            "object_missing",
+            format!("HTTP 状态异常: {}", resp.status()),
+        ));
+    }
     if !resp.status().is_success() {
-        return Err(CmdError::from(format!("HTTP 状态异常: {}", resp.status())));
+        return Err(CmdError::coded(
+            "network",
+            format!("HTTP 状态异常: {}", resp.status()),
+        ));
     }
     if let Some(len) = resp.content_length() {
         if len as usize > max_size {
-            return Err(CmdError::from("响应超过大小上限"));
+            return Err(CmdError::coded("size_mismatch", "响应超过大小上限"));
         }
     }
     let mut bytes: Vec<u8> = Vec::new();
@@ -141,11 +162,11 @@ async fn fetch_bytes_limited(
     while let Some(chunk) = resp
         .chunk()
         .await
-        .map_err(|e| CmdError::from(format!("下载中断: {e}")))?
+        .map_err(|e| CmdError::coded("network", format!("下载中断: {e}")))?
     {
         bytes.extend_from_slice(&chunk);
         if bytes.len() > max_size {
-            return Err(CmdError::from("响应超过大小上限"));
+            return Err(CmdError::coded("size_mismatch", "响应超过大小上限"));
         }
     }
     Ok(bytes)
@@ -248,6 +269,14 @@ fn capabilities_value(d: &RepositoryDiscovery) -> serde_json::Value {
     serde_json::to_value(&d.capabilities).unwrap_or_else(|_| serde_json::json!({}))
 }
 
+fn delivery_type(d: &RepositoryDiscovery) -> &'static str {
+    if d.api.is_some() {
+        "dynamic"
+    } else {
+        "static-https"
+    }
+}
+
 fn source_info_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<TrpSourceInfo> {
     let fingerprint: String = row.get(8)?;
     let capabilities_json: String = row.get(10)?;
@@ -265,17 +294,18 @@ fn source_info_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<TrpSourceInfo> {
         trust_confirmed_at: row.get(9)?,
         capabilities: serde_json::from_str(&capabilities_json)
             .unwrap_or_else(|_| serde_json::json!({})),
-        last_sync_at: row.get(11)?,
-        last_sync_status: row.get(12)?,
-        last_sync_error: row.get(13)?,
-        last_sync_duration_ms: row.get(14)?,
-        entry_count: row.get(15)?,
+        delivery_type: row.get(11)?,
+        last_sync_at: row.get(12)?,
+        last_sync_status: row.get(13)?,
+        last_sync_error: row.get(14)?,
+        last_sync_duration_ms: row.get(15)?,
+        entry_count: row.get(16)?,
     })
 }
 
 const SOURCE_INFO_SQL: &str = "SELECT s.id, s.kind, s.discovery_url, s.display_name, s.operator,
         s.local, s.enabled, s.priority, s.root_key_fingerprint, s.trust_confirmed_at,
-        s.capabilities_json, s.last_sync_at, s.last_sync_status, s.last_sync_error,
+        s.capabilities_json, s.delivery_type, s.last_sync_at, s.last_sync_status, s.last_sync_error,
         s.last_sync_duration_ms,
         (SELECT COUNT(*) FROM trp_catalog_cache c WHERE c.source_id = s.id)
  FROM trp_sources s";
@@ -313,6 +343,7 @@ pub async fn trp_source_preview(
         native_workers: d.capabilities.native_workers,
         is_official: is_official_root(&root_fingerprint),
         capabilities: capabilities_value(&d),
+        delivery_type: delivery_type(&d).into(),
     })
 }
 
@@ -370,8 +401,8 @@ pub async fn trp_source_add(
         db.conn.execute(
             "INSERT INTO trp_sources
              (id, kind, discovery_url, display_name, operator, local, enabled, priority,
-              profile, root_key_fingerprint, trust_confirmed_at, capabilities_json)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, 1, 100, 'tuf-v1', ?7, unixepoch(), ?8)",
+              profile, root_key_fingerprint, trust_confirmed_at, capabilities_json, delivery_type)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, 1, 100, 'tuf-v1', ?7, unixepoch(), ?8, ?9)",
             rusqlite::params![
                 d.source.id,
                 kind,
@@ -381,6 +412,7 @@ pub async fn trp_source_add(
                 local as i64,
                 root_fingerprint,
                 capabilities_value(&d).to_string(),
+                delivery_type(&d),
             ],
         )?;
     }
@@ -554,6 +586,14 @@ async fn sync_one_inner(state: &AppState, source_id: &str) -> Result<i64, CmdErr
     db.conn.execute_batch("BEGIN;")?;
     let write = || -> Result<(), CmdError> {
         db.conn.execute(
+            "UPDATE trp_sources SET capabilities_json = ?2, delivery_type = ?3 WHERE id = ?1",
+            rusqlite::params![
+                source_id,
+                capabilities_value(&d).to_string(),
+                delivery_type(&d),
+            ],
+        )?;
+        db.conn.execute(
             "DELETE FROM trp_catalog_cache WHERE source_id = ?1",
             [source_id],
         )?;
@@ -647,7 +687,10 @@ pub fn trp_catalog_search(state: State<AppState>, keyword: String) -> CmdResult<
             // 公告来自缓存条目；所有 review/verified 布尔都来自未验证
             // catalog，不能提升客户端验证状态。
             let parsed: Option<CatalogEntry> = serde_json::from_str(&entry_json).ok();
-            let advisories = parsed.map(|e| e.advisories).unwrap_or_default();
+            let advisories = parsed
+                .as_ref()
+                .map(|entry| entry.advisories.clone())
+                .unwrap_or_default();
             Ok(CatalogItem {
                 source_id: r.get(0)?,
                 source_priority: r.get(1)?,
@@ -667,6 +710,7 @@ pub fn trp_catalog_search(state: State<AppState>, keyword: String) -> CmdResult<
                 publisher_signature_verified: false,
                 official_review_passed: false,
                 security_scan_passed: false,
+                availability: parsed.as_ref().and_then(|entry| entry.availability.clone()),
                 advisory_count: advisories.len() as u32,
                 max_advisory_severity: max_advisory_severity(&advisories),
             })
@@ -932,18 +976,22 @@ fn granted_permissions(state: &AppState, tool_id: &str) -> Vec<String> {
 /// 更新时强制来源固定 + 发布者固定（evaluate_update，默认拒绝跨源/换钥/降级）。
 #[tauri::command]
 pub async fn trp_install(
+    app: AppHandle,
     state: State<'_, AppState>,
     source_id: String,
     publisher_key_id: String,
     tool_id: String,
     permissions_confirmed: bool,
 ) -> CmdResult<useful_core::registry::ToolDefinition> {
-    install_from_trp_source(
+    install_from_trp_source_version(
         &state,
         &source_id,
         &publisher_key_id,
         &tool_id,
+        None,
         permissions_confirmed,
+        false,
+        Some(app),
     )
     .await
 }
@@ -964,6 +1012,7 @@ pub async fn install_from_trp_source(
         None,
         permissions_confirmed,
         false,
+        None,
     )
     .await
 }
@@ -976,6 +1025,7 @@ async fn install_from_trp_source_version(
     target_version: Option<&str>,
     permissions_confirmed: bool,
     allow_downgrade: bool,
+    app: Option<AppHandle>,
 ) -> Result<useful_core::registry::ToolDefinition, CmdError> {
     // Global lock order is tool -> source. Hold both from the first origin
     // read through filesystem, SQLite and registry commit/rollback.
@@ -1067,7 +1117,9 @@ async fn install_from_trp_source_version(
         fetch_tuf_metadata(&d.repository.metadata_base_url, &src.pinned_fp, src.local).await?;
     let verified = BuiltinTufBackend
         .verify(&files, &trusted_root, &now_rfc3339())
-        .map_err(|e| CmdError::from(format!("TUF 验证失败，拒绝安装: {e}")))?;
+        .map_err(|e| {
+            CmdError::coded("signature_invalid", format!("TUF 验证失败，拒绝安装: {e}"))
+        })?;
     // Fast replay rejection before downloading the target. The atomic compare
     // and advance happens only after every target/publisher check succeeds.
     {
@@ -1101,35 +1153,94 @@ async fn install_from_trp_source_version(
             artifact_sha256: &artifact.artifact_sha256,
         },
     )
-    .map_err(|error| CmdError::from(format!("发布者独立签名证明无效，拒绝安装: {error}")))?;
+    .map_err(|error| {
+        CmdError::coded(
+            "signature_invalid",
+            format!("发布者独立签名证明无效，拒绝安装: {error}"),
+        )
+    })?;
 
     // 5) 下载 target（consistent 路径 <sha256>.<文件名>）并校验 hash+length
     let targets_base = d.repository.targets_base_url.trim_end_matches('/');
     let url = format!("{targets_base}/{}.{target_name}", target_info.sha256);
     let package_limit = useful_plugin::install::InstallOptions::default().max_package_size;
     if target_info.length > package_limit {
-        return Err(CmdError::from("TUF target 超过插件包大小上限"));
+        return Err(CmdError::coded(
+            "size_mismatch",
+            "TUF target 超过插件包大小上限",
+        ));
     }
     let target_length = usize::try_from(target_info.length)
-        .map_err(|_| CmdError::from("TUF target 长度超出当前平台范围"))?;
-    let bytes = fetch_bytes_limited(&url, target_length, src.local).await?;
-    verify_target_bytes(target_info, &bytes)
-        .map_err(|e| CmdError::from(format!("制品校验失败，拒绝安装: {e}")))?;
+        .map_err(|_| CmdError::coded("size_mismatch", "TUF target 长度超出当前平台范围"))?;
+    let tracker = app
+        .map(|app| {
+            super::downloads::TrustedInstallTracker::begin(
+                app,
+                tool_id,
+                &artifact.version,
+                &target_info.sha256,
+                target_info.length,
+            )
+        })
+        .transpose()?;
+    let track = |result: Result<(), CmdError>| {
+        if let (Some(tracker), Err(error)) = (&tracker, &result) {
+            tracker.fail(error);
+        }
+        result
+    };
+    if let Some(tracker) = &tracker {
+        track(tracker.progress("downloading", 0))?;
+    }
+    let bytes = match fetch_bytes_limited(&url, target_length, src.local).await {
+        Ok(bytes) => bytes,
+        Err(error) => {
+            if let Some(tracker) = &tracker {
+                tracker.fail(&error);
+            }
+            return Err(error);
+        }
+    };
+    if let Some(tracker) = &tracker {
+        track(tracker.progress("verifying", bytes.len() as u64))?;
+    }
+    let verify_result = verify_target_bytes(target_info, &bytes).map_err(|e| {
+        let message = e.to_string();
+        let code = if message.to_ascii_lowercase().contains("length") {
+            "size_mismatch"
+        } else {
+            "signature_invalid"
+        };
+        CmdError::coded(code, format!("制品校验失败，拒绝安装: {message}"))
+    });
+    if let Err(error) = verify_result {
+        if let Some(tracker) = &tracker {
+            tracker.fail(&error);
+        }
+        return Err(error);
+    }
 
     // 6) 写入 staging 临时文件后走统一安装管线（ZIP 安全/原子安装/失败回滚）
-    std::fs::create_dir_all(&state.paths.staging_dir).map_err(|e| CmdError::from(e.to_string()))?;
+    let prepare_result = std::fs::create_dir_all(&state.paths.staging_dir)
+        .map_err(|e| CmdError::from(e.to_string()));
+    track(prepare_result)?;
     let tmp_path = state
         .paths
         .staging_dir
         .join(format!("trp-{}.useful", uuid::Uuid::new_v4()));
-    std::fs::write(&tmp_path, &bytes).map_err(|e| CmdError::from(e.to_string()))?;
+    let write_result = std::fs::write(&tmp_path, &bytes).map_err(|e| CmdError::from(e.to_string()));
+    track(write_result)?;
 
-    let result = (|| -> Result<useful_core::registry::ToolDefinition, CmdError> {
+    if let Some(tracker) = &tracker {
+        track(tracker.progress("installing", bytes.len() as u64))?;
+    }
+    let install_result = (|| -> Result<useful_core::registry::ToolDefinition, CmdError> {
         // manifest 摘要与目录声明一致（防目录/制品不一致）
         let manifest_bytes = useful_plugin::zip_safety::read_manifest_bytes(&tmp_path)
             .map_err(|e| CmdError::from(e.to_string()))?;
         if !sha256_hex(&manifest_bytes).eq_ignore_ascii_case(&artifact.manifest_digest) {
-            return Err(CmdError::from(
+            return Err(CmdError::coded(
+                "signature_invalid",
                 "包内 manifest 与目录声明的摘要不一致——拒绝安装",
             ));
         }
@@ -1143,7 +1254,8 @@ async fn install_from_trp_source_version(
             || manifest.version != artifact.version
             || manifest_permissions != expected_permissions
         {
-            return Err(CmdError::from(
+            return Err(CmdError::coded(
+                "signature_invalid",
                 "包内 manifest 与目录工具身份或权限不一致——拒绝安装",
             ));
         }
@@ -1187,7 +1299,13 @@ async fn install_from_trp_source_version(
         super::plugins::persist_installed(state, outcome, Some(&commit))
     })();
     let _ = std::fs::remove_file(&tmp_path);
-    result
+    if let Some(tracker) = &tracker {
+        match &install_result {
+            Ok(_) => tracker.complete(),
+            Err(error) => tracker.fail(error),
+        }
+    }
+    install_result
 }
 
 #[tauri::command]
@@ -1216,6 +1334,7 @@ pub async fn rollback_from_trp_source(
         Some(target_version),
         permissions_confirmed,
         true,
+        None,
     )
     .await
 }
@@ -1313,6 +1432,26 @@ mod tests {
             catalog_url("https://s.example/.well-known/useful-repository.json", &d),
             "https://s.example/catalog/snapshot.json"
         );
+        assert_eq!(delivery_type(&d), "static-https");
+    }
+
+    #[test]
+    fn delivery_type_uses_api_presence_not_provider_claims() {
+        let d: RepositoryDiscovery = serde_json::from_value(serde_json::json!({
+            "schemaVersion": "1.0",
+            "source": { "id": "com.example.s", "name": "S", "operator": "Op" },
+            "repository": {
+                "profile": "tuf-v1",
+                "metadataBaseUrl": "https://s.example/metadata/",
+                "targetsBaseUrl": "https://s.example/targets/",
+                "rootUrl": "https://s.example/metadata/1.root.json",
+                "rootSha256": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"
+            },
+            "api": { "baseUrl": "https://api.s.example/v1/" },
+            "capabilities": { "catalog": true, "staticMirror": true }
+        }))
+        .unwrap();
+        assert_eq!(delivery_type(&d), "dynamic");
     }
 
     #[test]

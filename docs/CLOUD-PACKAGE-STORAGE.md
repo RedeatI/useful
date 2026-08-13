@@ -102,11 +102,16 @@ Upload plan:
 Exit non-zero on size mismatch, missing object, object conflict, or bad credentials.
 Idempotent put: identical bytes → `unchanged`; different bytes at same key → refuse.
 
-## Client surface (P0-1c target)
+## Client surface (P0-1c implemented)
 
-- Source Center lists storage-backed sources with last availability.
-- Downloads queue shows digest + verify step.
-- Errors use stable codes: `object_missing`, `size_mismatch`, `signature_invalid`, `network`.
+- Source Center shows the client-observed delivery type (`static-https` or `dynamic`) and carries
+  each catalog entry's last availability check into local search results. S3/R2/MinIO public
+  buckets appear as static HTTPS because provider internals are not a client trust signal.
+- Trusted TRP/TUF installs create download records with the TUF-bound digest and explicit
+  downloading, verifying, and installing states.
+- Download records keep human-readable detail separate from stable codes:
+  `object_missing`, `size_mismatch`, `signature_invalid`, `network` (with `install_failed` as the
+  local installation fallback).
 
 ## Cost tiers
 
@@ -129,7 +134,7 @@ Idempotent put: identical bytes → `unchanged`; different bytes at same key →
 - [x] Add storage doctor/dry-run/push/verify to CLI (`packages/useful-cli/bin/source/storage.mjs`)
 - [x] Unit tests for fs backend (`storage.spec.mjs`)
 - [ ] Live integration test with MinIO/R2 (optional CI)
-- [ ] Source Center display + download verify (P0-1c)
+- [x] Source Center display + download verify (P0-1c)
 - [x] Threat note: same-key different bytes refused; keys/ never uploaded
 
 ## Related

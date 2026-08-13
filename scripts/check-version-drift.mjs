@@ -18,6 +18,7 @@ const TAURI_PLATFORM_CONFIGS = Object.freeze([
   { platform: "macos", path: "apps/useful/src-tauri/tauri.macos.conf.json" },
   { platform: "linux", path: "apps/useful/src-tauri/tauri.linux.conf.json" },
 ]);
+const PUBLIC_READMES = Object.freeze(["README.md", "README.zh-CN.md"]);
 
 async function readJson(repoRoot, relative) {
   return JSON.parse(await readFile(path.join(repoRoot, relative), "utf8"));
@@ -92,6 +93,50 @@ function localCargoLockVersions(raw) {
     .filter((entry) => entry.name?.startsWith("useful-") && entry.version);
 }
 
+function uniqueMatches(raw, pattern) {
+  return [...new Set([...raw.matchAll(pattern)].map((match) => match[1]))];
+}
+
+export async function evaluateReadmeReleaseReferences({ repoRoot = defaultRepoRoot, expected }) {
+  const required = Object.freeze({
+    releaseTag: `releases/tag/v${expected}`,
+    portableAsset: `Useful-${expected}-windows-x64-portable.zip`,
+    bundleAsset: `Useful-${expected}-windows-x64-bundle.zip`,
+    checksumAsset: `SHA256SUMS-${expected}.txt`,
+  });
+  const files = [];
+  const failures = [];
+  for (const relative of PUBLIC_READMES) {
+    const raw = await readFile(path.join(repoRoot, relative), "utf8");
+    const observed = {
+      releaseTags: uniqueMatches(raw, /releases\/tag\/v([^\s)#]+)/g),
+      portableVersions: uniqueMatches(raw, /Useful-([^\s"']+)-windows-x64-portable\.zip/g),
+      bundleVersions: uniqueMatches(raw, /Useful-([^\s"']+)-windows-x64-bundle\.zip/g),
+      checksumVersions: uniqueMatches(raw, /SHA256SUMS-([^\s"']+)\.txt/g),
+    };
+    const missing = Object.entries(required)
+      .filter(([, value]) => !raw.includes(value))
+      .map(([name]) => name);
+    const drift = Object.entries(observed)
+      .filter(([, values]) => values.some((value) => value !== expected))
+      .map(([name, values]) => ({ name, values }));
+    for (const name of missing) {
+      failures.push({ code: "readme-release-reference-missing", path: relative, field: name });
+    }
+    for (const entry of drift) {
+      failures.push({
+        code: "readme-release-version-drift",
+        path: relative,
+        field: entry.name,
+        expected,
+        actual: entry.values,
+      });
+    }
+    files.push({ path: relative, ok: missing.length === 0 && drift.length === 0, observed });
+  }
+  return { expected, ok: failures.length === 0, required, files, failures };
+}
+
 export async function evaluateVersionDrift({ repoRoot = defaultRepoRoot } = {}) {
   const rootPackage = await readJson(repoRoot, "package.json");
   const expected = rootPackage.version;
@@ -127,14 +172,16 @@ export async function evaluateVersionDrift({ repoRoot = defaultRepoRoot } = {}) 
     platformConfigs[platform] = await readJson(repoRoot, relative);
   }
   const bundleIdentifier = evaluateBundleIdentifierConfiguration({ baseConfig, platformConfigs });
+  const readmeRelease = await evaluateReadmeReleaseReferences({ repoRoot, expected });
   const mismatches = observations.filter((entry) => !entry.matches);
   return {
     schemaVersion: "useful.version-drift.v1",
-    ok: mismatches.length === 0 && bundleIdentifier.ok,
+    ok: mismatches.length === 0 && bundleIdentifier.ok && readmeRelease.ok,
     version: expected,
     channel,
     checked: observations.length,
     bundleIdentifier,
+    readmeRelease,
     mismatches,
   };
 }
@@ -174,6 +221,9 @@ async function main() {
     }
     for (const failure of result.bundleIdentifier.failures) {
       process.stderr.write(`- ${failure.path}: ${failure.code}\n`);
+    }
+    for (const failure of result.readmeRelease.failures) {
+      process.stderr.write(`- ${failure.path}: ${failure.code} (${failure.field})\n`);
     }
   }
   process.exitCode = result.ok ? 0 : 1;

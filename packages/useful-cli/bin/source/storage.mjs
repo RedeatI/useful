@@ -245,7 +245,7 @@ export class S3StorageDriver {
   }
 
   async signedRequest(method, key, body, contentType) {
-    const { accessKey, secretKey, region, endpoint } = this.config;
+    const { accessKey, secretKey, region } = this.config;
     const url = this.objectUrl(key);
     const parsed = new URL(url);
     const now = new Date();

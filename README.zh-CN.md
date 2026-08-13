@@ -7,7 +7,7 @@ Useful 是在本地计算机上运行工具的桌面应用。它把常分散在�
 
 Useful 包含：
 
-- 31 个开发实用工具
+- 31 个独立开发实用工具（含 Office 分组共 36 个内置 Action）
 - 有固定边界的本地 Office 文件处理
 - 视频裁剪与转码
 - Windows 进程观测
@@ -23,6 +23,15 @@ Useful 包含：
 > [v0.1.0-beta.4](https://github.com/RedeatI/useful/releases/tag/v0.1.0-beta.4) 发布（推荐便携 zip）。
 > Windows 是主要开发平台。部分原生功能在 macOS 或 Linux 上不可用。阅读
 > [已知限制](docs/KNOWN-LIMITATIONS.md)。
+
+## 按你的目标开始
+
+| 你想要…… | 从这里开始 |
+| --- | --- |
+| 试用 Windows 桌面应用 | [下载未签名预览版](#下载未签名-windows-预览) |
+| 连接 Agent 宿主 | [CLI 与 MCP](#cli-与-mcp) |
+| 构建第三方工具 | [Agent 工具构建指南](docs/agent/BUILD-A-TOOL.md) |
+| 构建 Useful 或参与贡献 | [从源码运行](#从源码运行) · [贡献指南](CONTRIBUTING.md) |
 
 ![Useful 工具库界面](docs/assets/readme/workflow.zh-CN.svg)
 
@@ -48,6 +57,18 @@ Useful 包含：
 可选：`.msi` / `-setup.exe`，或 `Useful-0.1.0-beta.4-windows-x64-bundle.zip`。  
 可能出现 SmartScreen 警告。当前**不是** Authenticode 签名的生产包。
 
+请同时下载发布页中的 `SHA256SUMS-0.1.0-beta.4.txt`，校验便携包：
+
+```powershell
+$asset = "Useful-0.1.0-beta.4-windows-x64-portable.zip"
+$expected = ((Select-String -Path .\SHA256SUMS-0.1.0-beta.4.txt -Pattern ([regex]::Escape($asset) + '$')).Line -split '\s+')[0].ToLowerInvariant()
+$actual = (Get-FileHash ".\$asset" -Algorithm SHA256).Hash.ToLowerInvariant()
+if ($actual -ne $expected) { throw "$asset 的 SHA-256 不匹配" }
+```
+
+可复现的问题请提交到 [GitHub Issues](https://github.com/RedeatI/useful/issues)。安全漏洞请按
+[SECURITY.md](SECURITY.md) 说明私下报告，不要创建公开 Issue。
+
 
 
 ## 功能
@@ -61,8 +82,8 @@ Useful 包含：
 - **进程监视器（Windows）** — 显示 CPU、内存、磁盘、GPU 与网络使用情况。首发版本为只读。结束
   进程与一键提权已禁用。若需要管理员权限，先退出 Useful，再从 Windows 以管理员身份启动。
 - **工具库** — 搜索、固定并收藏内置工具与已安装工具。
-- **扩展** — 校验并打包 Web 工具为 `.useful` 归档。在受信任安装中验证发布者签名。可自托管兼容的
-  软件源。
+- **扩展** — 校验并打包 Web 工具为 `.useful` 归档，在受信任安装中验证工具发布者的软件包签名。
+  这与 Windows 应用本身是否具有 Authenticode 签名是两件事。可自托管兼容的软件源。
 - **Agent 访问** — 通过 JSON 命令行接口（CLI）或本地 stdio 的 Model Context Protocol（MCP）
   服务器调用 36 个内置 Action。可用 Agent profile 隐藏宿主不应看到的 Action。
 

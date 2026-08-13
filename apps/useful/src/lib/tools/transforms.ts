@@ -40,6 +40,11 @@ export function jsonMinify(input: string): string {
   return runJsonAction({ operation: "minify", text: input }).text;
 }
 
+/** RFC 6901 JSON Pointer 查询；空指针返回整个文档。 */
+export function jsonQuery(input: string, pointer: string, indent = 2): string {
+  return runJsonAction({ operation: "query", text: input, pointer, indent }).text;
+}
+
 // ---------- UUID ----------
 
 /** 生成 1 个 v4 UUID（优先 crypto.randomUUID，回退到 getRandomValues）。 */

@@ -10,6 +10,7 @@ import {
   advisorySeverityKey,
   capabilityLabels,
   conflictCount,
+  deliveryTypeKey,
   formatFingerprint,
   loginStatusKey,
   officialBadgeVisible,
@@ -384,6 +385,8 @@ function syncTimeText(s: TrpSourceInfo): string {
           <dd>{{ preview.operator }}</dd>
           <dt>{{ t("sourceCenter.fieldUrl") }}</dt>
           <dd class="useful-mono sc-break">{{ preview.discoveryUrl }}</dd>
+          <dt>{{ t("sourceCenter.fieldDelivery") }}</dt>
+          <dd>{{ t(deliveryTypeKey(preview.deliveryType)) }}</dd>
           <dt>{{ t("sourceCenter.fieldFingerprint") }}</dt>
           <dd class="useful-mono sc-break" data-testid="preview-fingerprint">
             {{ formatFingerprint(preview.rootKeyFingerprint) }}
@@ -432,6 +435,9 @@ function syncTimeText(s: TrpSourceInfo): string {
               {{ t("sourceCenter.localBadge") }}
             </span>
             <span v-if="s.kind === 'mirror'" class="useful-badge">{{ t("sourceCenter.mirrorBadge") }}</span>
+            <span class="useful-badge" data-testid="delivery-type-badge">
+              {{ t(deliveryTypeKey(s.deliveryType)) }}
+            </span>
             <span
               class="useful-badge"
               :class="{ 'useful-badge--warning': s.lastSyncStatus === 'failed' }"
@@ -573,6 +579,7 @@ function syncTimeText(s: TrpSourceInfo): string {
                 :data-testid="b.ok ? 'review-badge-ok' : 'review-badge-pending'"
               >
                 {{ t(b.key) }}{{ b.ok ? "" : t("sourceCenter.reviewNotPassedSuffix") }}
+                <template v-if="b.detail"> · {{ b.detail }}</template>
               </span>
             </div>
             <div

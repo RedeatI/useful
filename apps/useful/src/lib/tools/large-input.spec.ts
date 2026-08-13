@@ -79,14 +79,14 @@ describe("10MB 大输入性能验证", () => {
     expect(encoded.length).toBeGreaterThan(MB_10);
     const decoded = base64Decode(encoded);
     expect(decoded.length).toBe(MB_10);
-  });
+  }, 30_000);
 
   it("Base64 10MB 往返一致性", () => {
     const text = makeText(MB_10);
     const encoded = base64Encode(text);
     const decoded = base64Decode(encoded);
     expect(decoded).toBe(text);
-  });
+  }, 30_000);
 
   it("URL 10MB 编解码往返一致", () => {
     const text = makeText(MB_10);

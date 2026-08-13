@@ -57,6 +57,42 @@ export function accessModeKey(mode: string): string {
   }
 }
 
+/** 客户端实际观察到的源交付形态；不把云厂商实现当作信任信号。 */
+export function deliveryTypeKey(type: TrpSourceInfo["deliveryType"]): string {
+  switch (type) {
+    case "static-https":
+      return "sourceCenter.deliveryStaticHttps";
+    case "dynamic":
+      return "sourceCenter.deliveryDynamic";
+    default:
+      return "sourceCenter.deliveryUnknown";
+  }
+}
+
+/** Catalog 可用性状态对应的 i18n key；未知值按 unknown 展示。 */
+export function availabilityStatusKey(status: string): string {
+  switch (status) {
+    case "healthy":
+      return "sourceCenter.sourceReportedHealthy";
+    case "degraded":
+      return "sourceCenter.sourceReportedDegraded";
+    case "unavailable":
+      return "sourceCenter.sourceReportedUnavailable";
+    default:
+      return "sourceCenter.sourceReportedUnknown";
+  }
+}
+
+/** 保留源报告的检查时间与检查器来源；两者都不提升为客户端验证事实。 */
+export function availabilityDetail(
+  availability: Pick<NonNullable<TrpCatalogItem["availability"]>, "checkedAt" | "source">,
+): string | undefined {
+  const parts = [availability.checkedAt, availability.source].filter(
+    (part): part is string => typeof part === "string" && part.length > 0,
+  );
+  return parts.length ? parts.join(" · ") : undefined;
+}
+
 /** 按启用状态分组（组内保持后端返回的优先级顺序）。 */
 export function splitSources(sources: TrpSourceInfo[]): {
   enabled: TrpSourceInfo[];
@@ -154,12 +190,15 @@ export function reviewBadges(
       detail: item.reproducibleBuild.strategy,
     });
   }
-  // 来源可用性：只有 healthy 才算通过；带最后检查时间
+  // 来源可用性只作为自报状态展示；带检查时间与报告来源。
   if (item.availability) {
     badges.push({
-      key: "sourceCenter.sourceAvailable",
-      ok: item.availability.status === "healthy",
-      detail: item.availability.checkedAt,
+      key: availabilityStatusKey(item.availability.status),
+      // Catalog sync is intentionally not TUF-verified. Availability remains
+      // a source assertion until the install path independently verifies the
+      // TUF target, digest and publisher binding.
+      ok: false,
+      detail: availabilityDetail(item.availability),
     });
   }
   return badges;

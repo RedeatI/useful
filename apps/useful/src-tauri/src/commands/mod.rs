@@ -34,12 +34,24 @@ use serde::Serialize;
 #[derive(Debug, Serialize)]
 pub struct CmdError {
     pub message: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub code: Option<String>,
+}
+
+impl CmdError {
+    pub fn coded(code: impl Into<String>, message: impl Into<String>) -> Self {
+        Self {
+            message: message.into(),
+            code: Some(code.into()),
+        }
+    }
 }
 
 impl<E: std::fmt::Display> From<E> for CmdError {
     fn from(e: E) -> Self {
         CmdError {
             message: e.to_string(),
+            code: None,
         }
     }
 }

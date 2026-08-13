@@ -46,7 +46,7 @@ Reference: 50 个“网站就能免费搞定”的互联网工具样本（TinyWo
 
 | 能力带 | 样本站 | 与 Useful 现状 | 策略 |
 | --- | --- | --- | --- |
-| A. 万能小工具箱 | TinyWow, CyberChef, Transform.tools | 已有 31 utility + 网格 | **深耕本地**，按缺口补 Action |
+| A. 万能小工具集 | TinyWow, CyberChef, Transform.tools | 已有 31 utility + 网格 | **深耕本地**，按缺口补 Action |
 | B. 文件/格式转换 | CloudConvert, PDF24, Squoosh, SVGOMG | 已有 Office/PDF/媒体边界 | **本地有界转换**；禁止默认上传 |
 | C. 隐私与临时通信 | Temp-Mail, Privnote | 弱 | 仅做**本地**阅后即焚/一次笔记；不做邮箱服务 |
 | D. 跨设备传文件 | LocalSend, PairDrop | 无 | 可选 P2；优先本地局域网，不做中心化中转 |
@@ -67,8 +67,19 @@ Reference: 50 个“网站就能免费搞定”的互联网工具样本（TinyWo
 | --- | --- | --- | --- | --- | --- | --- |
 | **P0-1** | **云端包存储（Object store for `.useful`）** | 5 | 5 | 5 | 4 | 见 §5；复用现有 TRP/签名/源模型 |
 | **P0-2** | 官方/自建 **Source 可用性与制品校验** 产品化 | 4 | 5 | 5 | 4 | ADR-012 已有后端语义；客户端 Source Center 可见 |
-| **P0-3** | Portable / 预览发布路径稳定（版本徽章、校验和、下载文案） | 5 | 3 | 3 | 5 | 已部分完成；保持不回退 |
-| **P0-4** | Action 合同闭环：新工具默认 **GUI + CLI + MCP 三面** | 5 | 5 | 5 | 4 | 任何“丰富功能”的准入门槛 |
+| **P0-3** | Portable / 预览发布路径稳定（版本徽章、校验和、下载文案） | 5 | 3 | 3 | 5 | **已实现**；版本/README/二进制门禁防回退 |
+| **P0-4** | Action 合同闭环：新工具默认 **GUI + CLI + MCP 三面** | 5 | 5 | 5 | 4 | **已实现**；`pnpm action:check` 为准入门 |
+
+#### P0-3 / P0-4 防回退门（已实现）
+
+- `pnpm version:check` 同时绑定产品清单、Tauri 配置、双语 README 的 Release tag、portable/
+  bundle 资产名与同版本 `SHA256SUMS` 文件名。
+- `scripts/package-release.ps1` 在复制前校验 `Useful.exe` 和 `useful-bootstrap.exe` 的
+  `ProductVersion`，拒绝把旧二进制重新标成新版本；界面版本来自同一二进制的
+  `CARGO_PKG_VERSION`。
+- `pnpm action:check` 要求内置 Action 的运行时目录、GUI 投影与 MCP 暴露顺序闭合，且每项都有
+  闭合 input/output schema、handler、GUI route 和确定性测试向量。
+- 新功能优先扩展已有 Action；确需新增 Action 时，任何一面缺失都会使准入门非零。
 
 ### P1 — 下一阶段默认工具丰富（本地、高复用）
 
@@ -76,7 +87,7 @@ Reference: 50 个“网站就能免费搞定”的互联网工具样本（TinyWo
 | --- | --- | --- | --- |
 | P1-1 | **图片本地管线**：压缩/格式/尺寸/EXIF 清理 | Squoosh | Worker 内处理；不上传 |
 | P1-2 | **PDF 边界能力加强**：合并/拆分/压缩/元数据 | PDF24 | 已有 PDF Action 基础；补齐高频子集 |
-| P1-3 | **JSON 可视化 / 路径查询** | JSON Crack | 纯本地；强 Agent 价值 |
+| P1-3 | **JSON 可视化 / 路径查询（已实现）** | JSON Crack | 纯本地；复用现有 JSON Action，不增加公开 Action 数量 |
 | P1-4 | **Cron / Shell 解释器（本地）** | Crontab Guru, ExplainShell | 规则/模板，无网络 |
 | P1-5 | **哈希/编码“流水线”**（多步配方） | CyberChef | 可复用现有 pure Action 组合 |
 | P1-6 | **颜色/配色/对比度套件** | Coolors | 已有 color/contrast；扩展导出 |
@@ -155,12 +166,12 @@ Client Source Center / downloader
 
 ### 5.5 分阶段交付
 
-#### P0-1a — 规格与契约（文档 + schema，可 1 次 PR）
+#### P0-1a — 规格与契约（已实现）
 
-- [ ] `docs/CLOUD-PACKAGE-STORAGE.md`：对象键规范、URL 模板、权限、失败码  
-- [ ] 固定 key 规则：`sha256/{lowercaseHex}`，禁止开放重定向  
-- [ ] 明确：客户端只接受 **源配置里的 origin + 内容寻址路径**，拒绝任意粘贴 URL 安装  
-- [ ] 与 `export-static` 布局对照表（静态源 = 零服务器云存储）
+- [x] `docs/CLOUD-PACKAGE-STORAGE.md`：对象键规范、URL 模板、权限、失败码
+- [x] 固定 key 规则：`sha256/{lowercaseHex}`，禁止开放重定向
+- [x] 明确：客户端只接受 **源配置里的 origin + 内容寻址路径**，拒绝任意粘贴 URL 安装
+- [x] 与 `export-static` 布局对照表（静态源 = 零服务器云存储）
 
 #### P0-1b — CLI 上传/同步（作者路径）— **已实现**
 
@@ -170,11 +181,13 @@ Client Source Center / downloader
 - [x] 输出可机读 JSON（`--json`）  
 - [x] fs 后端单测；s3 兼容 SigV4 实现（live MinIO 可选）
 
-#### P0-1c — 客户端消费
+#### P0-1c — 客户端消费（已实现）
 
-- [ ] Source Center：显示源类型 `static-https` / `s3-compatible` / `dynamic`  
-- [ ] 下载走现有 downloads 队列 + digest 校验  
-- [ ] 失败分类：missing / size-mismatch / sig-fail / network（对齐 ADR-012）
+- [x] Source Center：显示客户端可验证的 `static-https` / `dynamic` 交付形态；S3/R2/MinIO
+  公共桶统一显示为 `static-https / S3-compatible`，不把服务商内部实现当作信任信号
+- [x] 下载走现有 downloads 队列 + digest 校验
+- [x] 失败分类：`object_missing` / `size_mismatch` / `signature_invalid` / `network`
+  （对齐 ADR-012）
 
 #### P1-1d — 官方镜像与 Pro 门（可选）
 
@@ -182,7 +195,15 @@ Client Source Center / downloader
 - [ ] FREE-AND-PRO：免费工具本地永久；云下载额度可后接  
 - [ ] availability 聚合展示“源健康”
 
-### 5.6 安全底线（写死）
+### 5.6 Source 可用性与制品校验（P0-2，客户端已产品化）
+
+- [x] Catalog 的 `availability.status / checkedAt / source` 进入 Source Center 搜索结果
+- [x] 可用性明确标为“源报告”且保持未验证样式，不冒充客户端独立探测或 TUF 验证
+- [x] 安装阶段独立执行 TUF、发布者绑定、长度与 SHA-256 校验
+- [x] 静态对象缺失、大小不符、签名/摘要失败、网络失败使用稳定错误码
+- [ ] 多镜像 source 级聚合健康度（保留到 P1-1d）
+
+### 5.7 安全底线（写死）
 
 1. **签名先于存储**：云上只是字节；不可信直到 publisher verify  
 2. **内容寻址**：同一 digest 全局同一对象；禁止“同名覆盖改内容”  
@@ -190,7 +211,7 @@ Client Source Center / downloader
 4. **本地优先安装结果**：取消订阅/断网后，已装包仍可按现有策略运行  
 5. **日志脱敏**：不写密钥、不写完整用户路径
 
-### 5.7 验收（P0 完成定义）
+### 5.8 验收（P0 完成定义）
 
 1. 作者在干净机器：`pack → sign → publish → sync-storage` 成功  
 2. 另一台机器：只配置源 origin + 公钥 pin，能发现、下载、验签、安装  
@@ -221,6 +242,14 @@ Client Source Center / downloader
 3. 是否默认离线？  
 4. 依赖是否可进 Lite portable（无 GPL 阻塞）？  
 5. 是否可用插件代替内置？能插件则优先插件（控体积）
+
+### 6.1 P1-3 JSON Explorer（已实现）
+
+- 保留 `builtin.utilities.json` 单一 Action 身份，新增受限 RFC 6901 JSON Pointer `query` 操作；
+  GUI、runtime CLI 与 MCP 复用同一 handler 和确定性向量。
+- GUI 提供格式化/树形切换、节点折叠、键/路径/类型/值筛选和路径复制。
+- 树形投影最多5000节点、64层；超限明确显示截断，不生成无界 DOM。
+- 不执行 JSONPath 脚本、表达式或网络请求；空 pointer 表示文档根。
 
 ---
 

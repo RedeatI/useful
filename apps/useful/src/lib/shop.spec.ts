@@ -5,6 +5,7 @@ import {
   applyDownloadProgress,
   catalogCategories,
   downloadPercent,
+  downloadErrorKey,
   downloadStatusKey,
   filterCatalog,
   isActiveDownload,
@@ -22,7 +23,9 @@ function mkDownload(over: Partial<DownloadRecord> = {}): DownloadRecord {
     totalBytes: 1000,
     receivedBytes: 0,
     status: "pending",
+    digest: null,
     error: null,
+    errorCode: null,
     createdAt: 1,
     ...over,
   };
@@ -51,6 +54,7 @@ describe("下载状态", () => {
     expect(downloadStatusKey("pending")).toBe("downloads.statusPending");
     expect(downloadStatusKey("downloading")).toBe("downloads.statusDownloading");
     expect(downloadStatusKey("verifying")).toBe("downloads.statusVerifying");
+    expect(downloadStatusKey("installing")).toBe("downloads.statusInstalling");
     expect(downloadStatusKey("done")).toBe("downloads.statusDone");
     expect(downloadStatusKey("failed")).toBe("downloads.statusFailed");
     expect(downloadStatusKey("cancelled")).toBe("downloads.statusCancelled");
@@ -60,9 +64,18 @@ describe("下载状态", () => {
     expect(isActiveDownload("pending")).toBe(true);
     expect(isActiveDownload("downloading")).toBe(true);
     expect(isActiveDownload("verifying")).toBe(true);
+    expect(isActiveDownload("installing")).toBe(false);
     expect(isActiveDownload("done")).toBe(false);
     expect(isActiveDownload("failed")).toBe(false);
     expect(isActiveDownload("cancelled")).toBe(false);
+  });
+
+  it("稳定错误码映射到用户文案，未知码保留原始详情", () => {
+    expect(downloadErrorKey("object_missing")).toBe("downloads.errorObjectMissing");
+    expect(downloadErrorKey("size_mismatch")).toBe("downloads.errorSizeMismatch");
+    expect(downloadErrorKey("signature_invalid")).toBe("downloads.errorSignatureInvalid");
+    expect(downloadErrorKey("network")).toBe("downloads.errorNetwork");
+    expect(downloadErrorKey("unknown")).toBeNull();
   });
 
   it("进度百分比钳制在 0-100，总大小未知返回 null", () => {
@@ -84,6 +97,7 @@ describe("下载事件合并", () => {
       receivedBytes: 300,
       totalBytes: 1000,
       status: "downloading",
+      digest: "aa".repeat(32),
     });
     expect(next[0].receivedBytes).toBe(300);
     expect(next[0].status).toBe("downloading");
@@ -98,6 +112,7 @@ describe("下载事件合并", () => {
       receivedBytes: 10,
       totalBytes: 100,
       status: "downloading",
+      digest: "bb".repeat(32),
     });
     expect(next).toHaveLength(1);
     expect(next[0].id).toBe("d2");
@@ -112,6 +127,7 @@ describe("下载事件合并", () => {
       version: "1.0.0",
       status: "done",
       error: null,
+      errorCode: null,
     });
     expect(done[0].status).toBe("done");
     expect(done[0].receivedBytes).toBe(1000);
@@ -122,9 +138,11 @@ describe("下载事件合并", () => {
       version: "1.0.0",
       status: "failed",
       error: "SHA-256 不匹配",
+      errorCode: "signature_invalid",
     });
     expect(failed[0].status).toBe("failed");
     expect(failed[0].error).toBe("SHA-256 不匹配");
+    expect(failed[0].errorCode).toBe("signature_invalid");
     expect(failed[0].receivedBytes).toBe(700);
   });
 });
