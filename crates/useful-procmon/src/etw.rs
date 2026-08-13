@@ -6,7 +6,9 @@
 
 use crate::model::Capability;
 use std::collections::HashMap;
-use std::time::{Duration, Instant};
+#[cfg(any(windows, test))]
+use std::time::Duration;
+use std::time::Instant;
 
 /// 每 PID 网络速率（字节/秒）。
 #[derive(Debug, Clone, Copy, Default)]
@@ -97,6 +99,7 @@ impl NetCollector {
     /// 读取并清零累计字节，使用 monotonic elapsed 换算为字节/秒。
     pub fn sample(&mut self) -> HashMap<u32, NetUsage> {
         let now = Instant::now();
+        #[cfg(windows)]
         let elapsed = now.saturating_duration_since(self.sampled_at).as_secs_f64();
         self.sampled_at = now;
         #[cfg(windows)]
@@ -118,6 +121,7 @@ impl NetCollector {
     }
 }
 
+#[cfg(any(windows, test))]
 fn rates_for_elapsed(
     mut usage: HashMap<u32, NetUsage>,
     elapsed: Duration,

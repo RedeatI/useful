@@ -348,6 +348,34 @@ function inspectCiWorkflow(file, workflow) {
   if (!(workflow.jobs?.["compose-e2e"]?.steps ?? []).some((step) => stepRunsExact(step, "pnpm policy:test"))) {
     violations.push({ file, code: "ci-compose-linux-policy-tests-missing" });
   }
+  const linuxRustLintSteps = workflow.jobs?.["linux-rust-lint"]?.steps ?? [];
+  const linuxPnpmIndex = linuxRustLintSteps.findIndex((step) => (
+    String(step?.uses ?? "").startsWith("pnpm/action-setup@")
+    && String(step?.with?.version ?? "") === "9.15.0"
+  ));
+  const linuxNodeIndex = linuxRustLintSteps.findIndex((step) => (
+    String(step?.uses ?? "").startsWith("actions/setup-node@")
+    && String(step?.with?.["node-version"] ?? "") === "20"
+    && String(step?.with?.cache ?? "") === "pnpm"
+  ));
+  const linuxInstallIndex = linuxRustLintSteps.findIndex((step) => stepRunsExact(step, "pnpm install --frozen-lockfile"));
+  const linuxBuildIndex = linuxRustLintSteps.findIndex((step) => stepRunsExact(step, "pnpm -r build"));
+  const linuxClippyIndex = linuxRustLintSteps.findIndex((step) => stepRunsExact(step, "cargo clippy --workspace --all-targets -- -D warnings"));
+  if (linuxClippyIndex < 0) {
+    violations.push({ file, code: "ci-linux-release-clippy-missing" });
+  }
+  if (
+    linuxPnpmIndex < 0
+    || linuxNodeIndex < 0
+    || linuxInstallIndex < 0
+    || !(linuxPnpmIndex < linuxNodeIndex && linuxNodeIndex < linuxInstallIndex)
+  ) {
+    violations.push({ file, code: "ci-linux-release-clippy-bootstrap-missing" });
+  }
+  if (linuxBuildIndex < 0 || linuxClippyIndex < 0 || !(linuxInstallIndex < linuxBuildIndex && linuxBuildIndex < linuxClippyIndex)) {
+    violations.push({ file, code: "ci-linux-release-clippy-build-order-invalid" });
+  }
+  inspectLinuxDesktopDependencies(file, workflow.jobs?.["linux-rust-lint"], "ci-linux-release-clippy-dependency-missing");
   if (!hasFrozenPnpmBootstrap(workflow.jobs?.["platform-limited-matrix"]?.steps ?? [])) {
     violations.push({ file, code: "ci-platform-matrix-dependency-bootstrap-missing" });
   }
