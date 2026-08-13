@@ -203,6 +203,8 @@ jobs:
           node-version: 20
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - name: Linux public release policy regression
+        run: pnpm policy:test
       - run: pnpm --filter @useful/sdk build
       - name: Compose E2E
         working-directory: deploy/docker-compose

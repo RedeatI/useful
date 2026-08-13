@@ -345,6 +345,9 @@ function inspectCiWorkflow(file, workflow) {
   if (!hasFrozenPnpmBootstrap(workflow.jobs?.["compose-e2e"]?.steps ?? [])) {
     violations.push({ file, code: "ci-compose-dependency-bootstrap-missing" });
   }
+  if (!(workflow.jobs?.["compose-e2e"]?.steps ?? []).some((step) => stepRunsExact(step, "pnpm policy:test"))) {
+    violations.push({ file, code: "ci-compose-linux-policy-tests-missing" });
+  }
   if (!hasFrozenPnpmBootstrap(workflow.jobs?.["platform-limited-matrix"]?.steps ?? [])) {
     violations.push({ file, code: "ci-platform-matrix-dependency-bootstrap-missing" });
   }
@@ -630,6 +633,9 @@ function inspectReleaseWorkflow(file, workflow) {
 
   const identityRun = jobRunText(workflow.jobs?.identity);
   const verifyRun = jobRunText(workflow.jobs?.verify);
+  if (!hasFrozenPnpmBootstrap(workflow.jobs?.["verify-compose"]?.steps ?? [])) {
+    violations.push({ file, code: "release-compose-dependency-bootstrap-missing" });
+  }
   const buildRun = jobRunText(buildJob);
   const agentKitRun = jobRunText(workflow.jobs?.["agent-kit"]);
   const assembleRun = jobRunText(workflow.jobs?.assemble);

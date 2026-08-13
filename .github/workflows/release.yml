@@ -344,9 +344,15 @@ jobs:
           test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
           test -z "$(git status --porcelain --untracked-files=all)"
           echo "SOURCE_DATE_EPOCH=$(git show -s --format=%ct "$EXPECTED_SHA")" >> "$GITHUB_ENV"
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+        with:
+          version: 9.15.0
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 20
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @useful/sdk build
       - name: Compose E2E
         working-directory: deploy/docker-compose
         run: |

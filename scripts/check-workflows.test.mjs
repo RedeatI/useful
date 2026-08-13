@@ -378,6 +378,24 @@ test("CI Compose E2E builds the workspace SDK after dependency installation", as
   assertViolation(runChecker(root), "ci.yml", "ci-compose-dependency-bootstrap-missing");
 });
 
+test("CI Compose E2E runs public release policy on Linux", async (t) => {
+  const root = await createFixture(t);
+  await mutateWorkflow(root, "ci.yml", (workflow) => {
+    workflow.jobs["compose-e2e"].steps = workflow.jobs["compose-e2e"].steps
+      .filter((step) => String(step.run ?? "") !== "pnpm policy:test");
+  });
+  assertViolation(runChecker(root), "ci.yml", "ci-compose-linux-policy-tests-missing");
+});
+
+test("release Compose E2E requires frozen pnpm dependencies and SDK build", async (t) => {
+  const root = await createFixture(t);
+  await mutateWorkflow(root, "release.yml", (workflow) => {
+    workflow.jobs["verify-compose"].steps = workflow.jobs["verify-compose"].steps
+      .filter((step) => String(step.run ?? "") !== "pnpm install --frozen-lockfile");
+  });
+  assertViolation(runChecker(root), "release.yml", "release-compose-dependency-bootstrap-missing");
+});
+
 test("CI platform matrix requires frozen pnpm dependencies", async (t) => {
   const root = await createFixture(t);
   await mutateWorkflow(root, "ci.yml", (workflow) => {

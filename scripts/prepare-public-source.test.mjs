@@ -78,6 +78,7 @@ async function makeRepository({ internalFiles = false } = {}) {
     for (const relative of excluded) await write(root, relative, `excluded ${relative}\n`);
   }
   git(root, ["init", "--quiet"]);
+  git(root, ["config", "core.filemode", "false"]);
   git(root, ["add", "."]);
   if (internalFiles) {
     git(root, [
