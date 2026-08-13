@@ -14,6 +14,7 @@ const workflowRoot = path.join(repoRoot, ".github", "workflows");
 const jsonMode = process.argv.includes("--json");
 const violations = [];
 const workflowEvidence = [];
+const EXPECTED_GO_TOOLCHAIN = "1.26.6";
 const dependabotEvidence = {
   activePath: ".github/dependabot.yml",
   activePresent: false,
@@ -136,6 +137,30 @@ function inspectSteps(file, steps, location) {
         details: String(step?.with?.toolchain ?? "missing"),
       });
     }
+    if (
+      uses.startsWith("actions/setup-go@")
+      && String(step?.with?.["go-version"] ?? "") !== EXPECTED_GO_TOOLCHAIN
+    ) {
+      violations.push({
+        file,
+        code: "go-toolchain-version-not-exact",
+        location: `${location}.steps[${index}]`,
+        details: String(step?.with?.["go-version"] ?? "missing"),
+      });
+    }
+  }
+}
+
+async function inspectGoToolchainClosure() {
+  const goModPath = path.join(repoRoot, "services", "go.mod");
+  const dockerfilePath = path.join(repoRoot, "services", "Dockerfile");
+  const goMod = await readFile(goModPath, "utf8").catch(() => "");
+  const dockerfile = await readFile(dockerfilePath, "utf8").catch(() => "");
+  if (!new RegExp(`^go ${EXPECTED_GO_TOOLCHAIN.replaceAll(".", "\\.")}$`, "m").test(goMod)) {
+    violations.push({ file: "services/go.mod", code: "go-toolchain-version-not-exact", details: EXPECTED_GO_TOOLCHAIN });
+  }
+  if (!new RegExp(`^FROM golang:${EXPECTED_GO_TOOLCHAIN.replaceAll(".", "\\.")} AS build$`, "m").test(dockerfile)) {
+    violations.push({ file: "services/Dockerfile", code: "docker-go-toolchain-version-not-exact", details: EXPECTED_GO_TOOLCHAIN });
   }
 }
 
@@ -1292,6 +1317,7 @@ for (const file of files) {
 }
 
 await inspectDependabotConfiguration();
+await inspectGoToolchainClosure();
 workflowEvidence.sort((left, right) => left.file.localeCompare(right.file));
 
 const result = {
