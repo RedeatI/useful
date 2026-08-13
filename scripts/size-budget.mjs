@@ -51,6 +51,10 @@ const CI_REQUIRED = [
   ...FRONTEND_REQUIRED,
   "portableLiteZipBytes",
 ];
+const RELEASE_LITE_REQUIRED = [
+  ...CI_REQUIRED,
+  "setupLiteBytes",
+];
 const RELEASE_REQUIRED = [
   ...CI_REQUIRED,
   "setupLiteBytes",
@@ -59,6 +63,7 @@ const RELEASE_REQUIRED = [
 const PROFILE_REQUIREMENTS = {
   frontend: FRONTEND_REQUIRED,
   ci: CI_REQUIRED,
+  "release-lite": RELEASE_LITE_REQUIRED,
   release: RELEASE_REQUIRED,
 };
 const RELEASE_ARTIFACT_FIELDS = [
@@ -383,13 +388,15 @@ function expectedReleaseArtifactPaths(profile, version) {
       portableFullZip: null,
     };
   }
-  return {
+  const desktop = {
     usefulExe: "target/x86_64-pc-windows-msvc/release/Useful.exe",
     bootstrapExe: "target/x86_64-pc-windows-msvc/release/useful-bootstrap.exe",
     portableLiteZip: `release-assets/Useful-${version}-windows-x64-portable-lite.zip`,
     setupLite: `release-assets/Useful-${version}-windows-x64-setup-lite.exe`,
     portableFullZip: `release-assets/Useful-${version}-windows-x64-portable-full.zip`,
   };
+  if (profile === "release-lite") desktop.portableFullZip = null;
+  return desktop;
 }
 
 function validateProfileArtifactBindings(profile, version, artifacts) {

@@ -11,6 +11,7 @@ on:
         type: choice
         options:
           - source-agent-kit
+          - desktop-lite
           - desktop-full
       channel:
         description: Release channel encoded by package.json and the selected tag
@@ -100,7 +101,7 @@ jobs:
 
       - name: Validate canonical repository, publisher, and production update trust
         id: publish-gate
-        if: inputs.scope == 'desktop-full'
+        if: inputs.scope == 'desktop-lite' || inputs.scope == 'desktop-full'
         env:
           EXPECTED_REPOSITORY: ${{ vars.USEFUL_EXPECTED_REPOSITORY }}
           RELEASE_ACTORS: ${{ vars.USEFUL_RELEASE_ACTORS }}
@@ -115,6 +116,7 @@ jobs:
           REPOSITORY_VISIBILITY: ${{ github.event.repository.visibility }}
           RELEASE_ACTOR: ${{ github.actor }}
           PUBLISH_REQUESTED: ${{ inputs.publish }}
+          RELEASE_SCOPE: ${{ inputs.scope }}
           RELEASE_CHANNEL: ${{ inputs.channel }}
           RELEASE_TAG: ${{ github.ref_name }}
         run: >-
@@ -125,6 +127,7 @@ jobs:
           --actor "$RELEASE_ACTOR"
           --allowed-actors "$RELEASE_ACTORS"
           --publish "$PUBLISH_REQUESTED"
+          --scope "$RELEASE_SCOPE"
           --channel "$RELEASE_CHANNEL"
           --update-root-pubkey "$UPDATE_ROOT_PUBKEY_HEX"
           --update-feed-template "$UPDATE_FEED_URL_TEMPLATE"
@@ -190,7 +193,7 @@ jobs:
             >> "$GITHUB_OUTPUT"
 
       - name: Require all exact-commit CI and platform-limited checks before publish
-        if: inputs.publish == true && inputs.scope == 'desktop-full'
+        if: inputs.publish == true && (inputs.scope == 'desktop-lite' || inputs.scope == 'desktop-full')
         env:
           GH_TOKEN: ${{ github.token }}
           REPOSITORY: ${{ github.repository }}
@@ -222,7 +225,7 @@ jobs:
   verify:
     name: Re-run source and workspace release gates
     needs: identity
-    if: inputs.scope == 'desktop-full'
+    if: inputs.scope == 'desktop-lite' || inputs.scope == 'desktop-full'
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -326,7 +329,7 @@ jobs:
   verify-compose:
     name: Re-run Compose release integration
     needs: identity
-    if: inputs.scope == 'desktop-full'
+    if: inputs.scope == 'desktop-lite' || inputs.scope == 'desktop-full'
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -608,7 +611,6 @@ jobs:
           REF_TYPE: ${{ github.ref_type }}
           REF_NAME: ${{ github.ref_name }}
           IDENTITY_TAG: ${{ needs.identity.outputs.tag }}
-          RELEASE_SCOPE: ${{ inputs.scope }}
           PUBLISH_REQUESTED: ${{ inputs.publish }}
           RELEASE_CHANNEL: ${{ inputs.channel }}
           REPOSITORY: ${{ github.repository }}
@@ -693,7 +695,7 @@ jobs:
   sbom:
     name: Generate release SBOM
     needs: [identity, verify, verify-compose]
-    if: inputs.scope == 'desktop-full'
+    if: inputs.scope == 'desktop-lite' || inputs.scope == 'desktop-full'
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -730,7 +732,7 @@ jobs:
   agent-kit:
     name: Build deterministic Useful Agent Kit
     needs: [identity, verify, verify-compose]
-    if: inputs.scope == 'desktop-full'
+    if: inputs.scope == 'desktop-lite' || inputs.scope == 'desktop-full'
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -828,7 +830,7 @@ jobs:
   build:
     name: Build ${{ matrix.platform }} ${{ matrix.arch }}
     needs: [identity, verify, verify-compose]
-    if: inputs.scope == 'desktop-full'
+    if: inputs.scope == 'desktop-lite' || inputs.scope == 'desktop-full'
     runs-on: ${{ matrix.runner }}
     env:
       USEFUL_UPDATE_ROOT_PUBKEY_HEX: ${{ needs.identity.outputs.update_root_pubkey }}
@@ -1012,7 +1014,7 @@ jobs:
           TARGET: ${{ matrix.target }}
         run: pnpm --filter @useful/app tauri bundle --target "$TARGET" --bundles nsis --no-sign --ci
       - name: Fetch and verify locked media runtimes for Windows Portable Full
-        if: matrix.platform == 'windows'
+        if: matrix.platform == 'windows' && inputs.scope == 'desktop-full'
         shell: pwsh
         run: powershell -NoProfile -ExecutionPolicy Bypass -File scripts/fetch-binaries.ps1
       - name: Package Windows Setup Lite and deterministic Portable Lite/Full assets
@@ -1022,6 +1024,7 @@ jobs:
           VERSION: ${{ needs.identity.outputs.version }}
           TARGET: ${{ matrix.target }}
           WINDOWS_SIGNED: ${{ steps.windows-signing.outputs.signed }}
+          RELEASE_SCOPE: ${{ inputs.scope }}
         run: |
           $ErrorActionPreference = 'Stop'
           if (Test-Path variable:PSNativeCommandUseErrorActionPreference) {
@@ -1100,12 +1103,16 @@ jobs:
           Assert-NoReparsePath $assetDir
           Copy-NewFile $installer.FullName (Join-Path $assetDir "Useful-$version-windows-x64-setup-lite.exe") 'NSIS Setup Lite'
 
-          & node scripts/release-metadata-media.mjs `
-            --lock scripts/media-runtimes.lock.json `
-            --binaries binaries `
-            --output (Join-Path $assetDir 'MEDIA-RUNTIMES.json') | Out-Null
-          if ($LASTEXITCODE -ne 0) { throw 'MEDIA-RUNTIMES.json generation failed.' }
-          Assert-OrdinaryFile (Join-Path $assetDir 'MEDIA-RUNTIMES.json') 'MEDIA-RUNTIMES.json'
+          if ($env:RELEASE_SCOPE -eq 'desktop-full') {
+            & node scripts/release-metadata-media.mjs `
+              --lock scripts/media-runtimes.lock.json `
+              --binaries binaries `
+              --output (Join-Path $assetDir 'MEDIA-RUNTIMES.json') | Out-Null
+            if ($LASTEXITCODE -ne 0) { throw 'MEDIA-RUNTIMES.json generation failed.' }
+            Assert-OrdinaryFile (Join-Path $assetDir 'MEDIA-RUNTIMES.json') 'MEDIA-RUNTIMES.json'
+          } elseif ($env:RELEASE_SCOPE -ne 'desktop-lite') {
+            throw "Unknown desktop release scope: $env:RELEASE_SCOPE"
+          }
 
           function New-PortableEdition([string]$edition, [bool]$withMedia) {
             $editionSlug = $edition.ToLowerInvariant()
@@ -1180,22 +1187,26 @@ jobs:
           ) { throw 'Portable Lite must not contain media runtimes or MEDIA-RUNTIMES.json.' }
           New-DeterministicPortableZip $liteDirectory (Join-Path $assetDir "Useful-$version-windows-x64-portable-lite.zip")
 
-          $fullDirectory = New-PortableEdition 'Full' $true
-          $fullBinaryDirectory = Join-Path $fullDirectory 'binaries'
-          Assert-NoReparsePath $fullBinaryDirectory
-          $fullNames = [string[]]@(Get-ChildItem -LiteralPath $fullBinaryDirectory -File -Force | ForEach-Object Name)
-          [Array]::Sort($fullNames, [StringComparer]::Ordinal)
-          $expectedFullNames = [string[]]@('CHECKSUMS.txt', 'ffmpeg.exe', 'ffprobe.exe', 'mpv.exe')
-          [Array]::Sort($expectedFullNames, [StringComparer]::Ordinal)
-          if (($fullNames -join "`n") -ne ($expectedFullNames -join "`n")) { throw 'Portable Full media file set is not closed.' }
-          New-DeterministicPortableZip $fullDirectory (Join-Path $assetDir "Useful-$version-windows-x64-portable-full.zip")
+          if ($env:RELEASE_SCOPE -eq 'desktop-full') {
+            $fullDirectory = New-PortableEdition 'Full' $true
+            $fullBinaryDirectory = Join-Path $fullDirectory 'binaries'
+            Assert-NoReparsePath $fullBinaryDirectory
+            $fullNames = [string[]]@(Get-ChildItem -LiteralPath $fullBinaryDirectory -File -Force | ForEach-Object Name)
+            [Array]::Sort($fullNames, [StringComparer]::Ordinal)
+            $expectedFullNames = [string[]]@('CHECKSUMS.txt', 'ffmpeg.exe', 'ffprobe.exe', 'mpv.exe')
+            [Array]::Sort($expectedFullNames, [StringComparer]::Ordinal)
+            if (($fullNames -join "`n") -ne ($expectedFullNames -join "`n")) { throw 'Portable Full media file set is not closed.' }
+            New-DeterministicPortableZip $fullDirectory (Join-Path $assetDir "Useful-$version-windows-x64-portable-full.zip")
+          }
 
-          foreach ($name in @(
+          $expectedAssetNames = @(
             "Useful-$version-windows-x64-setup-lite.exe",
-            "Useful-$version-windows-x64-portable-lite.zip",
-            "Useful-$version-windows-x64-portable-full.zip",
-            'MEDIA-RUNTIMES.json'
-          )) {
+            "Useful-$version-windows-x64-portable-lite.zip"
+          )
+          if ($env:RELEASE_SCOPE -eq 'desktop-full') {
+            $expectedAssetNames += "Useful-$version-windows-x64-portable-full.zip", 'MEDIA-RUNTIMES.json'
+          }
+          foreach ($name in $expectedAssetNames) {
             $file = Get-Item -LiteralPath (Join-Path $assetDir $name)
             if ($file.Attributes -band [IO.FileAttributes]::ReparsePoint -or $file.Length -le 0) { throw "Invalid Windows release asset: $name" }
           }
@@ -1212,10 +1223,11 @@ jobs:
         env:
           USEFUL_SIZE_EXPECTED_COMMIT: ${{ github.sha }}
           TARGET: ${{ matrix.target }}
+          SIZE_PROFILE: ${{ inputs.scope == 'desktop-lite' && 'release-lite' || 'release' }}
         run: |
           $ErrorActionPreference = 'Stop'
           & ./scripts/measure-size.ps1 -OutDir release-assets -Target $env:TARGET -ExpectedCommit $env:USEFUL_SIZE_EXPECTED_COMMIT
-          pnpm size:check --profile release --json
+          pnpm size:check --profile "$env:SIZE_PROFILE" --json
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Remove ephemeral Windows certificate material
         if: always() && matrix.platform == 'windows'
@@ -1391,7 +1403,7 @@ jobs:
   assemble:
     name: Assemble checksums and release metadata
     needs: [identity, build, sbom, agent-kit]
-    if: inputs.scope == 'desktop-full'
+    if: inputs.scope == 'desktop-lite' || inputs.scope == 'desktop-full'
     runs-on: ubuntu-24.04
     outputs:
       release_name: ${{ steps.metadata.outputs.release_name }}
@@ -1432,6 +1444,7 @@ jobs:
           VERSION: ${{ needs.identity.outputs.version }}
           TAG: ${{ needs.identity.outputs.tag }}
           CHANNEL: ${{ needs.identity.outputs.channel }}
+          RELEASE_SCOPE: ${{ inputs.scope }}
         shell: bash
         run: |
           set -euo pipefail
@@ -1444,8 +1457,15 @@ jobs:
           } from 'node:fs';
           import path from 'node:path';
           const gate = JSON.parse(process.env.PUBLISH_GATE_JSON);
+          const scope = process.env.RELEASE_SCOPE;
+          if (!['desktop-lite', 'desktop-full'].includes(scope) || gate.scope !== scope) {
+            throw new Error('publish gate scope does not match the selected desktop scope');
+          }
           const media = gate.mediaSourceCompliance;
-          if (!media || !['pending', 'verified'].includes(media.status)) throw new Error('media source compliance status is invalid');
+          if (!media || !['not-applicable', 'pending', 'verified'].includes(media.status)) throw new Error('media source compliance status is invalid');
+          if (scope === 'desktop-lite' && (media.status !== 'not-applicable' || media.distribution !== 'NOT-INCLUDED')) {
+            throw new Error('desktop-lite must exclude media runtime distribution');
+          }
           if (media.status === 'pending' && media.distribution !== 'NOT-FOR-PUBLIC-DISTRIBUTION') {
             throw new Error('pending Full candidate is missing the public-distribution prohibition');
           }
@@ -1453,6 +1473,10 @@ jobs:
           const generatedNames = new Set([
             'SOURCE-MANIFEST.json', 'SIGNING-STATUS.json', 'RELEASE-METADATA.json', 'RELEASE-NOTES.md',
             'RELEASE-ASSETS.txt', 'BUILD-PROVENANCE.json', 'SHA256SUMS.txt',
+          ]);
+          const liteBuildAssets = new Set([
+            `Useful-${process.env.VERSION}-windows-x64-setup-lite.exe`,
+            `Useful-${process.env.VERSION}-windows-x64-portable-lite.zip`,
           ]);
           const assertPathChain = (candidate, leafType = 'file') => {
             const absolute = path.resolve(candidate);
@@ -1496,6 +1520,7 @@ jobs:
             assertPathChain(releaseAssetRoot, 'directory');
             for (const entry of readdirSync(releaseAssetRoot, { withFileTypes: true })) {
               if (!entry.isFile() || entry.isSymbolicLink()) throw new Error(`release-assets must contain only ordinary files: ${entry.name}`);
+              if (scope === 'desktop-lite' && !liteBuildAssets.has(entry.name)) continue;
               reserveFile(entry.name, path.join(releaseAssetRoot, entry.name));
             }
           }
@@ -1546,10 +1571,12 @@ jobs:
         id: signing
         env:
           VERSION: ${{ needs.identity.outputs.version }}
+          RELEASE_SCOPE: ${{ inputs.scope }}
         run: >-
           node scripts/release-signing-status.mjs
           --root _downloads
           --version "$VERSION"
+          --scope "$RELEASE_SCOPE"
           --output release-candidate/SIGNING-STATUS.json
           --github-output "$GITHUB_OUTPUT"
       - name: Produce final channel-aware release metadata
@@ -1581,6 +1608,7 @@ jobs:
           RELEASE_CHANNEL: ${{ needs.identity.outputs.channel }}
           RELEASE_TAG: ${{ needs.identity.outputs.tag }}
           MEDIA_SOURCE_COMPLIANCE_STATUS: ${{ needs.identity.outputs.media_source_compliance_status }}
+          RELEASE_SCOPE: ${{ inputs.scope }}
         run: |
           set -euo pipefail
           set -o noclobber
@@ -1589,16 +1617,25 @@ jobs:
             echo
             echo "Channel: $RELEASE_CHANNEL"
             echo "Version/tag: $VERSION / $RELEASE_TAG"
-            echo "Windows and macOS signing verification complete: $SIGNED"
+            if test "$RELEASE_SCOPE" = desktop-lite; then
+              echo "Windows signing verification complete: $SIGNED"
+            else
+              echo "Windows and macOS signing verification complete: $SIGNED"
+            fi
             if test "$UNSIGNED_PREVIEW" = true; then
               echo
               echo '> **UNSIGNED PREVIEW:** Windows code signing and macOS notarization were not both verified. Do not treat these assets as a formally signed stable release.'
             fi
             echo
-            echo 'Release assets and internal executables use the Useful product name. Windows publishes Setup Lite, Portable Lite, and Portable Full as distinct editions.'
-            echo 'Portable Full contains the locked ffmpeg, ffprobe, and mpv Windows runtimes described by `MEDIA-RUNTIMES.json`; Portable Lite and Setup Lite do not include those media runtimes.'
-            echo 'The macOS and Linux packages do not claim bundled mpv or ffmpeg runtimes.'
-            if test "$MEDIA_SOURCE_COMPLIANCE_STATUS" != verified; then
+            if test "$RELEASE_SCOPE" = desktop-lite; then
+              echo 'This desktop-lite preview publishes only Windows Setup Lite and Portable Lite. Neither asset includes bundled ffmpeg, ffprobe, or mpv runtimes.'
+              echo 'Source evidence, the cross-platform Agent Kit, SBOM, signing status, and build provenance are included as separate assets.'
+            else
+              echo 'Release assets and internal executables use the Useful product name. Windows publishes Setup Lite, Portable Lite, and Portable Full as distinct editions.'
+              echo 'Portable Full contains the locked ffmpeg, ffprobe, and mpv Windows runtimes described by `MEDIA-RUNTIMES.json`; Portable Lite and Setup Lite do not include those media runtimes.'
+              echo 'The macOS and Linux packages do not claim bundled mpv or ffmpeg runtimes.'
+            fi
+            if test "$RELEASE_SCOPE" = desktop-full && test "$MEDIA_SOURCE_COMPLIANCE_STATUS" != verified; then
               echo
               echo '> **NOT FOR PUBLIC DISTRIBUTION:** media source compliance is pending for the exact GPL ffmpeg/ffprobe/mpv binaries. This candidate may be built and verified internally, but publishing is blocked until committed source/build/license evidence and its release assets pass the Owner Gate.'
             fi
@@ -1607,7 +1644,28 @@ jobs:
             echo 'License and third-party notice files are included in the release asset set.'
           } > release-candidate/RELEASE-NOTES.md
 
-          cat > release-candidate/RELEASE-ASSETS.txt <<EOF
+          if test "$RELEASE_SCOPE" = desktop-lite; then
+            cat > release-candidate/RELEASE-ASSETS.txt <<EOF
+          Useful-$VERSION-windows-x64-setup-lite.exe
+          Useful-$VERSION-windows-x64-portable-lite.zip
+          Useful-$VERSION-SBOM.cdx.json
+          Useful-$VERSION-agent-kit.zip
+          Useful-$VERSION-agent-kit.zip.sha256
+          SIGNING-STATUS.json
+          RELEASE-METADATA.json
+          PUBLISH-GATE.json
+          BUILD-PROVENANCE.json
+          SOURCE-MANIFEST.json
+          SOURCE-CHECK.json
+          LICENSE
+          LICENSES.md
+          NOTICE
+          THIRD_PARTY_NOTICES.md
+          TRADEMARKS.md
+          RELEASE-ASSETS.txt
+          EOF
+          else
+            cat > release-candidate/RELEASE-ASSETS.txt <<EOF
           Useful-$VERSION-windows-x64-setup-lite.exe
           Useful-$VERSION-windows-x64-portable-lite.zip
           Useful-$VERSION-windows-x64-portable-full.zip
@@ -1632,10 +1690,15 @@ jobs:
           TRADEMARKS.md
           RELEASE-ASSETS.txt
           EOF
+          fi
           node --input-type=module <<'NODE'
           import { appendFileSync } from 'node:fs';
           const media = JSON.parse(process.env.PUBLISH_GATE_JSON).mediaSourceCompliance;
-          if (media.status === 'verified') {
+          if (process.env.RELEASE_SCOPE === 'desktop-lite') {
+            if (media.status !== 'not-applicable' || media.distribution !== 'NOT-INCLUDED') {
+              throw new Error('desktop-lite media exclusion evidence is invalid');
+            }
+          } else if (media.status === 'verified') {
             const names = [media.evidence.releaseAssetName, ...media.releaseAssets.map(({ releaseAssetName }) => releaseAssetName)].sort();
             if (names.length !== new Set(names).size) throw new Error('media compliance release asset names are duplicated');
             appendFileSync('release-candidate/RELEASE-ASSETS.txt', `${names.join('\n')}\n`);
@@ -1733,7 +1796,7 @@ jobs:
 
   publish:
     name: Publish guarded GitHub Release
-    if: inputs.publish == true && inputs.scope == 'desktop-full'
+    if: inputs.publish == true && (inputs.scope == 'desktop-lite' || inputs.scope == 'desktop-full')
     needs: [identity, assemble]
     runs-on: ubuntu-24.04
     environment: release
@@ -1788,6 +1851,7 @@ jobs:
           REF_TYPE: ${{ github.ref_type }}
           REF_NAME: ${{ github.ref_name }}
           PUBLISH_REQUESTED: ${{ inputs.publish }}
+          RELEASE_SCOPE: ${{ inputs.scope }}
           INPUT_CHANNEL: ${{ inputs.channel }}
           REPOSITORY: ${{ github.repository }}
           REPOSITORY_VISIBILITY: ${{ github.event.repository.visibility }}
@@ -1818,6 +1882,7 @@ jobs:
             --actor "$RELEASE_ACTOR" \
             --allowed-actors "$RELEASE_ACTORS" \
             --publish true \
+            --scope "$RELEASE_SCOPE" \
             --channel "$CHANNEL" \
             --update-root-pubkey "$UPDATE_ROOT_PUBKEY_HEX" \
             --update-feed-template "$UPDATE_FEED_URL_TEMPLATE" \
@@ -1834,11 +1899,17 @@ jobs:
             --status release-candidate/SIGNING-STATUS.json \
             --asset-root release-candidate \
             --version "$VERSION" \
+            --scope "$RELEASE_SCOPE" \
             > /tmp/SIGNING-STATUS.validated.json
-          node scripts/release-metadata-media.mjs \
-            --lock scripts/media-runtimes.lock.json \
-            --manifest release-candidate/MEDIA-RUNTIMES.json \
-            > /tmp/MEDIA-RUNTIMES.validated.json
+          if test "$RELEASE_SCOPE" = desktop-full; then
+            node scripts/release-metadata-media.mjs \
+              --lock scripts/media-runtimes.lock.json \
+              --manifest release-candidate/MEDIA-RUNTIMES.json \
+              > /tmp/MEDIA-RUNTIMES.validated.json
+          else
+            test "$RELEASE_SCOPE" = desktop-lite
+            test ! -e release-candidate/MEDIA-RUNTIMES.json
+          fi
           signed=$(node -e "const x=require('./release-candidate/SIGNING-STATUS.json'); process.stdout.write(String(x.signed))")
           node scripts/release-metadata.mjs \
             --package package.json \

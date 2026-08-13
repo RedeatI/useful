@@ -238,7 +238,7 @@ test("release requires the Windows production size gate after packaging", async 
   const root = await createFixture(t);
   await mutateWorkflow(root, "release.yml", (workflow) => {
     workflow.jobs.build.steps = workflow.jobs.build.steps
-      .filter((step) => !String(step.run ?? "").includes("pnpm size:check --profile release --json"));
+      .filter((step) => !String(step.run ?? "").includes('pnpm size:check --profile "$env:SIZE_PROFILE" --json'));
   });
   assertViolation(runChecker(root), "release.yml", "release-size-budget-production-gate-invalid");
 });
@@ -247,7 +247,7 @@ test("release size gate is Windows-only and binds expected commit through env", 
   const root = await createFixture(t);
   await mutateWorkflow(root, "release.yml", (workflow) => {
     const step = workflow.jobs.build.steps
-      .find((candidate) => String(candidate.run ?? "").includes("pnpm size:check --profile release --json"));
+      .find((candidate) => String(candidate.run ?? "").includes('pnpm size:check --profile "$env:SIZE_PROFILE" --json'));
     step.if = "matrix.platform == 'linux'";
     step.env.USEFUL_SIZE_EXPECTED_COMMIT = "not-a-sha";
   });
@@ -260,12 +260,12 @@ test("release size gate rejects continue-on-error, early exit, and command subst
       const root = await createFixture(subtest);
       await mutateWorkflow(root, "release.yml", (workflow) => {
         const step = workflow.jobs.build.steps
-          .find((candidate) => String(candidate.run ?? "").includes("pnpm size:check --profile release --json"));
+          .find((candidate) => String(candidate.run ?? "").includes('pnpm size:check --profile "$env:SIZE_PROFILE" --json'));
         if (mutation === "continue") step["continue-on-error"] = true;
         if (mutation === "exit") step.run = `exit 0\n${step.run}`;
         if (mutation === "spoof") step.run = step.run.replace(
-          "pnpm size:check --profile release --json",
-          "echo pnpm size:check --profile release --json",
+          'pnpm size:check --profile "$env:SIZE_PROFILE" --json',
+          'echo pnpm size:check --profile "$env:SIZE_PROFILE" --json',
         );
       });
       assertViolation(runChecker(root), "release.yml", "release-size-budget-production-gate-invalid");
@@ -279,11 +279,11 @@ test("release size gate rejects extra report arguments, extra env, and upload-be
       const root = await createFixture(subtest);
       await mutateWorkflow(root, "release.yml", (workflow) => {
         const steps = workflow.jobs.build.steps;
-        const size = steps.find((candidate) => String(candidate.run ?? "").includes("pnpm size:check --profile release --json"));
+        const size = steps.find((candidate) => String(candidate.run ?? "").includes('pnpm size:check --profile "$env:SIZE_PROFILE" --json'));
         if (mutation === "argument") {
           size.run = size.run.replace(
-            "pnpm size:check --profile release --json",
-            "pnpm size:check --profile release --report release-assets/size-report.json --json",
+            'pnpm size:check --profile "$env:SIZE_PROFILE" --json',
+            'pnpm size:check --profile "$env:SIZE_PROFILE" --report release-assets/size-report.json --json',
           );
         }
         if (mutation === "env") size.env.UNREVIEWED = "1";

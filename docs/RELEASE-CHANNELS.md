@@ -16,14 +16,15 @@
 非公开路径仍在候选树中时都不能发布；仅生成“排除清单”不构成发布证据。
 
 `.github/workflows/release.yml` 是 Useful 唯一的 Release 编排。它只接受手动 `workflow_dispatch`；
-选择已有 tag ref 后，操作者必须明确选择 `source-agent-kit` 或 `desktop-full` scope，并选择
+选择已有 tag ref 后，操作者必须明确选择 `source-agent-kit`、`desktop-lite` 或 `desktop-full` scope，并选择
 `stable`、`beta` 或 `nightly` 通道。推送 tag 本身不会触发构建或发布。
 
 `source-agent-kit` 是非桌面 source preview，只允许 beta/nightly：资产闭集为公开源码证据、Agent Kit、
 SBOM、legal 文件、源码 manifest、provenance、Owner gate、资产清单和校验和。它不运行或削弱桌面
 build/signing/update/media Full 门禁，不包含任何桌面二进制，也不作签名、公证、安装或平台支持声明。
 Agent Kit builder 的 `publicationAuthorized=false` 不会被 workflow 改写；独立 Owner gate 只授权该次
-source preview 发布。`desktop-full` 继续执行本文描述的全部严格门禁。
+source preview 发布。`desktop-lite` 只允许 Windows Setup Lite、Portable Lite 和相应证据闭集进入 Release，
+明确排除 Full 媒体运行时与 macOS/Linux 桌面资产；`desktop-full` 继续执行本文描述的全部严格门禁。
 
 ## 版本、tag 与通道
 
@@ -67,7 +68,9 @@ Node/CLI/MCP/前端、Rust、Go 与 Compose 门禁。`publish=true` 还要求同
 channel 与 edition 是两条独立轴：channel 决定 stable/beta/nightly 更新流；edition 决定同一版本的
 打包内容。Windows x64 edition 语义为 setup Lite、Portable Lite、Portable Full。Full 内含固定版本且
 经 SHA-256 校验的 ffmpeg、ffprobe、mpv，Lite 不内置这些媒体运行时。精确资产文件名和闭集正在由
-Release allowlist 收敛，本文不猜测下载地址或声称候选产物已经发布。
+Release allowlist 收敛。`desktop-lite` 的公开闭集只取 Windows Setup Lite 与 Portable Lite；构建矩阵产生的
+其他内部候选不会进入其 candidate、签名清单、校验和或 GitHub Release。本文不猜测下载地址或声称候选
+产物已经发布。
 
 | 平台 | 架构 | edition / 包边界 |
 | --- | --- | --- |
@@ -113,16 +116,16 @@ DMG 的 stapled ticket；`APPLE_SIGNING_IDENTITY` 可在证书包含多个 ident
 - `APPLE_TEAM_ID`
 - `APPLE_SIGNING_IDENTITY`（可选）
 
-`stable` 同时要求 repository variable `USEFUL_SIGNING_READY=true`，并要求 Windows、macOS x64、
-macOS arm64 三项签名/公证验证证据全部成功。变量只是治理开关，不能替代实际验证；任一 secret 缺失或
-验证失败都会阻断 stable。
+`stable` 同时要求 repository variable `USEFUL_SIGNING_READY=true`，并要求所选 scope 内全部可签名平台
+证据成功：`desktop-lite` 要求 Windows；`desktop-full` 要求 Windows、macOS x64 与 macOS arm64。
+变量只是治理开关，不能替代实际验证；适用于所选 scope 的任一 secret 缺失或验证失败都会阻断 stable。
 
 beta/nightly 可以在未配置签名 secret 时构建，但最终元数据、发布说明和 Release 名称都会明确包含
 `UNSIGNED PREVIEW`，不能被误认为已签名正式版本。
 
 ## 唯一发布入口
 
-只有两个隔离的 publish job 拥有 `contents: write`。`publish` 仅服务 `desktop-full`，并且必须同时满足：
+只有两个隔离的 publish job 拥有 `contents: write`。`publish` 仅服务 `desktop-lite` 或 `desktop-full`，并且必须同时满足：
 
 1. 事件是 `workflow_dispatch`；
 2. 当前 ref 是与版本严格一致的已有 tag；

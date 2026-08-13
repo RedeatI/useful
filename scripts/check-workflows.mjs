@@ -505,7 +505,7 @@ function inspectReleaseWorkflow(file, workflow) {
     scopeInput?.type !== "choice"
     || scopeInput?.required !== true
     || scopeInput?.default !== "source-agent-kit"
-    || JSON.stringify(scopeInput?.options) !== JSON.stringify(["source-agent-kit", "desktop-full"])
+    || JSON.stringify(scopeInput?.options) !== JSON.stringify(["source-agent-kit", "desktop-lite", "desktop-full"])
   ) {
     violations.push({ file, code: "release-scope-input-not-closed" });
   }
@@ -603,9 +603,10 @@ function inspectReleaseWorkflow(file, workflow) {
   }
   if (publish?.environment !== "release") violations.push({ file, code: "release-environment-gate-missing" });
 
-  const desktopCondition = "inputs.scope == 'desktop-full'";
+  const desktopConditions = ["inputs.scope == 'desktop-lite'", "inputs.scope == 'desktop-full'"];
   for (const jobId of ["verify", "verify-compose", "sbom", "agent-kit", "build", "assemble", "publish"]) {
-    if (!String(workflow.jobs?.[jobId]?.if ?? "").includes(desktopCondition)) {
+    const condition = String(workflow.jobs?.[jobId]?.if ?? "");
+    if (!desktopConditions.every((required) => condition.includes(required))) {
       violations.push({ file, code: "release-desktop-scope-gate-missing", details: jobId });
     }
   }
@@ -805,6 +806,7 @@ function inspectReleaseWorkflow(file, workflow) {
     "max_by(.id)",
     "--media-source-evidence-path",
     "--media-source-evidence-sha256",
+    "--scope \"$RELEASE_SCOPE\"",
   ]) {
     if (!identityRun.includes(required)) violations.push({ file, code: "release-identity-gate-missing", details: required });
   }
@@ -873,7 +875,7 @@ function inspectReleaseWorkflow(file, workflow) {
     .filter((index) => index >= 0);
   if (
     !windowsFetch
-    || String(windowsFetch?.if ?? "") !== "matrix.platform == 'windows'"
+    || String(windowsFetch?.if ?? "") !== "matrix.platform == 'windows' && inputs.scope == 'desktop-full'"
     || windowsFetch?.["continue-on-error"] === true
     || windowsBundleIndexes.length !== 2
     || windowsBundleIndexes.some((index) => index >= windowsFetchIndex)
@@ -899,6 +901,8 @@ function inspectReleaseWorkflow(file, workflow) {
     "2107-12-31T23:59:58Z",
     "Assert-NoReparsePath",
     "Copy-NewFile",
+    "$env:RELEASE_SCOPE",
+    "desktop-lite",
     "LICENSE",
     "NOTICE",
   ]) {
@@ -913,11 +917,11 @@ function inspectReleaseWorkflow(file, workflow) {
   const releaseSizeLines = [
     "$ErrorActionPreference = 'Stop'",
     "& ./scripts/measure-size.ps1 -OutDir release-assets -Target $env:TARGET -ExpectedCommit $env:USEFUL_SIZE_EXPECTED_COMMIT",
-    "pnpm size:check --profile release --json",
+    "pnpm size:check --profile \"$env:SIZE_PROFILE\" --json",
     "if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }",
   ];
   const sizeIndexes = buildSteps
-    .map((step, index) => runLines(step).includes("pnpm size:check --profile release --json") ? index : -1)
+    .map((step, index) => runLines(step).includes("pnpm size:check --profile \"$env:SIZE_PROFILE\" --json") ? index : -1)
     .filter((index) => index >= 0);
   const sizeIndex = sizeIndexes.length === 1 ? sizeIndexes[0] : -1;
   const sizeStep = sizeIndex >= 0 ? buildSteps[sizeIndex] : undefined;
@@ -932,6 +936,7 @@ function inspectReleaseWorkflow(file, workflow) {
     || !stepRunsExactLines(sizeStep, releaseSizeLines, { allowedCondition: "matrix.platform == 'windows'" })
     || String(sizeStep?.shell ?? "") !== "pwsh"
     || !stepEnvIsExact(sizeStep, {
+      SIZE_PROFILE: "${{ inputs.scope == 'desktop-lite' && 'release-lite' || 'release' }}",
       USEFUL_SIZE_EXPECTED_COMMIT: "${{ github.sha }}",
       TARGET: "${{ matrix.target }}",
     })
@@ -1056,6 +1061,10 @@ function inspectReleaseWorkflow(file, workflow) {
     "THIRD_PARTY_NOTICES.md",
     "SHA256SUMS.txt",
     "release-signing-status.mjs",
+    "--scope \"$RELEASE_SCOPE\"",
+    "liteBuildAssets",
+    "desktop-lite must exclude media runtime distribution",
+    "NOT-INCLUDED",
     "sourceTimestamp",
     "subjects",
     "sha256sum --check SHA256SUMS.txt",
@@ -1089,6 +1098,7 @@ function inspectReleaseWorkflow(file, workflow) {
     || !publishRun.includes("--media-source-evidence-path")
     || !publishRun.includes("--media-source-evidence-sha256")
     || !publishRun.includes("--status release-candidate/SIGNING-STATUS.json")
+    || !publishRun.includes("--scope \"$RELEASE_SCOPE\"")
     || !publishRun.includes("--manifest release-candidate/MEDIA-RUNTIMES.json")
     || !publishRun.includes("BUILD-PROVENANCE.json is not the exact closed release statement")
     || !publishRun.includes("agent_receipt_hash")

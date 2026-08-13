@@ -7,11 +7,12 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { readMediaRuntimeLock } from "./release-metadata-media.mjs";
 
-export const RELEASE_PUBLISH_GATE_SCHEMA = "useful.release-publish-gate.v2";
+export const RELEASE_PUBLISH_GATE_SCHEMA = "useful.release-publish-gate.v3";
 export const DEVELOPMENT_UPDATE_ROOT_PUBKEY_HEX =
   "3b6a27bcceb6a42d62a3a8d02a6f0d73653215771de243a63ac048a18b59da29";
 
 const CHANNELS = new Set(["stable", "beta", "nightly"]);
+const RELEASE_SCOPES = new Set(["desktop-lite", "desktop-full"]);
 const REQUIRED_FEED_PLACEHOLDERS = ["channel", "platform", "arch"];
 const MEDIA_EVIDENCE_FIELDS = ["components", "continuousAccessMethod", "mediaRuntimeLockSha256", "schemaVersion"];
 const MEDIA_COMPONENT_FIELDS = ["binaryArchiveSha256", "buildAssets", "completeSourceAssets", "licenseAssets", "name", "version"];
@@ -141,6 +142,17 @@ function pendingMediaCompliance() {
   };
 }
 
+function excludedMediaCompliance() {
+  return {
+    status: "not-applicable",
+    distribution: "NOT-INCLUDED",
+    reason: "desktop-lite excludes Portable Full and all media runtime assets",
+    requiredActions: [],
+    evidence: null,
+    releaseAssets: [],
+  };
+}
+
 async function validateMediaSourceCompliance({ repoRoot, evidencePath, expectedSha256 }) {
   if (!evidencePath) throw new Error("public publish 缺少 USEFUL_MEDIA_SOURCE_EVIDENCE_PATH; Full is NOT-FOR-PUBLIC-DISTRIBUTION");
   const evidenceFile = await validateRepositoryFile(repoRoot, evidencePath, "media source compliance evidence");
@@ -211,6 +223,7 @@ async function validateMediaSourceCompliance({ repoRoot, evidencePath, expectedS
 export function validateReleasePublishGate(input) {
   const publish = parseStrictBoolean(input.publish, "publish");
   if (!CHANNELS.has(input.channel)) throw new Error("channel 必须是 stable、beta 或 nightly");
+  if (!RELEASE_SCOPES.has(input.scope)) throw new Error("scope 必须是 desktop-lite 或 desktop-full");
   if (!/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(input.expectedRepository ?? "")) {
     throw new Error("USEFUL_EXPECTED_REPOSITORY 必须是 owner/repository");
   }
@@ -230,6 +243,7 @@ export function validateReleasePublishGate(input) {
     schemaVersion: RELEASE_PUBLISH_GATE_SCHEMA,
     ok: true,
     publish,
+    scope: input.scope,
     channel: input.channel,
     repository: input.repository,
     visibility: input.visibility,
@@ -270,7 +284,7 @@ async function validateStableEvidence({ repoRoot, evidencePath, expectedSha256, 
 
 function parseCliArgs(args) {
   const allowed = new Set([
-    "--repository", "--expected-repository", "--visibility", "--actor", "--allowed-actors", "--publish", "--channel",
+    "--repository", "--expected-repository", "--visibility", "--actor", "--allowed-actors", "--publish", "--scope", "--channel",
     "--update-root-pubkey", "--update-feed-template", "--root-ceremony-sha256", "--repo-root",
     "--media-source-evidence-path", "--media-source-evidence-sha256", "--stable-evidence-path", "--stable-evidence-sha256",
     "--tag", "--github-output",
@@ -303,6 +317,7 @@ export async function runCli(args, env = process.env) {
     actor: valueOf(values, "--actor"),
     allowedActors: valueOf(values, "--allowed-actors"),
     publish: valueOf(values, "--publish"),
+    scope: valueOf(values, "--scope"),
     channel: valueOf(values, "--channel"),
     updateRootPublicKey: valueOf(values, "--update-root-pubkey"),
     updateFeedUrlTemplate: valueOf(values, "--update-feed-template"),
@@ -321,22 +336,23 @@ export async function runCli(args, env = process.env) {
   const mediaEvidenceSha = mediaEvidenceShaRaw && mediaEvidenceShaRaw !== "-"
     ? mediaEvidenceShaRaw
     : "";
-  // This gate is invoked only for the desktop-full workflow scope, whose
-  // closed asset set contains Portable Full alongside the Lite editions.
-  // Therefore every public channel must bind the exact committed GPL source
-  // evidence before any asset in that scope may be published.
-  if (gate.publish && !mediaEvidencePath) {
+  // desktop-full contains Portable Full and therefore requires exact GPL
+  // corresponding-source evidence. desktop-lite excludes every media runtime
+  // asset and records that exclusion explicitly in its publish evidence.
+  if (gate.scope === "desktop-full" && gate.publish && !mediaEvidencePath) {
     throw new Error(
       "public publish 缺少 USEFUL_MEDIA_SOURCE_EVIDENCE_PATH; Full is NOT-FOR-PUBLIC-DISTRIBUTION",
     );
   }
-  const mediaSourceCompliance = gate.publish
-    ? await validateMediaSourceCompliance({
-        repoRoot,
-        evidencePath: mediaEvidencePath,
-        expectedSha256: mediaEvidenceSha,
-      })
-    : pendingMediaCompliance();
+  const mediaSourceCompliance = gate.scope === "desktop-lite"
+    ? excludedMediaCompliance()
+    : gate.publish
+      ? await validateMediaSourceCompliance({
+          repoRoot,
+          evidencePath: mediaEvidencePath,
+          expectedSha256: mediaEvidenceSha,
+        })
+      : pendingMediaCompliance();
   let stableEvidence = null;
   if (gate.channel === "stable" && gate.publish) {
     stableEvidence = await validateStableEvidence({

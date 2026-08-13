@@ -120,13 +120,15 @@ function profileArtifactPaths(profile) {
       portableLiteZip: "dist-release/Useful-Portable-Lite-x64.zip",
     };
   }
-  return {
+  const desktop = {
     usefulExe: "target/x86_64-pc-windows-msvc/release/Useful.exe",
     bootstrapExe: "target/x86_64-pc-windows-msvc/release/useful-bootstrap.exe",
     portableLiteZip: `release-assets/Useful-${PACKAGE_VERSION}-windows-x64-portable-lite.zip`,
     setupLite: `release-assets/Useful-${PACKAGE_VERSION}-windows-x64-setup-lite.exe`,
     portableFullZip: `release-assets/Useful-${PACKAGE_VERSION}-windows-x64-portable-full.zip`,
   };
+  if (profile === "release-lite") delete desktop.portableFullZip;
+  return desktop;
 }
 
 async function writeArtifactEvidence(repoRoot, relative, contents) {
@@ -191,11 +193,13 @@ test("size budget config exists and declares hard limits", async () => {
   );
   assert.equal(budgets.hardLimits.initialJsBytes, 256_000);
   assert.equal(budgets.hardLimits.agentProfileChunkBytes, 40_960);
-  assert.deepEqual(Object.keys(budgets.requiredProfiles), ["frontend", "ci", "release"]);
+  assert.deepEqual(Object.keys(budgets.requiredProfiles), ["frontend", "ci", "release-lite", "release"]);
   assert.ok(budgets.requiredProfiles.frontend.every((key) => key.includes("frontend") || key.includes("Worker") || key.includes("initial") || key.includes("agentProfile")));
   assert.ok(budgets.requiredProfiles.ci.includes("portableLiteZipBytes"));
   assert.ok(budgets.requiredProfiles.release.includes("setupLiteBytes"));
   assert.ok(budgets.requiredProfiles.release.includes("portableFullZipBytes"));
+  assert.ok(budgets.requiredProfiles["release-lite"].includes("setupLiteBytes"));
+  assert.ok(!budgets.requiredProfiles["release-lite"].includes("portableFullZipBytes"));
   assert.equal(budgets.hardLimits.entryJsBytes, undefined);
   assert.equal(budgets.hardLimits.agentChunkBytes, undefined);
 });
@@ -562,6 +566,36 @@ test("production profiles require their artifacts and release accepts a complete
   const result = await checkSizeBudget({ ...options, profile: "release" });
   assert.equal(result.ok, true);
   assert.deepEqual(result.required.slice(-3), ["portableLiteZipBytes", "setupLiteBytes", "portableFullZipBytes"]);
+});
+
+test("release-lite requires Setup Lite and rejects any Portable Full evidence", async (t) => {
+  const fixture = await createFrontendFixture(t);
+  const { report } = await captureFixture(fixture);
+  await populateProfileArtifacts(fixture, report, "release-lite");
+  const options = {
+    repoRoot: fixture.repoRoot,
+    reportPath: fixture.reportPath,
+    budgetPath: path.join(fixture.repoRoot, "config", "size-budgets.json"),
+    profile: "release-lite",
+    expectedCommit: TEST_COMMIT,
+    actualCommit: TEST_COMMIT,
+  };
+  await writeFile(fixture.reportPath, `${JSON.stringify(report)}\n`, "utf8");
+  const result = await checkSizeBudget(options);
+  assert.equal(result.ok, true);
+  assert.equal(report.releaseArtifacts.portableFullZip, null);
+
+  report.releaseArtifacts.portableFullZip = await writeArtifactEvidence(
+    fixture.repoRoot,
+    `release-assets/Useful-${PACKAGE_VERSION}-windows-x64-portable-full.zip`,
+    "forbidden-full\n",
+  );
+  report.portableFullZipBytes = report.releaseArtifacts.portableFullZip.bytes;
+  await writeFile(fixture.reportPath, `${JSON.stringify(report)}\n`, "utf8");
+  await assert.rejects(
+    checkSizeBudget(options),
+    (error) => error?.code === "ARTIFACT_PROFILE_BINDING_INVALID" && error.message.includes("portableFullZip"),
+  );
 });
 
 test("CI artifact evidence is bound to the exact CI binary and Portable Lite names", async (t) => {

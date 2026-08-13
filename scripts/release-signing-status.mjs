@@ -5,28 +5,36 @@ import { appendFile, lstat, readFile, readdir, writeFile } from "node:fs/promise
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-export const RELEASE_SIGNING_STATUS_SCHEMA = "useful.signing-status.v1";
+export const RELEASE_SIGNING_STATUS_SCHEMA = "useful.signing-status.v2";
 
-const EXPECTED = [
+const FULL_PLATFORMS = [
   ["windows", "x64"],
   ["macos", "x64"],
   ["macos", "arm64"],
   ["linux", "x64"],
 ];
-const EXPECTED_KEYS = new Set(EXPECTED.map(([platform, arch]) => `${platform}/${arch}`));
+const RELEASE_SCOPES = new Set(["desktop-lite", "desktop-full"]);
 const EXACT_FIELDS = ["arch", "platform", "signingStatus", "verification", "version"];
-const SUMMARY_FIELDS = ["artifacts", "nonCodeSignedArtifacts", "platforms", "schemaVersion", "signed", "version"];
+const SUMMARY_FIELDS = ["artifacts", "nonCodeSignedArtifacts", "platforms", "schemaVersion", "scope", "signed", "version"];
 const SUMMARY_PLATFORM_FIELDS = [...EXACT_FIELDS, "artifacts"].sort();
 const ARTIFACT_FIELDS = ["name", "sha256", "sizeBytes"];
 
-export function expectedReleaseAssets(version) {
-  return new Map([
-    ["windows/x64", [
-      `Useful-${version}-windows-x64-setup-lite.exe`,
-      `Useful-${version}-windows-x64-portable-lite.zip`,
-      `Useful-${version}-windows-x64-portable-full.zip`,
-      "MEDIA-RUNTIMES.json",
-    ]],
+function expectedPlatforms(scope) {
+  if (!RELEASE_SCOPES.has(scope)) throw new Error("scope 必须是 desktop-lite 或 desktop-full");
+  return scope === "desktop-lite" ? [["windows", "x64"]] : FULL_PLATFORMS;
+}
+
+export function expectedReleaseAssets(version, scope = "desktop-full") {
+  const windows = [
+    `Useful-${version}-windows-x64-setup-lite.exe`,
+    `Useful-${version}-windows-x64-portable-lite.zip`,
+  ];
+  if (scope === "desktop-full") windows.push(
+    `Useful-${version}-windows-x64-portable-full.zip`,
+    "MEDIA-RUNTIMES.json",
+  );
+  const entries = [
+    ["windows/x64", windows],
     ["macos/x64", [`Useful-${version}-macos-x64.dmg`]],
     ["macos/arm64", [`Useful-${version}-macos-arm64.dmg`]],
     ["linux/x64", [
@@ -37,11 +45,13 @@ export function expectedReleaseAssets(version) {
       `Useful-${version}-agent-kit.zip`,
       `Useful-${version}-agent-kit.zip.sha256`,
     ]],
-  ]);
+  ];
+  const platformKeys = new Set(expectedPlatforms(scope).map(([platform, arch]) => `${platform}/${arch}`));
+  return new Map(entries.filter(([key]) => key === "agent-kit/n-a" || platformKeys.has(key)));
 }
 
 function parseCliArgs(args) {
-  const allowed = new Set(["--version", "--root", "--status", "--asset-root", "--output", "--github-output"]);
+  const allowed = new Set(["--version", "--scope", "--root", "--status", "--asset-root", "--output", "--github-output"]);
   const values = new Map();
   for (let index = 0; index < args.length; index += 2) {
     const name = args[index];
@@ -79,7 +89,7 @@ async function assertExclusiveOutputPath(outputPath) {
   }
   throw new Error("--output 必须包含文件名");
 }
-function validateEntry(value, expectedVersion, source) {
+function validateEntry(value, expectedVersion, expectedKeys, source) {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     throw new Error(`${source}: signing evidence 必须是 JSON object`);
   }
@@ -88,7 +98,7 @@ function validateEntry(value, expectedVersion, source) {
     throw new Error(`${source}: signing evidence 字段不符合闭合 schema`);
   }
   const key = `${value.platform}/${value.arch}`;
-  if (!EXPECTED_KEYS.has(key)) throw new Error(`${source}: 未知发布平台 ${key}`);
+  if (!expectedKeys.has(key)) throw new Error(`${source}: 当前 scope 不允许发布平台 ${key}`);
   if (value.version !== expectedVersion) throw new Error(`${source}: version 与 Release 不一致`);
 
   if (value.platform === "linux") {
@@ -128,8 +138,8 @@ function validateVersion(version) {
   return version;
 }
 
-async function collectReleaseAssets(root, version) {
-  const expectedByKey = expectedReleaseAssets(version);
+async function collectReleaseAssets(root, version, scope) {
+  const expectedByKey = expectedReleaseAssets(version, scope);
   const expectedNames = [...expectedByKey.values()].flat();
   const expectedNameSet = new Set(expectedNames);
   const relativeFiles = (await readdir(root, { recursive: true }))
@@ -182,14 +192,19 @@ function nonCodeSignedArtifacts(releaseAssets) {
   }];
 }
 
-export async function aggregateSigningStatus(root, version) {
+export async function aggregateSigningStatus(root, version, scope = "desktop-full") {
   validateVersion(version);
+  const expected = expectedPlatforms(scope);
+  const expectedKeys = new Set(expected.map(([platform, arch]) => `${platform}/${arch}`));
+  const expectedReceiptNames = new Set(expected.map(([platform, arch]) => `signing-${platform}-${arch}.json`));
   const relativeFiles = (await readdir(root, { recursive: true }))
     .map(String)
-    .filter((file) => /^signing-.*\.json$/.test(path.basename(file)))
+    .filter((file) => scope === "desktop-lite"
+      ? expectedReceiptNames.has(path.basename(file))
+      : /^signing-.*\.json$/.test(path.basename(file)))
     .sort();
-  if (relativeFiles.length !== EXPECTED.length) {
-    throw new Error(`signing evidence 数量不符：expected=${EXPECTED.length}, actual=${relativeFiles.length}`);
+  if (relativeFiles.length !== expected.length) {
+    throw new Error(`signing evidence 数量不符：expected=${expected.length}, actual=${relativeFiles.length}`);
   }
 
   const byKey = new Map();
@@ -197,17 +212,17 @@ export async function aggregateSigningStatus(root, version) {
     const absolute = path.join(root, relative);
     const info = await lstat(absolute);
     if (!info.isFile()) throw new Error(`${relative}: signing evidence 不是普通文件`);
-    const entry = validateEntry(JSON.parse(await readFile(absolute, "utf8")), version, relative.replaceAll("\\", "/"));
+    const entry = validateEntry(JSON.parse(await readFile(absolute, "utf8")), version, expectedKeys, relative.replaceAll("\\", "/"));
     const key = `${entry.platform}/${entry.arch}`;
     if (byKey.has(key)) throw new Error(`signing evidence 重复：${key}`);
     byKey.set(key, entry);
   }
-  for (const key of EXPECTED_KEYS) {
+  for (const key of expectedKeys) {
     if (!byKey.has(key)) throw new Error(`signing evidence 缺失：${key}`);
   }
 
-  const releaseAssets = await collectReleaseAssets(root, version);
-  const platforms = EXPECTED.map(([platform, arch]) => ({
+  const releaseAssets = await collectReleaseAssets(root, version, scope);
+  const platforms = expected.map(([platform, arch]) => ({
     ...byKey.get(`${platform}/${arch}`),
     artifacts: releaseAssets.byKey.get(`${platform}/${arch}`),
   }));
@@ -217,6 +232,7 @@ export async function aggregateSigningStatus(root, version) {
   return {
     schemaVersion: RELEASE_SIGNING_STATUS_SCHEMA,
     version,
+    scope,
     signed,
     platforms,
     nonCodeSignedArtifacts: nonCodeSignedArtifacts(releaseAssets),
@@ -224,8 +240,10 @@ export async function aggregateSigningStatus(root, version) {
   };
 }
 
-export async function validateSigningStatusFile(statusPath, assetRoot, version) {
+export async function validateSigningStatusFile(statusPath, assetRoot, version, scope = "desktop-full") {
   validateVersion(version);
+  const expected = expectedPlatforms(scope);
+  const expectedKeys = new Set(expected.map(([platform, arch]) => `${platform}/${arch}`));
   const info = await lstat(statusPath);
   if (!info.isFile() || info.isSymbolicLink()) throw new Error("SIGNING-STATUS 必须是普通文件");
   const value = JSON.parse(await readFile(statusPath, "utf8"));
@@ -233,7 +251,8 @@ export async function validateSigningStatusFile(statusPath, assetRoot, version) 
   assertExactFields(value, SUMMARY_FIELDS, "SIGNING-STATUS");
   if (value.schemaVersion !== RELEASE_SIGNING_STATUS_SCHEMA) throw new Error("SIGNING-STATUS schemaVersion 不匹配");
   if (value.version !== version) throw new Error("SIGNING-STATUS version 与 Release 不一致");
-  if (!Array.isArray(value.platforms) || value.platforms.length !== EXPECTED.length) {
+  if (value.scope !== scope) throw new Error("SIGNING-STATUS scope 与 Release 不一致");
+  if (!Array.isArray(value.platforms) || value.platforms.length !== expected.length) {
     throw new Error("SIGNING-STATUS platforms 数量不符");
   }
   if (!Array.isArray(value.artifacts)) throw new Error("SIGNING-STATUS artifacts 必须是 array");
@@ -241,7 +260,7 @@ export async function validateSigningStatusFile(statusPath, assetRoot, version) 
     throw new Error("SIGNING-STATUS nonCodeSignedArtifacts 数量不符");
   }
 
-  const assets = await collectReleaseAssets(assetRoot, version);
+  const assets = await collectReleaseAssets(assetRoot, version, scope);
   const validatedPlatforms = value.platforms.map((entry, index) => {
     assertExactFields(entry, SUMMARY_PLATFORM_FIELDS, `SIGNING-STATUS platforms[${index}]`);
     const receipt = validateEntry({
@@ -250,8 +269,8 @@ export async function validateSigningStatusFile(statusPath, assetRoot, version) 
       signingStatus: entry.signingStatus,
       verification: entry.verification,
       version: entry.version,
-    }, version, `SIGNING-STATUS platforms[${index}]`);
-    const [expectedPlatform, expectedArch] = EXPECTED[index];
+    }, version, expectedKeys, `SIGNING-STATUS platforms[${index}]`);
+    const [expectedPlatform, expectedArch] = expected[index];
     if (receipt.platform !== expectedPlatform || receipt.arch !== expectedArch) {
       throw new Error(`SIGNING-STATUS platforms[${index}] 顺序或身份不匹配`);
     }
@@ -281,17 +300,19 @@ export async function validateSigningStatusFile(statusPath, assetRoot, version) 
 export async function runCli(args, env = process.env) {
   const values = parseCliArgs(args);
   const version = valueOf(values, "--version");
+  const scope = valueOf(values, "--scope");
   const outputPath = values.has("--output") ? await assertExclusiveOutputPath(valueOf(values, "--output")) : null;
   const aggregateMode = values.has("--root");
   const validateMode = values.has("--status") || values.has("--asset-root");
   if (aggregateMode === validateMode) throw new Error("必须且只能选择 --root 聚合或 --status/--asset-root 验证模式");
   if (validateMode && (!values.has("--status") || !values.has("--asset-root"))) throw new Error("验证模式必须同时提供 --status 和 --asset-root");
   const result = aggregateMode
-    ? await aggregateSigningStatus(path.resolve(valueOf(values, "--root")), version)
+    ? await aggregateSigningStatus(path.resolve(valueOf(values, "--root")), version, scope)
     : await validateSigningStatusFile(
         path.resolve(valueOf(values, "--status")),
         path.resolve(valueOf(values, "--asset-root")),
         version,
+        scope,
       );
   if (outputPath) {
     await writeFile(outputPath, `${JSON.stringify(result, null, 2)}\n`, { encoding: "utf8", flag: "wx" });

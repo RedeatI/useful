@@ -45,6 +45,17 @@
       "agentProfileChunkBytes",
       "portableLiteZipBytes"
     ],
+    "release-lite": [
+      "usefulExeBytes",
+      "bootstrapExeBytes",
+      "frontendAppBytes",
+      "officeWorkerBytes",
+      "frontendDistBytes",
+      "initialJsBytes",
+      "agentProfileChunkBytes",
+      "portableLiteZipBytes",
+      "setupLiteBytes"
+    ],
     "release": [
       "usefulExeBytes",
       "bootstrapExeBytes",
