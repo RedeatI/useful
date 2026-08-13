@@ -32,6 +32,10 @@ async function createFixture(t) {
     path.join(repoRoot, ".github", "dependabot.yml.example"),
     path.join(root, ".github", "dependabot.yml.example"),
   );
+  await mkdir(path.join(root, "services"), { recursive: true });
+  for (const file of ["go.mod", "Dockerfile"]) {
+    await copyFile(path.join(repoRoot, "services", file), path.join(root, "services", file));
+  }
   return root;
 }
 
@@ -535,6 +539,26 @@ test("workflow Rust toolchains must match the exact repository pin", async (t) =
     "rust-toolchain-version-not-exact",
     "stable",
   );
+});
+
+test("workflow Go toolchains must match the patched repository pin", async (t) => {
+  const root = await createFixture(t);
+  await mutateWorkflow(root, "ci.yml", (workflow) => {
+    const step = workflow.jobs["source-backend"].steps
+      .find((candidate) => String(candidate.uses ?? "").startsWith("actions/setup-go@"));
+    step.with["go-version"] = "1.26";
+  });
+  assertViolation(runChecker(root), "ci.yml", "go-toolchain-version-not-exact", "1.26");
+});
+
+test("Go module and container builder must match the patched toolchain", async (t) => {
+  const root = await createFixture(t);
+  await writeFile(path.join(root, "services", "go.mod"), "module useful.dev/source\n\ngo 1.26.5\n", "utf8");
+  assertViolation(runChecker(root), "services/go.mod", "go-toolchain-version-not-exact", "1.26.6");
+
+  await copyFile(path.join(repoRoot, "services", "go.mod"), path.join(root, "services", "go.mod"));
+  await writeFile(path.join(root, "services", "Dockerfile"), "FROM golang:1.26 AS build\n", "utf8");
+  assertViolation(runChecker(root), "services/Dockerfile", "docker-go-toolchain-version-not-exact", "1.26.6");
 });
 
 test("release requires Useful executable and bootstrap paths", async (t) => {

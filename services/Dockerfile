@@ -1,5 +1,5 @@
 # source-server / source-worker 多阶段镜像（单镜像双二进制，compose 选择 command）
-FROM golang:1.26 AS build
+FROM golang:1.26.6 AS build
 WORKDIR /src
 COPY go.mod go.sum ./
 RUN go mod download
