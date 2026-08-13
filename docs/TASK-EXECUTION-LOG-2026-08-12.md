@@ -16,13 +16,13 @@
 | Agent Kit | `Useful-0.1.0-beta.4-agent-kit.zip`（sha256 `ddb1d471…`，对齐 public main） |
 | 签名门禁脚本 | `identityReady` / `updateTrustReady` true；`signedBetaPublishReady` false |
 | 密钥扫描 | secret scanning + push protection enabled；non-provider patterns API 未能打开（仍 disabled） |
+| glib Rust medium 告警（2026-08-13 复核） | 在 `f77033b` 未发现受影响 API `Variant::array_iter_str` / `VariantStrIter` 被仓库或已解析 Linux Rust 消费方调用；Dependabot #1 已按 `not_used` 关闭。依赖图或上述 API 使用发生变化时重新审查 |
 
 ## 阻塞 / 归 Owner
 
 | 事项 | 原因 |
 | --- | --- |
 | Windows/Apple 代码签名 | 需购买证书并上传 Actions secrets |
-| glib Rust medium 告警 | 经 gtk 0.18 链路依赖 tauri Linux；无法单独升到 0.20，待上游 tauri/gtk 升级 |
 | 更新 feed 真实清单 | 需签名 Release 后写真实 update manifest |
 | Portable Full | GPL 对应源码 Owner 门 |
 | CoC 执行联系人 | 政策要求命名 enforcement channel 后再广泛邀请贡献 |

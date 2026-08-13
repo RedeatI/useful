@@ -82,13 +82,15 @@ that a remote job ran. It does not show that a platform binary works.
 - Real macOS/Linux runner results and candidate-bound Windows native visual acceptance
 - Named CoC enforcement contact before broad drive-by contribution intake
   ([CODE_OF_CONDUCT.md](../CODE_OF_CONDUCT.md))
-- One open Rust Dependabot medium on `glib` 0.18.x (GHSA-wrw7-89jp-8q8g), blocked on the
-  gtk 0.18 / Tauri Linux path until an upstream-compatible upgrade; see
-  [OPEN-SOURCE-REMAINING-GATES.md](OPEN-SOURCE-REMAINING-GATES.md) §7
 
 ### Recently completed evidence
 
 - GitHub Private Vulnerability Reporting enabled on `RedeatI/useful` ([SECURITY.md](../SECURITY.md))
+- Rust Dependabot alert #1 for `glib` 0.18.x (GHSA-wrw7-89jp-8q8g) was dismissed as `not_used`
+  after static triage at `f77033b` found no calls to the affected `Variant::array_iter_str` /
+  `VariantStrIter` API in the repository or resolved Linux Rust consumers. Re-open the review if
+  the lockfile, Tauri/GTK/WebKitGTK dependency path, or either API use changes; see
+  [OPEN-SOURCE-REMAINING-GATES.md](OPEN-SOURCE-REMAINING-GATES.md) §7.
 
 ### Desktop preview product friction (beta.4)
 
