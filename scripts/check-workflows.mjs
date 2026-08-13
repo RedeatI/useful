@@ -351,6 +351,7 @@ function inspectCiWorkflow(file, workflow) {
   if (!(workflow.jobs?.["linux-rust-lint"]?.steps ?? []).some((step) => stepRunsExact(step, "cargo clippy --workspace --all-targets -- -D warnings"))) {
     violations.push({ file, code: "ci-linux-release-clippy-missing" });
   }
+  inspectLinuxDesktopDependencies(file, workflow.jobs?.["linux-rust-lint"], "ci-linux-release-clippy-dependency-missing");
   if (!hasFrozenPnpmBootstrap(workflow.jobs?.["platform-limited-matrix"]?.steps ?? [])) {
     violations.push({ file, code: "ci-platform-matrix-dependency-bootstrap-missing" });
   }

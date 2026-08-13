@@ -396,6 +396,16 @@ test("CI matches the Linux release Clippy gate", async (t) => {
   assertViolation(runChecker(root), "ci.yml", "ci-linux-release-clippy-missing");
 });
 
+test("CI Linux release Clippy installs the release desktop dependencies", async (t) => {
+  const root = await createFixture(t);
+  await mutateWorkflow(root, "ci.yml", (workflow) => {
+    const step = workflow.jobs["linux-rust-lint"].steps
+      .find((candidate) => String(candidate.name ?? "").includes("Linux desktop bundling dependencies"));
+    step.run = String(step.run).replace("libwebkit2gtk-4.1-dev", "");
+  });
+  assertViolation(runChecker(root), "ci.yml", "ci-linux-release-clippy-dependency-missing");
+});
+
 test("release Compose E2E requires frozen pnpm dependencies and SDK build", async (t) => {
   const root = await createFixture(t);
   await mutateWorkflow(root, "release.yml", (workflow) => {
