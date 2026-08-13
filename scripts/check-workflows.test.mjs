@@ -406,6 +406,24 @@ test("CI Linux release Clippy installs the release desktop dependencies", async 
   assertViolation(runChecker(root), "ci.yml", "ci-linux-release-clippy-dependency-missing");
 });
 
+test("CI Linux release Clippy uses a frozen pnpm bootstrap", async (t) => {
+  const root = await createFixture(t);
+  await mutateWorkflow(root, "ci.yml", (workflow) => {
+    workflow.jobs["linux-rust-lint"].steps = workflow.jobs["linux-rust-lint"].steps
+      .filter((step) => String(step.run ?? "") !== "pnpm install --frozen-lockfile");
+  });
+  assertViolation(runChecker(root), "ci.yml", "ci-linux-release-clippy-bootstrap-missing");
+});
+
+test("CI Linux release Clippy builds Tauri frontend context before linting", async (t) => {
+  const root = await createFixture(t);
+  await mutateWorkflow(root, "ci.yml", (workflow) => {
+    workflow.jobs["linux-rust-lint"].steps = workflow.jobs["linux-rust-lint"].steps
+      .filter((step) => String(step.run ?? "") !== "pnpm -r build");
+  });
+  assertViolation(runChecker(root), "ci.yml", "ci-linux-release-clippy-build-order-invalid");
+});
+
 test("release Compose E2E requires frozen pnpm dependencies and SDK build", async (t) => {
   const root = await createFixture(t);
   await mutateWorkflow(root, "release.yml", (workflow) => {
