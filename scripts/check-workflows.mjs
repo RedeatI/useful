@@ -84,7 +84,13 @@ function hasFrozenPnpmBootstrap(steps) {
     && String(step?.with?.cache ?? "") === "pnpm"
   ));
   const installIndex = steps.findIndex((step) => stepRunsExact(step, "pnpm install --frozen-lockfile"));
-  return pnpmIndex >= 0 && pnpmIndex < nodeIndex && nodeIndex < installIndex;
+  const sdkBuildIndex = steps.findIndex((step) => stepRunsExact(step, "pnpm --filter @useful/sdk build"));
+  return (
+    pnpmIndex >= 0
+    && pnpmIndex < nodeIndex
+    && nodeIndex < installIndex
+    && installIndex < sdkBuildIndex
+  );
 }
 
 function inspectCodeqlWorkflow(file, workflow) {
@@ -405,11 +411,12 @@ function inspectCiWorkflow(file, workflow) {
 function inspectPlatformBundlesWorkflow(file, workflow) {
   const bundle = workflow.jobs?.bundle;
   const steps = bundle?.steps ?? [];
+  const matrixEntries = bundle?.strategy?.matrix?.include ?? [];
   const checkouts = steps.filter((step) => String(step?.uses ?? "").startsWith("actions/checkout@"));
   if (checkouts.length !== 1 || checkouts[0]?.with?.["persist-credentials"] !== false) {
     violations.push({ file, code: "platform-bundles-checkout-invalid" });
   }
-  const linux = (bundle?.strategy?.matrix?.include ?? []).find((entry) => entry?.platform === "linux");
+  const linux = matrixEntries.find((entry) => entry?.platform === "linux");
   if (linux?.runner !== "ubuntu-22.04") {
     violations.push({ file, code: "platform-bundles-linux-baseline-invalid", details: linux?.runner ?? "missing" });
   }
@@ -441,7 +448,24 @@ function inspectPlatformBundlesWorkflow(file, workflow) {
   if (nativeIndex < 0) {
     violations.push({ file, code: "platform-bundles-native-command-missing", details: "cargo check -p useful-app" });
   }
-  if (!steps.some((step) => stepRunsExact(step, "pnpm --filter @useful/app tauri build --target ${{ matrix.target }}"))) {
+  const expectedBundleArgs = new Map([
+    ["windows-x86_64", "nsis"],
+    ["macos-x86_64", "dmg"],
+    ["macos-aarch64", "dmg"],
+    ["linux-x86_64", "appimage deb"],
+  ]);
+  if (
+    matrixEntries.length !== expectedBundleArgs.size
+    || matrixEntries.some((entry) => (
+      expectedBundleArgs.get(`${entry?.platform}-${entry?.arch}`) !== entry?.bundleArgs
+    ))
+  ) {
+    violations.push({ file, code: "platform-bundles-target-bundle-selection-invalid" });
+  }
+  if (!steps.some((step) => stepRunsExact(
+    step,
+    "pnpm --filter @useful/app tauri build --target ${{ matrix.target }} --bundles ${{ matrix.bundleArgs }}",
+  ))) {
     violations.push({ file, code: "platform-bundles-native-command-missing", details: "pnpm --filter @useful/app" });
   }
 }

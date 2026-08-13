@@ -203,6 +203,7 @@ jobs:
           node-version: 20
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @useful/sdk build
       - name: Compose E2E
         working-directory: deploy/docker-compose
         run: |
@@ -232,6 +233,7 @@ jobs:
           node-version: 20
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @useful/sdk build
       - name: 运行平台受限场景 ${{ matrix.scenario }}
         shell: pwsh
         run: powershell -ExecutionPolicy Bypass -File scripts/platform-matrix.ps1 -Scenario ${{ matrix.scenario }}

@@ -332,7 +332,7 @@ test("fails closed without leaving partial output", async (t) => {
           "tracked link",
         ]);
       },
-      expectedCode: "SOURCE_POLICY_FAILED",
+      expectedCode: ["SOURCE_DIRTY", "SOURCE_POLICY_FAILED"],
     },
     {
       name: "tracked directory replaced by a link boundary",

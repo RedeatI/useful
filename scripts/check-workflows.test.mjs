@@ -359,6 +359,15 @@ test("CI Compose E2E requires frozen pnpm dependencies before preparation", asyn
   assertViolation(runChecker(root), "ci.yml", "ci-compose-dependency-bootstrap-missing");
 });
 
+test("CI Compose E2E builds the workspace SDK after dependency installation", async (t) => {
+  const root = await createFixture(t);
+  await mutateWorkflow(root, "ci.yml", (workflow) => {
+    workflow.jobs["compose-e2e"].steps = workflow.jobs["compose-e2e"].steps
+      .filter((step) => String(step.run ?? "") !== "pnpm --filter @useful/sdk build");
+  });
+  assertViolation(runChecker(root), "ci.yml", "ci-compose-dependency-bootstrap-missing");
+});
+
 test("CI platform matrix requires frozen pnpm dependencies", async (t) => {
   const root = await createFixture(t);
   await mutateWorkflow(root, "ci.yml", (workflow) => {
@@ -406,6 +415,20 @@ test("platform bundles build the frontend before native compilation", async (t) 
     runChecker(root),
     "platform-bundles.yml",
     "platform-bundles-frontend-before-native-missing",
+  );
+});
+
+test("platform bundles select only the intended bundle formats", async (t) => {
+  const root = await createFixture(t);
+  await mutateWorkflow(root, "platform-bundles.yml", (workflow) => {
+    const windows = workflow.jobs.bundle.strategy.matrix.include
+      .find((entry) => entry.platform === "windows");
+    windows.bundleArgs = "msi nsis";
+  });
+  assertViolation(
+    runChecker(root),
+    "platform-bundles.yml",
+    "platform-bundles-target-bundle-selection-invalid",
   );
 });
 
