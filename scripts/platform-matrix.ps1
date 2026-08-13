@@ -141,7 +141,11 @@ function Get-HttpStatus([string]$Url, [int]$TimeoutSec = 5) {
     $resp = Invoke-WebRequest -Uri $Url -UseBasicParsing -TimeoutSec $TimeoutSec
     return [int]$resp.StatusCode
   } catch {
-    if ($_.Exception.Response) { return [int]$_.Exception.Response.StatusCode }
+    $responseProperty = $_.Exception.PSObject.Properties["Response"]
+    if ($null -ne $responseProperty -and $null -ne $responseProperty.Value) {
+      $statusCodeProperty = $responseProperty.Value.PSObject.Properties["StatusCode"]
+      if ($null -ne $statusCodeProperty) { return [int]$statusCodeProperty.Value }
+    }
     return -1  # 连接失败/超时
   }
 }
