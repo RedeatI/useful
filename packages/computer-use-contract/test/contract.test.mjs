@@ -298,12 +298,13 @@ test("deadline/cancel abort internal signals; late prepare and approval cannot c
   });
   const latePrepare = controller({
     provider: latePrepareProvider,
-    policy: { allowDomains: [], stepDeadlineMs: 30, totalDeadlineMs: 500 },
+    policy: { allowDomains: [], stepDeadlineMs: 250, totalDeadlineMs: 2_000 },
   });
   const first = await opened(latePrepare);
   const firstExecution = latePrepare.execute(first.session.sessionId, { step: 1, observationDigest: DIGEST_A, action: { type: "screenshot" } });
+  const firstRejection = assert.rejects(firstExecution, hasCode(COMPUTER_USE_ERROR_CODES.STEP_DEADLINE_EXCEEDED));
   const prepareSignal = await prepareStarted;
-  await assert.rejects(firstExecution, hasCode(COMPUTER_USE_ERROR_CODES.STEP_DEADLINE_EXCEEDED));
+  await firstRejection;
   assert.equal(prepareSignal.aborted, true);
   releasePrepare();
   await new Promise((resolve) => setImmediate(resolve));
@@ -331,9 +332,10 @@ test("deadline/cancel abort internal signals; late prepare and approval cannot c
   });
   const second = await opened(lateApproval);
   const secondExecution = lateApproval.execute(second.session.sessionId, { step: 1, observationDigest: DIGEST_A, action: { type: "screenshot" } });
+  const secondRejection = assert.rejects(secondExecution, hasCode(COMPUTER_USE_ERROR_CODES.CANCELLED));
   const approvalSignal = await approvalStarted;
   const closing = lateApproval.close(second.session.sessionId);
-  await assert.rejects(secondExecution, hasCode(COMPUTER_USE_ERROR_CODES.CANCELLED));
+  await secondRejection;
   assert.equal(approvalSignal.aborted, true);
   await closing;
   releaseApproval();
@@ -355,12 +357,13 @@ test("deadline/cancel abort internal signals; late prepare and approval cannot c
       },
       async close() { uncertainCloseCalls += 1; },
     }),
-    policy: { allowDomains: [], stepDeadlineMs: 30, totalDeadlineMs: 500 },
+    policy: { allowDomains: [], stepDeadlineMs: 250, totalDeadlineMs: 2_000 },
   });
   const third = await opened(uncertain);
   const thirdExecution = uncertain.execute(third.session.sessionId, { step: 1, observationDigest: DIGEST_A, action: { type: "screenshot" } });
+  const thirdRejection = assert.rejects(thirdExecution, hasCode(COMPUTER_USE_ERROR_CODES.STEP_DEADLINE_EXCEEDED));
   const commitSignal = await commitStarted;
-  await assert.rejects(thirdExecution, hasCode(COMPUTER_USE_ERROR_CODES.STEP_DEADLINE_EXCEEDED));
+  await thirdRejection;
   assert.equal(commitSignal.aborted, true);
   assert.equal(uncertainCloseCalls, 1);
   await assert.rejects(uncertain.observe(third.session.sessionId), hasCode(COMPUTER_USE_ERROR_CODES.SESSION_CLOSED));

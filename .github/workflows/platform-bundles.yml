@@ -22,21 +22,25 @@ jobs:
             arch: x86_64
             runner: windows-latest
             target: x86_64-pc-windows-msvc
+            bundleArgs: nsis
             bundleGlob: target/x86_64-pc-windows-msvc/release/bundle/nsis/*.exe
           - platform: macos
             arch: x86_64
             runner: macos-15-intel
             target: x86_64-apple-darwin
+            bundleArgs: dmg
             bundleGlob: target/x86_64-apple-darwin/release/bundle/dmg/*.dmg
           - platform: macos
             arch: aarch64
             runner: macos-15
             target: aarch64-apple-darwin
+            bundleArgs: dmg
             bundleGlob: target/aarch64-apple-darwin/release/bundle/dmg/*.dmg
           - platform: linux
             arch: x86_64
             runner: ubuntu-22.04
             target: x86_64-unknown-linux-gnu
+            bundleArgs: appimage deb
             bundleGlob: |
               target/x86_64-unknown-linux-gnu/release/bundle/appimage/*.AppImage
               target/x86_64-unknown-linux-gnu/release/bundle/deb/*.deb
@@ -99,12 +103,14 @@ jobs:
           esac
           test -f "$icon"
           test -s "$icon"
+      - name: Build frontend required by Tauri context
+        run: pnpm --filter @useful/app build
       - name: Compile native host for target
         run: cargo check -p useful-app --lib --target ${{ matrix.target }}
       - name: Build development-trust unsigned preview platform bundle
         env:
           USEFUL_ALLOW_DEVELOPMENT_UPDATE_TRUST: "1"
-        run: pnpm --filter @useful/app tauri build --target ${{ matrix.target }}
+        run: pnpm --filter @useful/app tauri build --target ${{ matrix.target }} --bundles ${{ matrix.bundleArgs }}
       - name: Upload development-trust unsigned preview bundle
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:

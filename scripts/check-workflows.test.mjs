@@ -135,6 +135,16 @@ test("CI requires the fail-closed release-readiness command", async (t) => {
   assertViolation(runChecker(root), "ci.yml", "ci-release-readiness-gate-missing");
 });
 
+test("CI serializes workspace tests to avoid runner-load RPC timeouts", async (t) => {
+  const root = await createFixture(t);
+  await mutateWorkflow(root, "ci.yml", (workflow) => {
+    const step = workflow.jobs["build-and-test"].steps
+      .find((candidate) => String(candidate.run ?? "").includes("workspace-concurrency"));
+    step.run = "pnpm -r test";
+  });
+  assertViolation(runChecker(root), "ci.yml", "ci-workspace-tests-not-serialized");
+});
+
 test("CI requires size measurement and production enforcement after Lite packaging", async (t) => {
   const root = await createFixture(t);
   await mutateWorkflow(root, "ci.yml", (workflow) => {
@@ -350,6 +360,53 @@ test("CI ignores a misleading CLI step name and binds the command to its workspa
   assert.equal(run.result.ok, true);
 });
 
+test("CI Compose E2E requires frozen pnpm dependencies before preparation", async (t) => {
+  const root = await createFixture(t);
+  await mutateWorkflow(root, "ci.yml", (workflow) => {
+    workflow.jobs["compose-e2e"].steps = workflow.jobs["compose-e2e"].steps
+      .filter((step) => String(step.run ?? "") !== "pnpm install --frozen-lockfile");
+  });
+  assertViolation(runChecker(root), "ci.yml", "ci-compose-dependency-bootstrap-missing");
+});
+
+test("CI Compose E2E builds the workspace SDK after dependency installation", async (t) => {
+  const root = await createFixture(t);
+  await mutateWorkflow(root, "ci.yml", (workflow) => {
+    workflow.jobs["compose-e2e"].steps = workflow.jobs["compose-e2e"].steps
+      .filter((step) => String(step.run ?? "") !== "pnpm --filter @useful/sdk build");
+  });
+  assertViolation(runChecker(root), "ci.yml", "ci-compose-dependency-bootstrap-missing");
+});
+
+test("CI platform matrix requires frozen pnpm dependencies", async (t) => {
+  const root = await createFixture(t);
+  await mutateWorkflow(root, "ci.yml", (workflow) => {
+    workflow.jobs["platform-limited-matrix"].steps = workflow.jobs["platform-limited-matrix"].steps
+      .filter((step) => !String(step.uses ?? "").startsWith("pnpm/action-setup@"));
+  });
+  assertViolation(runChecker(root), "ci.yml", "ci-platform-matrix-dependency-bootstrap-missing");
+});
+
+test("CI platform scenarios use their required runners and cross-platform PowerShell", async (t) => {
+  const root = await createFixture(t);
+  await mutateWorkflow(root, "ci.yml", (workflow) => {
+    const compose = workflow.jobs["platform-limited-matrix"].strategy.matrix.include
+      .find((entry) => entry.scenario === "compose-fault-injection");
+    compose.runner = "windows-latest";
+  });
+  assertViolation(runChecker(root), "ci.yml", "ci-platform-matrix-runner-contract-invalid");
+});
+
+test("CodeQL uses a supported build mode for each language", async (t) => {
+  const root = await createFixture(t);
+  await mutateWorkflow(root, "codeql.yml", (workflow) => {
+    const go = workflow.jobs.analyze.strategy.matrix.include
+      .find((entry) => entry.language === "go");
+    go["build-mode"] = "none";
+  });
+  assertViolation(runChecker(root), "codeql.yml", "codeql-language-build-mode-invalid");
+});
+
 test("platform bundles require the committed Useful application paths", async (t) => {
   const root = await createFixture(t);
   await mutateWorkflow(root, "platform-bundles.yml", (workflow) => {
@@ -362,6 +419,51 @@ test("platform bundles require the committed Useful application paths", async (t
     "platform-bundles.yml",
     "platform-bundles-committed-icon-gate-missing",
     "platform icon step",
+  );
+});
+
+test("release verification serializes workspace tests", async (t) => {
+  const root = await createFixture(t);
+  await mutateWorkflow(root, "release.yml", (workflow) => {
+    const step = workflow.jobs.verify.steps
+      .find((candidate) => String(candidate.run ?? "").includes("workspace-concurrency"));
+    step.run = "pnpm -r test";
+  });
+  assertViolation(
+    runChecker(root),
+    "release.yml",
+    "release-verification-command-missing",
+    "pnpm -r --workspace-concurrency=1 test",
+  );
+});
+
+test("platform bundles build the frontend before native compilation", async (t) => {
+  const root = await createFixture(t);
+  await mutateWorkflow(root, "platform-bundles.yml", (workflow) => {
+    const steps = workflow.jobs.bundle.steps;
+    const frontendIndex = steps.findIndex((step) => String(step.run ?? "") === "pnpm --filter @useful/app build");
+    const [frontend] = steps.splice(frontendIndex, 1);
+    const nativeIndex = steps.findIndex((step) => String(step.run ?? "").includes("cargo check -p useful-app"));
+    steps.splice(nativeIndex + 1, 0, frontend);
+  });
+  assertViolation(
+    runChecker(root),
+    "platform-bundles.yml",
+    "platform-bundles-frontend-before-native-missing",
+  );
+});
+
+test("platform bundles select only the intended bundle formats", async (t) => {
+  const root = await createFixture(t);
+  await mutateWorkflow(root, "platform-bundles.yml", (workflow) => {
+    const windows = workflow.jobs.bundle.strategy.matrix.include
+      .find((entry) => entry.platform === "windows");
+    windows.bundleArgs = "msi nsis";
+  });
+  assertViolation(
+    runChecker(root),
+    "platform-bundles.yml",
+    "platform-bundles-target-bundle-selection-invalid",
   );
 });
 

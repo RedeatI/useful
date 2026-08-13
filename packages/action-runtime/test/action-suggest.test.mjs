@@ -19,6 +19,8 @@ test("suggestions detect common structured inputs and respect the supplied descr
     ["192.168.1.10/24", "builtin.utilities.ipv4"],
     ["name,age\nAda,36", "builtin.office.spreadsheet"],
     ["# Heading\n\n- item", "builtin.office.markdown"],
+    ["<p>local text</p>", "builtin.utilities.html"],
+    ["&lt;encoded&gt;", "builtin.utilities.html"],
   ];
   for (const [sample, expected] of cases) {
     assert.equal(suggestActions(descriptors, sample, { limit: 1 }).suggestions[0].actionId, expected);

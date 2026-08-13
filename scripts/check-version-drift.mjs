@@ -100,9 +100,9 @@ function uniqueMatches(raw, pattern) {
 export async function evaluateReadmeReleaseReferences({ repoRoot = defaultRepoRoot, expected }) {
   const required = Object.freeze({
     releaseTag: `releases/tag/v${expected}`,
-    portableAsset: `Useful-${expected}-windows-x64-portable.zip`,
-    bundleAsset: `Useful-${expected}-windows-x64-bundle.zip`,
-    checksumAsset: `SHA256SUMS-${expected}.txt`,
+    portableLiteAsset: `Useful-${expected}-windows-x64-portable-lite.zip`,
+    setupLiteAsset: `Useful-${expected}-windows-x64-setup-lite.exe`,
+    checksumAsset: "SHA256SUMS.txt",
   });
   const files = [];
   const failures = [];
@@ -110,9 +110,8 @@ export async function evaluateReadmeReleaseReferences({ repoRoot = defaultRepoRo
     const raw = await readFile(path.join(repoRoot, relative), "utf8");
     const observed = {
       releaseTags: uniqueMatches(raw, /releases\/tag\/v([^\s)#]+)/g),
-      portableVersions: uniqueMatches(raw, /Useful-([^\s"']+)-windows-x64-portable\.zip/g),
-      bundleVersions: uniqueMatches(raw, /Useful-([^\s"']+)-windows-x64-bundle\.zip/g),
-      checksumVersions: uniqueMatches(raw, /SHA256SUMS-([^\s"']+)\.txt/g),
+      portableLiteVersions: uniqueMatches(raw, /Useful-([^\s"']+)-windows-x64-portable-lite\.zip/g),
+      setupLiteVersions: uniqueMatches(raw, /Useful-([^\s"']+)-windows-x64-setup-lite\.exe/g),
     };
     const missing = Object.entries(required)
       .filter(([, value]) => !raw.includes(value))

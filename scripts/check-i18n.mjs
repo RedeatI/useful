@@ -25,6 +25,20 @@ function lineOf(source, offset) {
   return source.slice(0, offset).split(/\r?\n/).length;
 }
 
+function stripHtmlComments(source) {
+  let result = "";
+  let cursor = 0;
+  while (cursor < source.length) {
+    const start = source.indexOf("<!--", cursor);
+    if (start < 0) return result + source.slice(cursor);
+    const end = source.indexOf("-->", start + 4);
+    if (end < 0) return result + source.slice(cursor);
+    result += source.slice(cursor, start);
+    cursor = end + 3;
+  }
+  return result;
+}
+
 const violations = [];
 const files = (await walk(sourceRoot)).sort();
 for (const absolute of files) {
@@ -32,7 +46,7 @@ for (const absolute of files) {
   const source = await readFile(absolute, "utf8");
   const templateMatch = /<template(?:\s[^>]*)?>([\s\S]*?)<\/template>/i.exec(source);
   if (templateMatch) {
-    const visibleTemplate = templateMatch[1].replace(/<!--[\s\S]*?-->/g, "");
+    const visibleTemplate = stripHtmlComments(templateMatch[1]);
     const han = visibleTemplate.search(HAN);
     if (han >= 0) {
       const offset = templateMatch.index + templateMatch[0].indexOf(templateMatch[1]) + han;

@@ -100,10 +100,27 @@ try {
     Push-Location $RepoRoot
     try {
       $previousEap = $ErrorActionPreference
-      $ErrorActionPreference = "Continue"
-      & pnpm --filter "@useful/app" tauri build --no-bundle --features native-test
-      $buildCode = $LASTEXITCODE
-      $ErrorActionPreference = $previousEap
+      $previousDevelopmentTrustOptIn = [Environment]::GetEnvironmentVariable(
+        "USEFUL_ALLOW_DEVELOPMENT_UPDATE_TRUST",
+        "Process"
+      )
+      try {
+        $ErrorActionPreference = "Continue"
+        [Environment]::SetEnvironmentVariable(
+          "USEFUL_ALLOW_DEVELOPMENT_UPDATE_TRUST",
+          "1",
+          "Process"
+        )
+        & pnpm --filter "@useful/app" tauri build --no-bundle --features native-test
+        $buildCode = $LASTEXITCODE
+      } finally {
+        [Environment]::SetEnvironmentVariable(
+          "USEFUL_ALLOW_DEVELOPMENT_UPDATE_TRUST",
+          $previousDevelopmentTrustOptIn,
+          "Process"
+        )
+        $ErrorActionPreference = $previousEap
+      }
       if ($buildCode -ne 0) { throw "Tauri native-test Release build failed: $buildCode" }
     } finally {
       $ErrorActionPreference = "Stop"

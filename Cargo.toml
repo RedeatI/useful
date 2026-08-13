@@ -13,7 +13,7 @@ members = [
 ]
 
 [workspace.package]
-version = "0.1.0-beta.4"
+version = "0.1.0-beta.5"
 edition = "2021"
 license = "MPL-2.0"
 authors = ["Useful Team"]
@@ -53,7 +53,7 @@ features = ["std"]
 codegen-units = 1
 lto = true
 strip = true
-opt-level = "s"
+opt-level = "z"
 
 # Disk-constrained developer builds (see scripts/dev-cache.ps1 -Mode Compact).
 # Do not use for day-to-day crash debugging — native stacks lose fidelity.

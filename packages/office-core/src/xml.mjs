@@ -55,10 +55,24 @@ export function decodeXml(bytes, maxBytes = OFFICE_LIMITS.partBytes) {
   return text.replace(/^\uFEFF/, "");
 }
 
+function stripTagLikeSegments(text) {
+  let result = "";
+  let cursor = 0;
+  while (cursor < text.length) {
+    const start = text.indexOf("<", cursor);
+    if (start < 0) return result + text.slice(cursor);
+    const end = text.indexOf(">", start + 1);
+    if (end < 0) return result + text.slice(cursor);
+    result += text.slice(cursor, start);
+    cursor = end + 1;
+  }
+  return result;
+}
+
 export function tagTexts(xml, qualifiedName) {
   const escaped = qualifiedName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   const expression = new RegExp(`<${escaped}(?:\\s[^>]*)?>([\\s\\S]*?)<\\/${escaped}>`, "g");
-  return [...xml.matchAll(expression)].map((match) => xmlUnescape(match[1].replace(/<[^>]*>/g, "")));
+  return [...xml.matchAll(expression)].map((match) => xmlUnescape(stripTagLikeSegments(match[1])));
 }
 
 export function attribute(tag, name) {

@@ -985,12 +985,14 @@ pub async fn trp_install(
 ) -> CmdResult<useful_core::registry::ToolDefinition> {
     install_from_trp_source_version(
         &state,
-        &source_id,
-        &publisher_key_id,
-        &tool_id,
-        None,
-        permissions_confirmed,
-        false,
+        TrpInstallRequest {
+            source_id: &source_id,
+            publisher_key_id: &publisher_key_id,
+            tool_id: &tool_id,
+            target_version: None,
+            permissions_confirmed,
+            allow_downgrade: false,
+        },
         Some(app),
     )
     .await
@@ -1006,27 +1008,41 @@ pub async fn install_from_trp_source(
 ) -> Result<useful_core::registry::ToolDefinition, CmdError> {
     install_from_trp_source_version(
         state,
-        source_id,
-        publisher_key_id,
-        tool_id,
-        None,
-        permissions_confirmed,
-        false,
+        TrpInstallRequest {
+            source_id,
+            publisher_key_id,
+            tool_id,
+            target_version: None,
+            permissions_confirmed,
+            allow_downgrade: false,
+        },
         None,
     )
     .await
 }
 
-async fn install_from_trp_source_version(
-    state: &AppState,
-    source_id: &str,
-    publisher_key_id: &str,
-    tool_id: &str,
-    target_version: Option<&str>,
+struct TrpInstallRequest<'a> {
+    source_id: &'a str,
+    publisher_key_id: &'a str,
+    tool_id: &'a str,
+    target_version: Option<&'a str>,
     permissions_confirmed: bool,
     allow_downgrade: bool,
+}
+
+async fn install_from_trp_source_version(
+    state: &AppState,
+    request: TrpInstallRequest<'_>,
     app: Option<AppHandle>,
 ) -> Result<useful_core::registry::ToolDefinition, CmdError> {
+    let TrpInstallRequest {
+        source_id,
+        publisher_key_id,
+        tool_id,
+        target_version,
+        permissions_confirmed,
+        allow_downgrade,
+    } = request;
     // Global lock order is tool -> source. Hold both from the first origin
     // read through filesystem, SQLite and registry commit/rollback.
     let _tool_guard = super::plugins::tool_mutation_lock(tool_id)
@@ -1328,12 +1344,14 @@ pub async fn rollback_from_trp_source(
         .ok_or_else(|| CmdError::from("该工具没有 TRP 来源记录"))?;
     install_from_trp_source_version(
         state,
-        &origin.source_id,
-        &origin.publisher_key_id,
-        tool_id,
-        Some(target_version),
-        permissions_confirmed,
-        true,
+        TrpInstallRequest {
+            source_id: &origin.source_id,
+            publisher_key_id: &origin.publisher_key_id,
+            tool_id,
+            target_version: Some(target_version),
+            permissions_confirmed,
+            allow_downgrade: true,
+        },
         None,
     )
     .await

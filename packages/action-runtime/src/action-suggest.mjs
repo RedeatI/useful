@@ -57,6 +57,28 @@ function isCanonicalBase64Candidate(value) {
   return /[+/=]/u.test(value) || value.length >= 16;
 }
 
+function looksLikeHtml(value) {
+  for (let cursor = 0; cursor < value.length;) {
+    const start = value.indexOf("<", cursor);
+    if (start < 0) break;
+    const first = value.codePointAt(start + 1);
+    if ((first >= 65 && first <= 90) || (first >= 97 && first <= 122)) {
+      if (value.indexOf(">", start + 2) >= 0) return true;
+    }
+    cursor = start + 1;
+  }
+  for (let cursor = 0; cursor < value.length;) {
+    const start = value.indexOf("&", cursor);
+    if (start < 0) return false;
+    const end = value.indexOf(";", start + 1);
+    if (end < 0) return false;
+    const entity = value.slice(start + 1, end);
+    if (/^(?:[A-Za-z]+|#\d+|#x[0-9a-f]+)$/iu.test(entity)) return true;
+    cursor = start + 1;
+  }
+  return false;
+}
+
 function validateOptions(options) {
   if (options === null || typeof options !== "object" || Array.isArray(options)) suggestionError();
   const allowed = new Set(["limit", "minimumScore"]);
@@ -141,7 +163,7 @@ export function suggestActions(descriptors, text, options = {}) {
     add("builtin.utilities.color", 900, "hex-color");
     add("builtin.utilities.contrast", 600, "hex-color");
   }
-  if (/<[A-Za-z][^>]*>|&(?:[A-Za-z]+|#\d+|#x[0-9a-f]+);/iu.test(trimmed)) add("builtin.utilities.html", 760, "html-markup");
+  if (looksLikeHtml(trimmed)) add("builtin.utilities.html", 760, "html-markup");
   if (/\\u[0-9a-f]{4}/iu.test(trimmed)) add("builtin.utilities.unicode", 760, "unicode-escape");
   if (/^[.\-/\s]+$/u.test(trimmed) && /[.-]/u.test(trimmed)) add("builtin.utilities.morse", 720, "morse-symbols");
   if (looksLikeDelimitedTable(text)) add("builtin.office.spreadsheet", 780, "delimited-table");

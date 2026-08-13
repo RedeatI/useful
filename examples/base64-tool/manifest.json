@@ -4,7 +4,6 @@
   "name": "Base64 Pro",
   "version": "1.0.0",
   "description": "完全离线且零权限的 Base64 编解码插件示例。",
-  "icon": "assets/icon.png",
   "entry": {
     "type": "web",
     "path": "index.html"

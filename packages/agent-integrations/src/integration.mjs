@@ -93,7 +93,12 @@ function assertAbsoluteLocalPath(value, field) {
 }
 
 function samePath(left, right) {
-  const normalize = (value) => path.normalize(value).replace(/^\\\\\?\\/, "").replace(/[\\/]+$/, "");
+  const normalize = (value) => {
+    const normalized = path.normalize(value).replace(/^\\\\\?\\/, "");
+    let end = normalized.length;
+    while (end > 0 && (normalized[end - 1] === "\\" || normalized[end - 1] === "/")) end -= 1;
+    return normalized.slice(0, end);
+  };
   const normalizedLeft = normalize(left);
   const normalizedRight = normalize(right);
   return process.platform === "win32"
