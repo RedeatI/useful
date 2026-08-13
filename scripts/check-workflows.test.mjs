@@ -377,6 +377,16 @@ test("CI platform matrix requires frozen pnpm dependencies", async (t) => {
   assertViolation(runChecker(root), "ci.yml", "ci-platform-matrix-dependency-bootstrap-missing");
 });
 
+test("CI platform scenarios use their required runners and cross-platform PowerShell", async (t) => {
+  const root = await createFixture(t);
+  await mutateWorkflow(root, "ci.yml", (workflow) => {
+    const compose = workflow.jobs["platform-limited-matrix"].strategy.matrix.include
+      .find((entry) => entry.scenario === "compose-fault-injection");
+    compose.runner = "windows-latest";
+  });
+  assertViolation(runChecker(root), "ci.yml", "ci-platform-matrix-runner-contract-invalid");
+});
+
 test("CodeQL uses a supported build mode for each language", async (t) => {
   const root = await createFixture(t);
   await mutateWorkflow(root, "codeql.yml", (workflow) => {

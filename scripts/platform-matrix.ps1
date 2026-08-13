@@ -123,11 +123,17 @@ function Test-NativeTauriSmoke {
 }
 
 # ---------- Compose 故障注入（需 Docker）----------
-function Invoke-Docker([string]$DockerArgs) {
-  # 经 cmd 合并 stderr，避免 $ErrorActionPreference=Stop 下 PowerShell 把
-  # docker 进度输出（stderr）误判为 NativeCommandError（同 Invoke-Step 既往缺陷）。
-  cmd /c "docker $DockerArgs 2>&1" | Out-Null
-  return $LASTEXITCODE
+function Invoke-Docker([string[]]$DockerArgs) {
+  # PowerShell 7 跨平台调用，参数保持边界；暂时放宽 native stderr 处理，
+  # 但保留 Docker 原始输出，确保远端失败可诊断。
+  $previousEap = $ErrorActionPreference
+  try {
+    $ErrorActionPreference = "Continue"
+    & docker @DockerArgs 2>&1 | ForEach-Object { Write-Host $_ }
+    return $LASTEXITCODE
+  } finally {
+    $ErrorActionPreference = $previousEap
+  }
 }
 
 function Get-HttpStatus([string]$Url, [int]$TimeoutSec = 5) {
@@ -146,15 +152,15 @@ function Test-ComposeFaultInjection {
     Write-Skip "无 Docker；环境受限未执行"
     return 3
   }
-  Push-Location (Join-Path $RepoRoot "deploy\docker-compose")
+  Push-Location (Join-Path $RepoRoot "deploy/docker-compose")
   # 专用宿主机端口，避免与本机 8080 占用者/Windows 保留端口区间冲突
   # （compose 支持 HTTP_PORT 变量；可用 FAULT_HTTP_PORT 覆盖）
   $port = if ($env:FAULT_HTTP_PORT) { $env:FAULT_HTTP_PORT } else { "28080" }
   $env:HTTP_PORT = $port
   $base = "http://127.0.0.1:$port"
   try {
-    node e2e\prepare.mjs | Out-Null
-    if ((Invoke-Docker "compose up -d --build") -ne 0) { Write-Err "compose up 失败"; return 1 }
+    node e2e/prepare.mjs | Out-Null
+    if ((Invoke-Docker @("compose", "up", "-d", "--build")) -ne 0) { Write-Err "compose up 失败"; return 1 }
 
     # 基线：health+ready 均 200
     $ok = $false
@@ -166,7 +172,7 @@ function Test-ComposeFaultInjection {
     Write-Ok "基线：/v1/ready = 200"
 
     # 注入 1：暂停 postgres → ready 必须非 200（503/超时），health 仍 200（进程活着）
-    Invoke-Docker "compose pause postgres" | Out-Null
+    Invoke-Docker @("compose", "pause", "postgres") | Out-Null
     Start-Sleep -Seconds 3
     $ready = Get-HttpStatus "$base/v1/ready" 5
     $health = Get-HttpStatus "$base/v1/health" 5
@@ -175,7 +181,7 @@ function Test-ComposeFaultInjection {
     Write-Ok "postgres 暂停：ready=$ready（非 200）、health=200（未崩溃）"
 
     # 恢复：ready 应在重试窗口内回到 200
-    Invoke-Docker "compose unpause postgres" | Out-Null
+    Invoke-Docker @("compose", "unpause", "postgres") | Out-Null
     $ok = $false
     for ($i = 0; $i -lt 15; $i++) {
       if ((Get-HttpStatus "$base/v1/ready") -eq 200) { $ok = $true; break }
@@ -185,19 +191,24 @@ function Test-ComposeFaultInjection {
     Write-Ok "postgres 恢复：ready 回到 200（可重试、无需重启）"
 
     # 注入 2：重启 worker → 容器回到 running，API 仍就绪
-    Invoke-Docker "compose restart source-worker" | Out-Null
+    Invoke-Docker @("compose", "restart", "source-worker") | Out-Null
     Start-Sleep -Seconds 5
-    $running = (cmd /c "docker compose ps --status running --format {{.Service}} 2>&1")
+    $previousEap = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    $running = @(& docker compose ps --status running --format "{{.Service}}" 2>&1)
+    $psCode = $LASTEXITCODE
+    $ErrorActionPreference = $previousEap
+    if ($psCode -ne 0) { Write-Err "compose ps 失败"; return 1 }
     if ($running -notcontains "source-worker") { Write-Err "worker 重启后未回到 running"; return 1 }
     if ((Get-HttpStatus "$base/v1/ready") -ne 200) { Write-Err "worker 重启影响了 API 就绪"; return 1 }
     Write-Ok "worker 重启：容器 running、API 就绪不受影响（队列任务可重试）"
 
-    Invoke-Docker "compose down -v" | Out-Null
+    Invoke-Docker @("compose", "down", "-v") | Out-Null
     Write-Ok "compose-fault-injection 通过"
     return 0
   } catch {
     Write-Err "故障注入异常：$($_.Exception.Message)"
-    Invoke-Docker "compose down -v" | Out-Null
+    Invoke-Docker @("compose", "down", "-v") | Out-Null
     return 1
   } finally {
     Remove-Item Env:\HTTP_PORT -ErrorAction SilentlyContinue

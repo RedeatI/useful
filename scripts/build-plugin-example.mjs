@@ -52,6 +52,22 @@ export async function buildPluginExample(source, output) {
   fs.writeFileSync(htmlPath, html);
   fs.rmSync(scriptPath);
 
+  const builtManifest = JSON.parse(fs.readFileSync(path.join(outputDir, "manifest.json"), "utf8"));
+  for (const [label, relative] of [
+    ["entry.path", builtManifest.entry?.path],
+    ["icon", builtManifest.icon],
+  ]) {
+    if (relative === undefined) continue;
+    if (typeof relative !== "string" || relative.length === 0) {
+      throw new Error(`插件 manifest ${label} 必须是非空相对路径`);
+    }
+    const referenced = path.resolve(outputDir, relative);
+    const outputPrefix = `${outputDir}${path.sep}`;
+    if (!referenced.startsWith(outputPrefix) || !fs.statSync(referenced, { throwIfNoEntry: false })?.isFile()) {
+      throw new Error(`插件 manifest ${label} 未精确指向构建输出文件: ${relative}`);
+    }
+  }
+
   console.log(`✓ 插件示例已构建: ${outputDir}`);
 }
 

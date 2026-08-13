@@ -345,6 +345,22 @@ function inspectCiWorkflow(file, workflow) {
   if (!hasFrozenPnpmBootstrap(workflow.jobs?.["platform-limited-matrix"]?.steps ?? [])) {
     violations.push({ file, code: "ci-platform-matrix-dependency-bootstrap-missing" });
   }
+  const platformMatrix = workflow.jobs?.["platform-limited-matrix"];
+  const scenarioRunners = new Map((platformMatrix?.strategy?.matrix?.include ?? [])
+    .map((entry) => [entry?.scenario, entry?.runner]));
+  const platformScenarioStep = (platformMatrix?.steps ?? [])
+    .find((step) => String(step?.run ?? "").includes("scripts/platform-matrix.ps1"));
+  if (
+    String(platformMatrix?.["runs-on"] ?? "") !== "${{ matrix.runner }}"
+    || scenarioRunners.size !== 3
+    || scenarioRunners.get("native-tauri-smoke") !== "windows-latest"
+    || scenarioRunners.get("large-file-resume") !== "windows-latest"
+    || scenarioRunners.get("compose-fault-injection") !== "ubuntu-latest"
+    || !stepRunsExact(platformScenarioStep, "pwsh -NoProfile -File scripts/platform-matrix.ps1 -Scenario ${{ matrix.scenario }}")
+    || String(platformScenarioStep?.shell ?? "") !== "pwsh"
+  ) {
+    violations.push({ file, code: "ci-platform-matrix-runner-contract-invalid" });
+  }
   const tauriStep = buildSteps
     .find((step) => String(step?.run ?? "").includes("tauri build --no-bundle"));
   if (

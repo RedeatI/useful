@@ -266,7 +266,11 @@ for (const plugin of realPlugins) {
       publisherSignature: signArtifact(plugin.id, "1.0.0", v1Sha),
     },
   );
-  ok(`${plugin.id} signed v1 accepted`, v1Release.status === 201, `got ${v1Release.status}`);
+  ok(
+    `${plugin.id} signed v1 accepted`,
+    v1Release.status === 201,
+    `got ${v1Release.status} ${JSON.stringify(v1Release.json)}`,
+  );
   const v1Published = await waitStatus(v1Release.json?.id, "published", 90);
   ok(`${plugin.id} v1 published`, v1Published !== null);
 
@@ -283,7 +287,11 @@ for (const plugin of realPlugins) {
       publisherSignature: signArtifact(plugin.id, "1.1.0", v2Sha),
     },
   );
-  ok(`${plugin.id} signed v2 accepted`, v2Release.status === 201, `got ${v2Release.status}`);
+  ok(
+    `${plugin.id} signed v2 accepted`,
+    v2Release.status === 201,
+    `got ${v2Release.status} ${JSON.stringify(v2Release.json)}`,
+  );
   const v2Published = await waitStatus(v2Release.json?.id, "published", 90);
   ok(`${plugin.id} v2 published`, v2Published !== null);
 

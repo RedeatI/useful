@@ -215,14 +215,17 @@ jobs:
   # 对应退出条件 11（Compose 故障注入）/12（原生 Tauri smoke）/14（大文件续传+回滚）。
   platform-limited-matrix:
     if: github.event_name == 'workflow_dispatch'
-    runs-on: windows-latest
+    runs-on: ${{ matrix.runner }}
     strategy:
       fail-fast: false
       matrix:
-        scenario:
-          - native-tauri-smoke      # 退出条件 12：真实 IPC smoke（UI Automation）
-          - large-file-resume       # 退出条件 14：1GB/10GB 断点续传 + 安装回滚
-          - compose-fault-injection # 退出条件 11：PostgreSQL/对象存储/worker 中断
+        include:
+          - scenario: native-tauri-smoke      # 退出条件 12：真实 IPC smoke（UI Automation）
+            runner: windows-latest
+          - scenario: large-file-resume       # 退出条件 14：1GB/10GB 断点续传 + 安装回滚
+            runner: windows-latest
+          - scenario: compose-fault-injection # 退出条件 11：PostgreSQL/对象存储/worker 中断
+            runner: ubuntu-latest
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
@@ -236,4 +239,4 @@ jobs:
       - run: pnpm --filter @useful/sdk build
       - name: 运行平台受限场景 ${{ matrix.scenario }}
         shell: pwsh
-        run: powershell -ExecutionPolicy Bypass -File scripts/platform-matrix.ps1 -Scenario ${{ matrix.scenario }}
+        run: pwsh -NoProfile -File scripts/platform-matrix.ps1 -Scenario ${{ matrix.scenario }}
