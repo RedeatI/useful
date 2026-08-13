@@ -74,7 +74,11 @@ pub(crate) fn file_url_path(url: &str) -> Result<Option<PathBuf>, CmdError> {
     }
     let parsed = reqwest::Url::parse(url)
         .map_err(|error| CmdError::from(format!("本地文件 URL 无效: {error}")))?;
-    if parsed.path().is_empty() {
+    let raw_authority_and_path = url["file://".len()..]
+        .split(['?', '#'])
+        .next()
+        .unwrap_or_default();
+    if !raw_authority_and_path.contains('/') {
         return Err(CmdError::from("本地文件 URL 必须表示当前平台的绝对路径"));
     }
     let path = parsed
