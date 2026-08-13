@@ -1,8 +1,8 @@
 # Open-source remaining gates (status)
 
-Date: 2026-08-12  
+Date: 2026-08-13
 Public repository: `https://github.com/RedeatI/useful`  
-Baseline commit for this note: `e381429` (beta.4 version align + npm audit cleanups).
+Baseline commit for this note: `f77033b` (public Beta readiness plus bounded JSON tree traversal).
 
 This page is a working status against [OPEN-SOURCE-RELEASE.md](OPEN-SOURCE-RELEASE.md).  
 It is not a publication authorization.
@@ -43,7 +43,7 @@ It is not a publication authorization.
 | Linux real runner build | blocked | CI config is not runner proof |
 | Required CI green on release commit | partial | Re-check before any `release.yml` publish=true run |
 | npm audit clean | done | `pnpm audit` clean after overrides (2026-08-12) |
-| Rust Dependabot open alerts | partial | One open medium: `glib` (see §7) |
+| Rust Dependabot open alerts | done | GitHub API returned zero open alerts after alert #1 was dismissed as `not_used` (2026-08-13; see §7) |
 
 ## 4. Release and update trust
 
@@ -74,13 +74,15 @@ It is not a publication authorization.
 | Real UI screenshots in README | partial | Three PNG screenshots present; optional refresh from current UI |
 | Local 宣发 pack (not in repo) | partial | Owner local pack aligned to beta.4; not required on GitHub |
 
-## 7. Known open Dependabot (Rust)
+## 7. Resolved Dependabot triage (Rust)
 
-| Alert | Package | Severity | Why open |
+| Alert | Package | Severity | Resolution |
 | --- | --- | --- | --- |
-| #1 GHSA-wrw7-89jp-8q8g | `glib` 0.18.x | medium | Fixed in `glib` 0.20.0. Tree is pinned through `gtk` 0.18.x / Tauri 2 Linux path; cannot bump alone without breaking gtk-rs alignment. Windows primary channel does not exercise this iterator path the same way. Track upstream Tauri/gtk-rs upgrade. |
+| #1 GHSA-wrw7-89jp-8q8g | `glib` 0.18.x | medium | Dismissed as `not_used` on 2026-08-13. Static triage at `f77033b` found no calls to affected API `Variant::array_iter_str` / `VariantStrIter` in the repository or resolved Linux Rust consumers. |
 
-Do not force-edit `Cargo.lock` to a mismatched gtk/glib pair. Prefer waiting for a Tauri-compatible upgrade line, then re-run Dependabot.
+The resolved tree remains on the gtk-rs 0.18 line, so do not force-edit `Cargo.lock` to a mismatched
+gtk/glib pair. Re-open this review if `Cargo.lock`, Tauri/GTK/WebKitGTK dependencies, or either
+affected API use changes; adopt a compatible upstream upgrade when one becomes available.
 
 ## Minimum next Owner actions
 

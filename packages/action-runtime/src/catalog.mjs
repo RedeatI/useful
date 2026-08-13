@@ -95,8 +95,8 @@ export const BUILTIN_ACTION_CATALOG = Object.freeze([
   defineMetadata({
     actionId: ACTION_IDS.JSON,
     title: "JSON format",
-    description: "Parse and deterministically format or minify JSON text.",
-    keywords: ["json", "format", "pretty", "minify"],
+    description: "Parse, format, minify, or query JSON with a bounded JSON Pointer.",
+    keywords: ["json", "format", "pretty", "minify", "pointer", "query"],
     aliases: ["beautify"],
     category: "utilities",
   }),

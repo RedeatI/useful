@@ -11,7 +11,7 @@ import {
 } from "@useful/action-runtime/catalog";
 import { BUILTIN_ACTION_DESCRIPTORS } from "../src/browser.mjs";
 
-const PUBLIC_CATALOG_SHA256 = "67d706a7ac2c0382dbaabbaed1a3b89bac9db96363170202b83ca2618ba71502";
+const PUBLIC_CATALOG_SHA256 = "5b5446313c2e0792cc09f870fa79b6d88ca59e398e25d1289ad893bd145c0de0";
 
 function publicCatalogProjection(metadata) {
   return {

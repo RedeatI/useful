@@ -1,5 +1,7 @@
 export type HashAlgorithm = "SHA-1" | "SHA-256" | "SHA-384" | "SHA-512";
-export type JsonActionInput = { operation: "format" | "minify"; text: string; indent?: number };
+export type JsonActionInput =
+  | { operation: "format" | "minify"; text: string; indent?: number; pointer?: never }
+  | { operation: "query"; text: string; pointer: string; indent?: number };
 export type Base64ActionInput = { operation: "encode" | "decode"; text: string };
 export type HashActionInput = { algorithm: HashAlgorithm; text: string };
 export type TextActionOutput = { text: string };

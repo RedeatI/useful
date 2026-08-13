@@ -107,9 +107,6 @@ fn setup_state(tmp: &Path, src_dir: &Path, discovery_url: &str) -> AppState {
     AppState::new(paths, db, registry)
 }
 
-const PUBLISHER_QUERY: &str =
-    "SELECT publisher_key_id FROM trp_catalog_cache WHERE tool_id = 'com.useful.hello-web'";
-
 #[tokio::test]
 async fn full_trp_flow_install_and_tamper_rejection() {
     let tmp = tempfile::tempdir().unwrap();
@@ -120,12 +117,21 @@ async fn full_trp_flow_install_and_tamper_rejection() {
     let sync = sync_one(&state, "com.example.static").await;
     assert!(sync.ok, "同步失败: {:?}", sync.message);
     assert_eq!(sync.entry_count, 1);
-    let publisher: String = {
+    let (publisher, delivery_type): (String, String) = {
         let db = state.db.lock().unwrap();
         db.conn
-            .query_row(PUBLISHER_QUERY, [], |r| r.get(0))
+            .query_row(
+                "SELECT
+                    (SELECT publisher_key_id FROM trp_catalog_cache
+                     WHERE tool_id = 'com.useful.hello-web'),
+                    delivery_type
+                 FROM trp_sources WHERE id = 'com.example.static'",
+                [],
+                |r| Ok((r.get(0)?, r.get(1)?)),
+            )
             .unwrap()
     };
+    assert_eq!(delivery_type, "static-https");
 
     // 2) metadata 被篡改 → 拒绝安装（未重签的 timestamp 改动被签名验证拦截）
     let ts_path = src_dir.join("metadata/timestamp.json");

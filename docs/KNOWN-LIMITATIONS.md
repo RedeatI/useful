@@ -118,5 +118,10 @@ Windows 为主要验证目标的能力。macOS/Linux 应明确降级或报告不
 - Full edition 的 GPL 对应源码和许可证证据
 - 精确候选的真实 macOS/Linux runner 执行，以及绑定候选的 Windows 原生视觉与运行验收
 - 命名 CoC 执法联系人后再广泛开放 drive-by 投稿（见 [`CODE_OF_CONDUCT.md`](../CODE_OF_CONDUCT.md)）
-- 一条未关闭的 Rust Dependabot medium：`glib` 0.18.x（GHSA-wrw7-89jp-8q8g），受 gtk 0.18 /
-  Tauri Linux 链路限制，需等上游可兼容升级；见 [OPEN-SOURCE-REMAINING-GATES.md](OPEN-SOURCE-REMAINING-GATES.md) §7
+
+### 最近完成的安全证据
+
+- `glib` 0.18.x 的 Rust Dependabot #1（GHSA-wrw7-89jp-8q8g）已按 `not_used` 关闭：在
+  `f77033b` 对仓库和已解析 Linux Rust 消费方做静态复核，未发现受影响 API
+  `Variant::array_iter_str` / `VariantStrIter` 的调用。若 lockfile、Tauri/GTK/WebKitGTK 依赖链或
+  上述 API 使用发生变化，须重新打开审查；见 [OPEN-SOURCE-REMAINING-GATES.md](OPEN-SOURCE-REMAINING-GATES.md) §7。

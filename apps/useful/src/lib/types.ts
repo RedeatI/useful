@@ -278,6 +278,7 @@ export type DownloadStatus =
   | "pending"
   | "downloading"
   | "verifying"
+  | "installing"
   | "done"
   | "failed"
   | "cancelled";
@@ -290,7 +291,9 @@ export interface DownloadRecord {
   totalBytes: number | null;
   receivedBytes: number;
   status: DownloadStatus;
+  digest: string | null;
   error: string | null;
+  errorCode: string | null;
   createdAt: number;
 }
 
@@ -301,6 +304,7 @@ export interface DownloadProgressEvent {
   receivedBytes: number;
   totalBytes: number;
   status: DownloadStatus;
+  digest: string;
 }
 
 export interface DownloadDoneEvent {
@@ -309,6 +313,7 @@ export interface DownloadDoneEvent {
   version: string;
   status: "done" | "failed" | "cancelled";
   error: string | null;
+  errorCode: string | null;
 }
 
 export type MediaPackTrustState = "blocked" | "unavailable" | "ready";
@@ -377,6 +382,7 @@ export interface TrpSourcePreview {
   local: boolean;
   rootKeyFingerprint: string;
   capabilities: Partial<TrpCapabilities>;
+  deliveryType: "unknown" | "static-https" | "dynamic";
   requiresAuth: boolean;
   paidDownloads: boolean;
   nativeWorkers: boolean;
@@ -398,6 +404,7 @@ export interface TrpSourceInfo {
   rootKeyFingerprint: string;
   trustConfirmedAt: number;
   capabilities: Partial<TrpCapabilities>;
+  deliveryType: "unknown" | "static-https" | "dynamic";
   lastSyncAt: number | null;
   lastSyncStatus: TrpSyncStatus;
   lastSyncError: string | null;
@@ -438,7 +445,7 @@ export interface TrpCatalogItem {
   signatureIdentity?: string;
   /** 复现构建验证状态（作者声明与官方验证分离，绝不合并） */
   reproducibleBuild?: ReproducibleBuildView;
-  /** 来源可用性（后台健康检查推导，带时间戳；过期显示 unknown） */
+  /** Catalog 中的来源自报可用性；不是客户端独立探测结果。 */
   availability?: AvailabilityView;
   /** 安全公告数（>0 时展示公告横幅） */
   advisoryCount: number;
@@ -446,7 +453,7 @@ export interface TrpCatalogItem {
   maxAdvisorySeverity: string | null;
 }
 
-/** 来源可用性视图（UI 显示状态与最后检查时间）。 */
+/** 来源自报可用性视图（UI 显示状态、检查时间与报告来源）。 */
 export interface AvailabilityView {
   status: "unknown" | "healthy" | "degraded" | "unavailable";
   checkedAt?: string;

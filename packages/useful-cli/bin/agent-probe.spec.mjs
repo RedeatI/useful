@@ -549,4 +549,29 @@ describe("useful agent self-probe production", () => {
       process.chdir(before);
     }
   });
+
+  it("accepts only a reciprocally bound Git linked-worktree metadata layout", () => {
+    const outer = fs.mkdtempSync(path.join(CANONICAL_TEMP_ROOT, "useful-probe-worktree-"));
+    const root = path.join(outer, "checkout");
+    const common = path.join(outer, "main", ".git");
+    const gitDirectory = path.join(common, "worktrees", "checkout");
+    const revision = "cd".repeat(20);
+    try {
+      fs.mkdirSync(path.join(root), { recursive: true });
+      fs.mkdirSync(path.join(gitDirectory), { recursive: true });
+      fs.mkdirSync(path.join(common, "refs", "heads"), { recursive: true });
+      fs.writeFileSync(path.join(root, ".git"), `gitdir: ${gitDirectory}\n`);
+      fs.writeFileSync(path.join(gitDirectory, "gitdir"), `${path.join(root, ".git")}\n`);
+      fs.writeFileSync(path.join(gitDirectory, "commondir"), "../..\n");
+      fs.writeFileSync(path.join(gitDirectory, "HEAD"), "ref: refs/heads/main\n");
+      fs.writeFileSync(path.join(common, "refs", "heads", "main"), `${revision}\n`);
+
+      expect(agentProbeTesting.readSourceRevision(root)).toBe(revision);
+      fs.writeFileSync(path.join(gitDirectory, "gitdir"), `${path.join(outer, "other", ".git")}\n`);
+      expect(() => agentProbeTesting.readSourceRevision(root))
+        .toThrowError(expect.objectContaining({ code: "SOURCE_REVISION_UNAVAILABLE" }));
+    } finally {
+      fs.rmSync(outer, { recursive: true, force: true });
+    }
+  });
 });

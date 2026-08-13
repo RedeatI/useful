@@ -31,4 +31,34 @@ describe("Source Center compatibility source management", () => {
     await wrapper.find('[data-testid="legacy-add"]').trigger("click");
     expect(ipcMock.sourceAdd).toHaveBeenCalledWith("https://new/index.json", undefined);
   });
+
+  it("shows the client-observed delivery type for a static object-store source", async () => {
+    ipcMock.trpSourceList.mockResolvedValueOnce([
+      {
+        id: "com.example.static",
+        kind: "tool",
+        discoveryUrl: "https://cdn.example/.well-known/useful-repository.json",
+        displayName: "Example static source",
+        operator: "Example",
+        local: false,
+        enabled: true,
+        priority: 100,
+        rootKeyFingerprint: "aa".repeat(32),
+        trustConfirmedAt: 1,
+        capabilities: { catalog: true, staticMirror: true },
+        deliveryType: "static-https",
+        lastSyncAt: 1,
+        lastSyncStatus: "ok",
+        lastSyncError: null,
+        lastSyncDurationMs: 10,
+        entryCount: 1,
+        isOfficial: false,
+      },
+    ]);
+    const wrapper = mount(SourceCenterView);
+    await flushPromises();
+    expect(wrapper.get('[data-testid="delivery-type-badge"]').text()).toContain(
+      "静态 HTTPS / S3 兼容存储",
+    );
+  });
 });

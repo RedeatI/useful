@@ -42,6 +42,8 @@ const versionDriftFixturePaths = Object.freeze([
   "apps/useful/src-tauri/tauri.linux.conf.json",
   "Cargo.toml",
   "Cargo.lock",
+  "README.md",
+  "README.zh-CN.md",
 ]);
 
 async function makeVersionDriftFixture() {
@@ -181,6 +183,11 @@ test("release readiness reports stable evidence boundaries without mutating the 
   );
   assert.equal(identifierGate.platformOverrides.every((entry) => entry.declaresIdentifier === false), true);
   assert.deepEqual(identifierGate.failures, []);
+  assert.equal(versionResult.readmeRelease.ok, true);
+  assert.deepEqual(
+    versionResult.readmeRelease.files.map((entry) => entry.path),
+    ["README.md", "README.zh-CN.md"],
+  );
   assert.equal(result.evidenceKind, "local-source-preflight");
   assert.equal(result.publicationAuthorized, false);
   assert.equal(result.remoteStateChecked, false);
@@ -246,6 +253,34 @@ test("bundle identifier policy fails closed for an invalid base or any platform 
         payload.bundleIdentifier.failures.some((failure) => failure.code === scenario.failureCode),
         true,
         scenario.name,
+      );
+    } finally {
+      await rm(fixture, { recursive: true, force: true });
+    }
+  }
+});
+
+test("bilingual README release tags, portable assets, bundles, and checksums are version-bound", async () => {
+  const scenarios = [
+    ["README.md", "releases/tag/v0.1.0-beta.4", "releases/tag/v0.1.0-beta.3"],
+    ["README.zh-CN.md", "Useful-0.1.0-beta.4-windows-x64-portable.zip", "Useful-0.1.0-beta.3-windows-x64-portable.zip"],
+    ["README.md", "Useful-0.1.0-beta.4-windows-x64-bundle.zip", "Useful-0.1.0-beta.3-windows-x64-bundle.zip"],
+    ["README.zh-CN.md", "SHA256SUMS-0.1.0-beta.4.txt", "SHA256SUMS-0.1.0-beta.3.txt"],
+  ];
+  for (const [relative, from, to] of scenarios) {
+    const fixture = await makeVersionDriftFixture();
+    try {
+      const target = path.join(fixture, ...relative.split("/"));
+      const raw = await readFile(target, "utf8");
+      assert.match(raw, new RegExp(from.replaceAll(".", "\\.")), `${relative} fixture marker`);
+      await writeFile(target, raw.replaceAll(from, to), "utf8");
+      const evaluated = await evaluateVersionDrift({ repoRoot: fixture });
+      assert.equal(evaluated.ok, false, relative);
+      assert.equal(evaluated.mismatches.length, 0, relative);
+      assert.equal(
+        evaluated.readmeRelease.failures.some((failure) => failure.path === relative),
+        true,
+        relative,
       );
     } finally {
       await rm(fixture, { recursive: true, force: true });

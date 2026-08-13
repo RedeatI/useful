@@ -9,6 +9,8 @@
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, HashMap};
 
+use crate::catalog::AvailabilityView;
+
 /// 从某个源缓存读出的一条目录条目（拍平后用于搜索/展示）。
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -35,6 +37,10 @@ pub struct CatalogItem {
     pub official_review_passed: bool,
     #[serde(default)]
     pub security_scan_passed: bool,
+    /// Catalog-provided availability is a display assertion only. It never
+    /// elevates client verification booleans.
+    #[serde(default)]
+    pub availability: Option<AvailabilityView>,
     /// 安全公告数（>0 时 UI 展示公告横幅）。
     #[serde(default)]
     pub advisory_count: u32,
@@ -140,6 +146,7 @@ mod tests {
             publisher_signature_verified: false,
             official_review_passed: false,
             security_scan_passed: true,
+            availability: None,
             advisory_count: 0,
             max_advisory_severity: None,
         }
@@ -205,6 +212,38 @@ mod tests {
         assert!(sources.contains(&"src.a"));
         assert!(sources.contains(&"src.b"));
         assert!(sources.contains(&"src.c"));
+    }
+
+    #[test]
+    fn merge_preserves_primary_source_availability() {
+        let mut primary = item(
+            "src.primary",
+            10,
+            "ed25519:pubA",
+            "com.x.tool",
+            &"aa".repeat(32),
+        );
+        primary.availability = Some(AvailabilityView {
+            status: "healthy".into(),
+            checked_at: Some("2026-08-13T10:00:00Z".into()),
+            source: "background-check".into(),
+        });
+        let merged = merge_catalog(vec![
+            primary,
+            item(
+                "src.mirror",
+                20,
+                "ed25519:pubA",
+                "com.x.tool",
+                &"aa".repeat(32),
+            ),
+        ]);
+        let availability = merged[0].item.availability.as_ref().unwrap();
+        assert_eq!(availability.status, "healthy");
+        assert_eq!(
+            availability.checked_at.as_deref(),
+            Some("2026-08-13T10:00:00Z")
+        );
     }
 
     #[test]

@@ -16,6 +16,8 @@ export function downloadStatusKey(status: DownloadStatus): string {
       return "downloads.statusDownloading";
     case "verifying":
       return "downloads.statusVerifying";
+    case "installing":
+      return "downloads.statusInstalling";
     case "done":
       return "downloads.statusDone";
     case "failed":
@@ -34,7 +36,29 @@ export function downloadPercent(received: number, total: number | null): number 
 
 /** 是否为进行中的下载（可取消）。 */
 export function isActiveDownload(status: DownloadStatus): boolean {
-  return status === "pending" || status === "downloading" || status === "verifying";
+  return (
+    status === "pending" ||
+    status === "downloading" ||
+    status === "verifying"
+  );
+}
+
+/** 稳定下载错误码对应的 i18n key；未知码仍保留原始错误详情。 */
+export function downloadErrorKey(code: string | null): string | null {
+  switch (code) {
+    case "object_missing":
+      return "downloads.errorObjectMissing";
+    case "size_mismatch":
+      return "downloads.errorSizeMismatch";
+    case "signature_invalid":
+      return "downloads.errorSignatureInvalid";
+    case "network":
+      return "downloads.errorNetwork";
+    case "install_failed":
+      return "downloads.errorInstallFailed";
+    default:
+      return null;
+  }
 }
 
 /** 把进度事件合并进下载记录列表（不存在时新建占位记录）。返回新数组。 */
@@ -52,7 +76,9 @@ export function applyDownloadProgress(
       totalBytes: ev.totalBytes,
       receivedBytes: ev.receivedBytes,
       status: ev.status,
+      digest: ev.digest,
       error: null,
+      errorCode: null,
       createdAt: Math.floor(Date.now() / 1000),
     };
     return [rec, ...list];
@@ -63,6 +89,7 @@ export function applyDownloadProgress(
     receivedBytes: ev.receivedBytes,
     totalBytes: ev.totalBytes,
     status: ev.status,
+    digest: ev.digest,
   };
   return next;
 }
@@ -79,6 +106,7 @@ export function applyDownloadDone(
     ...next[idx],
     status: ev.status,
     error: ev.error,
+    errorCode: ev.errorCode,
     receivedBytes:
       ev.status === "done" && next[idx].totalBytes
         ? (next[idx].totalBytes as number)

@@ -6,6 +6,7 @@ import {
   urlDecode,
   jsonFormat,
   jsonMinify,
+  jsonQuery,
   uuidV4,
   uuidBatch,
   fromUnix,
@@ -61,6 +62,13 @@ describe("JSON", () => {
   });
   it("非法 JSON 抛错", () => {
     expect(() => jsonFormat("{not json")).toThrow();
+  });
+  it("使用 RFC 6901 转义查询对象和数组", () => {
+    const input = '{"a/b":{"~key":[1,{"ok":true}]}}';
+    expect(jsonQuery(input, "/a~1b/~0key/1/ok")).toBe("true");
+    expect(jsonQuery(input, "", 0)).toBe('{"a/b":{"~key":[1,{"ok":true}]}}');
+    expect(() => jsonQuery(input, "/a~2b")).toThrow(/Pointer/);
+    expect(() => jsonQuery(input, "/a~1b/~0key/9")).toThrow(/Pointer/);
   });
 });
 

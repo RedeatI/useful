@@ -93,7 +93,7 @@ CREATE TABLE downloads (
     total_bytes INTEGER,
     received_bytes INTEGER NOT NULL DEFAULT 0,
     sha256_expected TEXT,
-    status      TEXT NOT NULL DEFAULT 'pending', -- pending|downloading|verifying|done|failed|cancelled
+    status      TEXT NOT NULL DEFAULT 'pending', -- pending|downloading|verifying|installing|done|failed|cancelled
     error       TEXT,
     created_at  INTEGER NOT NULL DEFAULT (unixepoch()),
     updated_at  INTEGER NOT NULL DEFAULT (unixepoch())
@@ -271,6 +271,25 @@ ALTER TABLE trp_sources ADD COLUMN last_tuf_root_sha256 TEXT NOT NULL DEFAULT ''
 ALTER TABLE trp_sources ADD COLUMN last_tuf_timestamp_sha256 TEXT NOT NULL DEFAULT '';
 ALTER TABLE trp_sources ADD COLUMN last_tuf_snapshot_sha256 TEXT NOT NULL DEFAULT '';
 ALTER TABLE trp_sources ADD COLUMN last_tuf_targets_sha256 TEXT NOT NULL DEFAULT '';
+"#,
+    },
+    Migration {
+        version: 8,
+        name: "download_error_codes",
+        sql: r#"
+-- Stable machine-readable failure code for Source Center download records.
+-- Human-readable error text remains separate and may be localized later.
+ALTER TABLE downloads ADD COLUMN error_code TEXT;
+"#,
+    },
+    Migration {
+        version: 9,
+        name: "trp_source_delivery_type",
+        sql: r#"
+-- Client-observed transport shape, not a provider trust assertion. Public
+-- S3-compatible buckets are static HTTPS from the client's perspective.
+ALTER TABLE trp_sources ADD COLUMN delivery_type TEXT NOT NULL DEFAULT 'unknown'
+    CHECK (delivery_type IN ('unknown', 'static-https', 'dynamic'));
 "#,
     },
 ];
@@ -625,11 +644,11 @@ mod tests {
         let db_path = tmp.path().join("useful.db");
         let db = Database::open(&db_path).unwrap();
         assert!(!db.recovered);
-        assert_eq!(db.schema_version().unwrap(), 7);
+        assert_eq!(db.schema_version().unwrap(), 9);
         drop(db);
         // 再次打开不报错、版本不变
         let db = Database::open(&db_path).unwrap();
-        assert_eq!(db.schema_version().unwrap(), 7);
+        assert_eq!(db.schema_version().unwrap(), 9);
         // 所有要求的表都存在
         for table in [
             "settings",
@@ -664,6 +683,30 @@ mod tests {
                 .unwrap();
             assert_eq!(n, 1, "缺少表 {table}");
         }
+        let error_code_columns: i64 = db
+            .conn
+            .query_row(
+                "SELECT COUNT(*) FROM pragma_table_info('downloads') WHERE name='error_code'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(
+            error_code_columns, 1,
+            "downloads.error_code migration missing"
+        );
+        let delivery_type_columns: i64 = db
+            .conn
+            .query_row(
+                "SELECT COUNT(*) FROM pragma_table_info('trp_sources') WHERE name='delivery_type'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(
+            delivery_type_columns, 1,
+            "trp_sources.delivery_type migration missing"
+        );
     }
 
     #[test]
@@ -683,7 +726,7 @@ mod tests {
     }
 
     #[test]
-    fn v5_database_migrates_to_v6_without_losing_existing_action_state() {
+    fn v5_database_migrates_to_latest_without_losing_existing_action_state() {
         let tmp = tempfile::tempdir().unwrap();
         let db_path = tmp.path().join("useful.db");
         let conn = Connection::open(&db_path).unwrap();
@@ -708,6 +751,7 @@ mod tests {
                 use_count INTEGER NOT NULL DEFAULT 1
             );
             CREATE TABLE trp_sources (id TEXT PRIMARY KEY);
+            CREATE TABLE downloads (id TEXT PRIMARY KEY);
             INSERT INTO action_favorites (action_id) VALUES ('builtin.utilities.base64');
             INSERT INTO action_recent (action_id, last_used_at) VALUES ('builtin.utilities.json', 1);
             "#,
@@ -716,7 +760,7 @@ mod tests {
         drop(conn);
 
         let db = Database::open(&db_path).unwrap();
-        assert_eq!(db.schema_version().unwrap(), 7);
+        assert_eq!(db.schema_version().unwrap(), 9);
         let favorite: String = db
             .conn
             .query_row("SELECT action_id FROM action_favorites", [], |row| {
@@ -772,7 +816,7 @@ mod tests {
         drop(db);
         assert_eq!(
             Database::open(&db_path).unwrap().schema_version().unwrap(),
-            7
+            9
         );
     }
 

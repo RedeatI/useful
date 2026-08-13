@@ -85,6 +85,19 @@ $versionMatch = Select-String -Path (Join-Path $root "Cargo.toml") -Pattern '^ve
 if (-not $versionMatch) { throw "Cargo.toml is missing the workspace version" }
 $version = $versionMatch.Matches[0].Groups[1].Value
 
+function Assert-ExecutableProductVersion([string]$file, [string]$label, [string]$expectedVersion) {
+    $actual = (Get-Item -LiteralPath $file).VersionInfo.ProductVersion
+    if ([string]::IsNullOrWhiteSpace($actual)) { throw "$label is missing ProductVersion metadata" }
+    if (-not [string]::Equals($actual.Trim(), $expectedVersion, [StringComparison]::Ordinal)) {
+        throw "$label ProductVersion mismatch: expected $expectedVersion, got $actual"
+    }
+}
+
+# Packaging must never relabel an executable built before the version bump.
+# The in-app Home badge reads CARGO_PKG_VERSION from this exact Useful binary.
+Assert-ExecutableProductVersion $exe "Release executable" $version
+Assert-ExecutableProductVersion $bootstrap "useful-bootstrap.exe" $version
+
 $requiredDocs = @("LICENSE", "LICENSES.md", "NOTICE", "THIRD_PARTY_NOTICES.md", "TRADEMARKS.md")
 foreach ($doc in $requiredDocs) { Assert-OrdinaryFile (Join-Path $root $doc) "Required release document $doc" }
 

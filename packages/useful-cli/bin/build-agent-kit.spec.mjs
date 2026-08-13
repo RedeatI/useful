@@ -23,6 +23,7 @@ import {
 } from "./build-agent-kit.mjs";
 
 const toolingRoot = fileURLToPath(new URL("../../..", import.meta.url));
+const currentVersion = JSON.parse(fs.readFileSync(path.join(toolingRoot, "package.json"), "utf8")).version;
 const requireFromMcp = createRequire(path.join(toolingRoot, "packages/useful-mcp/package.json"));
 const { Client } = await import(pathToFileURL(requireFromMcp.resolve("@modelcontextprotocol/client")).href);
 const { StdioClientTransport } = await import(pathToFileURL(requireFromMcp.resolve("@modelcontextprotocol/client/stdio")).href);
@@ -360,7 +361,7 @@ describe("Useful Agent Kit builder", () => {
 
     const inspected = inspectAgentKitZip(firstBytes);
     expect(inspected.manifest.schemaVersion).toBe(AGENT_KIT_SCHEMA_VERSION);
-    expect(inspected.manifest.product).toEqual({ name: "Useful", version: "0.1.0-beta.3" });
+    expect(inspected.manifest.product).toEqual({ name: "Useful", version: currentVersion });
     expect(inspected.manifest.source.revision).toBe(git(fixture.fixtureRoot, ["rev-parse", "HEAD"]));
     const listed = inspected.manifest.files.map((entry) => entry.path);
     expect(new Set(listed).size).toBe(listed.length);

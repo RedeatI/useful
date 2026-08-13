@@ -53,6 +53,10 @@ test("public local packaging has explicit Lite Full All semantics and Full fails
   assert.match(packaging, /\[StringComparer\]::Ordinal/);
   assert.match(packaging, /2107-12-31T23:59:58Z/);
   assert.match(packaging, /\.useful-package-release\.incomplete\.json/);
+  assert.match(packaging, /VersionInfo\.ProductVersion/);
+  assert.match(packaging, /ProductVersion mismatch/);
+  assert.match(packaging, /Assert-ExecutableProductVersion \$exe/);
+  assert.match(packaging, /Assert-ExecutableProductVersion \$bootstrap/);
   assert.match(packaging, /status = "incomplete"/);
   assert.match(packaging, /Incomplete Useful release delivery/);
   assert.ok(packaging.indexOf('[IO.File]::Delete($incompleteMarker)') < packaging.indexOf('Write-Host "Complete: $out"'));

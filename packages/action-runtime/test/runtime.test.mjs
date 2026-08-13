@@ -41,6 +41,7 @@ test("browser catalog exposes every bundled action and browser-safe utility hand
   const handlers = createBrowserActionHandlers({ crypto });
   assert.deepEqual(Object.keys(handlers), BUILTIN_ACTION_DESCRIPTORS.map((descriptor) => descriptor.actionId));
   assert.deepEqual(handlers["builtin.utilities.json"]({ operation: "minify", text: "{ \"ok\": true }" }), { text: "{\"ok\":true}" });
+  assert.deepEqual(handlers["builtin.utilities.json"]({ operation: "query", text: "{\"items\":[1,2]}", pointer: "/items/1" }), { text: "2" });
   assert.deepEqual(handlers["builtin.utilities.url"]({ operation: "encode", text: "a b" }), { text: "a%20b" });
   assert.match(handlers["builtin.utilities.uuid"]({ count: 1 }).values[0], /^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/);
   const password = handlers["builtin.utilities.password"]({ length: 16, lower: true, upper: true, digits: true, symbols: true, excludeAmbiguous: true });

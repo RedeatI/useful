@@ -44,7 +44,9 @@ describe("DownloadsView 渲染", () => {
         totalBytes: 1000,
         receivedBytes: 500,
         status: "downloading",
+        digest: "aa".repeat(32),
         error: null,
+        errorCode: null,
         createdAt: 1,
       },
       {
@@ -55,7 +57,9 @@ describe("DownloadsView 渲染", () => {
         totalBytes: 2000,
         receivedBytes: 2000,
         status: "done",
+        digest: "bb".repeat(32),
         error: null,
+        errorCode: null,
         createdAt: 2,
       },
     ]);
@@ -67,6 +71,8 @@ describe("DownloadsView 渲染", () => {
     // 进行中任务状态与进度文本
     expect(wrapper.text()).toContain("下载中");
     expect(wrapper.text()).toContain("50%");
+    expect(wrapper.text()).toContain("预期 SHA-256");
+    expect(wrapper.findAll('[data-testid="download-digest"]')).toHaveLength(2);
     // 已完成任务状态
     expect(wrapper.text()).toContain("已完成");
     // 仅进行中任务显示取消按钮

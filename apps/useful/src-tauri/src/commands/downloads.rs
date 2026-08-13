@@ -34,7 +34,9 @@ pub struct DownloadRecord {
     pub total_bytes: Option<u64>,
     pub received_bytes: u64,
     pub status: String,
+    pub digest: Option<String>,
     pub error: Option<String>,
+    pub error_code: Option<String>,
     pub created_at: i64,
 }
 
@@ -47,6 +49,7 @@ struct DownloadProgressEvent {
     received_bytes: u64,
     total_bytes: u64,
     status: String,
+    digest: String,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -57,6 +60,7 @@ struct DownloadDoneEvent {
     version: String,
     status: String, // done | failed | cancelled
     error: Option<String>,
+    error_code: Option<String>,
 }
 
 /// 下载任务的准备信息（同步阶段产出）。
@@ -82,16 +86,17 @@ fn set_download_status(
     id: &str,
     status: &str,
     error: Option<&str>,
+    error_code: Option<&str>,
     received: Option<u64>,
 ) {
     let state = app.state::<AppState>();
     let guard = state.db.lock();
     if let Ok(db) = guard {
         let _ = db.conn.execute(
-            "UPDATE downloads SET status = ?2, error = ?3,
-             received_bytes = COALESCE(?4, received_bytes), updated_at = unixepoch()
+            "UPDATE downloads SET status = ?2, error = ?3, error_code = ?4,
+             received_bytes = COALESCE(?5, received_bytes), updated_at = unixepoch()
              WHERE id = ?1",
-            rusqlite::params![id, status, error, received.map(|v| v as i64)],
+            rusqlite::params![id, status, error, error_code, received.map(|v| v as i64)],
         );
     }
 }
@@ -106,11 +111,18 @@ fn emit_progress(app: &AppHandle, job: &DownloadJob, received: u64, status: &str
             received_bytes: received,
             total_bytes: job.size,
             status: status.into(),
+            digest: job.sha256.clone(),
         },
     );
 }
 
-fn emit_done(app: &AppHandle, job: &DownloadJob, status: &str, error: Option<String>) {
+fn emit_done(
+    app: &AppHandle,
+    job: &DownloadJob,
+    status: &str,
+    error: Option<String>,
+    error_code: Option<String>,
+) {
     let _ = app.emit(
         "download-done",
         DownloadDoneEvent {
@@ -119,8 +131,145 @@ fn emit_done(app: &AppHandle, job: &DownloadJob, status: &str, error: Option<Str
             version: job.version.clone(),
             status: status.into(),
             error,
+            error_code,
         },
     );
+}
+
+/// Download-queue bridge for the trusted TRP/TUF install path. The artifact
+/// still flows through TRP verification; this object only persists and emits
+/// observable state and cancellation.
+pub(crate) struct TrustedInstallTracker {
+    app: AppHandle,
+    id: String,
+    package_id: String,
+    version: String,
+    digest: String,
+    size: u64,
+    cancel: Arc<AtomicBool>,
+}
+
+impl TrustedInstallTracker {
+    pub(crate) fn begin(
+        app: AppHandle,
+        package_id: &str,
+        version: &str,
+        digest: &str,
+        size: u64,
+    ) -> CmdResult<Self> {
+        let id = uuid::Uuid::new_v4().to_string();
+        let cancel = Arc::new(AtomicBool::new(false));
+        let state = app.state::<AppState>();
+        {
+            let db = state
+                .db
+                .lock()
+                .map_err(|_| CmdError::from("锁定数据库失败"))?;
+            db.conn.execute(
+                "INSERT INTO downloads
+                 (id, url, dest_path, total_bytes, sha256_expected, status, package_id, version)
+                 VALUES (?1, ?2, '', ?3, ?4, 'pending', ?5, ?6)",
+                rusqlite::params![
+                    id,
+                    format!("sha256:{digest}"),
+                    size as i64,
+                    digest.to_lowercase(),
+                    package_id,
+                    version
+                ],
+            )?;
+        }
+        state
+            .downloads
+            .cancels
+            .lock()
+            .map_err(|_| CmdError::from("锁定下载状态失败"))?
+            .insert(id.clone(), cancel.clone());
+        Ok(Self {
+            app,
+            id,
+            package_id: package_id.into(),
+            version: version.into(),
+            digest: digest.to_lowercase(),
+            size,
+            cancel,
+        })
+    }
+
+    pub(crate) fn cancelled(&self) -> bool {
+        self.cancel.load(Ordering::Relaxed)
+    }
+
+    pub(crate) fn progress(&self, status: &str, received: u64) -> CmdResult<()> {
+        if self.cancelled() {
+            return Err(CmdError::from("已取消"));
+        }
+        set_download_status(&self.app, &self.id, status, None, None, Some(received));
+        let _ = self.app.emit(
+            "download-progress",
+            DownloadProgressEvent {
+                id: self.id.clone(),
+                package_id: self.package_id.clone(),
+                version: self.version.clone(),
+                received_bytes: received,
+                total_bytes: self.size,
+                status: status.into(),
+                digest: self.digest.clone(),
+            },
+        );
+        Ok(())
+    }
+
+    pub(crate) fn complete(&self) {
+        set_download_status(&self.app, &self.id, "done", None, None, Some(self.size));
+        self.emit_terminal("done", None, None);
+        self.unregister();
+    }
+
+    pub(crate) fn fail(&self, error: &CmdError) {
+        let cancelled = self.cancelled();
+        let status = if cancelled { "cancelled" } else { "failed" };
+        let code = if cancelled {
+            None
+        } else {
+            Some(error.code.as_deref().unwrap_or("install_failed"))
+        };
+        set_download_status(
+            &self.app,
+            &self.id,
+            status,
+            Some(&error.message),
+            code,
+            None,
+        );
+        self.emit_terminal(
+            status,
+            Some(error.message.clone()),
+            code.map(str::to_string),
+        );
+        self.unregister();
+    }
+
+    fn emit_terminal(&self, status: &str, error: Option<String>, error_code: Option<String>) {
+        let _ = self.app.emit(
+            "download-done",
+            DownloadDoneEvent {
+                id: self.id.clone(),
+                package_id: self.package_id.clone(),
+                version: self.version.clone(),
+                status: status.into(),
+                error,
+                error_code,
+            },
+        );
+    }
+
+    fn unregister(&self) {
+        let state = self.app.state::<AppState>();
+        if let Ok(mut cancels) = state.downloads.cancels.lock() {
+            cancels.remove(&self.id);
+        };
+    }
 }
 
 /// 从源安装/更新/降级：创建下载任务，返回下载 ID；进度经事件推送。
@@ -281,17 +430,24 @@ async fn legacy_download_and_install_impl(
 
         match result {
             Ok(()) => {
-                set_download_status(&app, &job.download_id, "done", None, Some(job.size));
-                emit_done(&app, &job, "done", None);
+                set_download_status(&app, &job.download_id, "done", None, None, Some(job.size));
+                emit_done(&app, &job, "done", None, None);
             }
             Err(e) if job.cancel.load(Ordering::Relaxed) => {
-                set_download_status(&app, &job.download_id, "cancelled", None, None);
-                emit_done(&app, &job, "cancelled", Some(e.message));
+                set_download_status(&app, &job.download_id, "cancelled", None, None, None);
+                emit_done(&app, &job, "cancelled", Some(e.message), None);
             }
             Err(e) => {
                 tracing::warn!("下载安装失败 {}: {}", job.package_id, e.message);
-                set_download_status(&app, &job.download_id, "failed", Some(&e.message), None);
-                emit_done(&app, &job, "failed", Some(e.message));
+                set_download_status(
+                    &app,
+                    &job.download_id,
+                    "failed",
+                    Some(&e.message),
+                    e.code.as_deref(),
+                    None,
+                );
+                emit_done(&app, &job, "failed", Some(e.message), e.code);
             }
         }
     });
@@ -302,7 +458,7 @@ async fn legacy_download_and_install_impl(
 async fn run_download(app: &AppHandle, job: &DownloadJob) -> Result<(), CmdError> {
     use tokio::io::AsyncWriteExt;
 
-    set_download_status(app, &job.download_id, "downloading", None, Some(0));
+    set_download_status(app, &job.download_id, "downloading", None, None, Some(0));
     emit_progress(app, job, 0, "downloading");
 
     // ---- 下载到 .part ----
@@ -348,7 +504,14 @@ async fn run_download(app: &AppHandle, job: &DownloadJob) -> Result<(), CmdError
             // 进度节流：至少间隔 300ms
             if last_emit.elapsed().as_millis() >= 300 {
                 last_emit = std::time::Instant::now();
-                set_download_status(app, &job.download_id, "downloading", None, Some(received));
+                set_download_status(
+                    app,
+                    &job.download_id,
+                    "downloading",
+                    None,
+                    None,
+                    Some(received),
+                );
                 emit_progress(app, job, received, "downloading");
             }
         }
@@ -367,7 +530,14 @@ async fn run_download(app: &AppHandle, job: &DownloadJob) -> Result<(), CmdError
         .await
         .map_err(|e| CmdError::from(format!("重命名失败: {e}")))?;
 
-    set_download_status(app, &job.download_id, "verifying", None, Some(received));
+    set_download_status(
+        app,
+        &job.download_id,
+        "verifying",
+        None,
+        None,
+        Some(received),
+    );
     emit_progress(app, job, received, "verifying");
 
     // ---- 校验 + 安装（阻塞管线放 spawn_blocking）----
@@ -452,7 +622,8 @@ pub fn downloads_list(state: State<AppState>) -> CmdResult<Vec<DownloadRecord>> 
         .lock()
         .map_err(|_| CmdError::from("锁定数据库失败"))?;
     let mut stmt = db.conn.prepare(
-        "SELECT id, url, package_id, version, total_bytes, received_bytes, status, error, created_at
+        "SELECT id, url, package_id, version, total_bytes, received_bytes, status,
+                sha256_expected, error, error_code, created_at
          FROM downloads ORDER BY created_at DESC, id DESC LIMIT 100",
     )?;
     let rows = stmt.query_map([], |r| {
@@ -464,8 +635,10 @@ pub fn downloads_list(state: State<AppState>) -> CmdResult<Vec<DownloadRecord>> 
             total_bytes: r.get::<_, Option<i64>>(4)?.map(|v| v as u64),
             received_bytes: r.get::<_, i64>(5)? as u64,
             status: r.get(6)?,
-            error: r.get(7)?,
-            created_at: r.get(8)?,
+            digest: r.get(7)?,
+            error: r.get(8)?,
+            error_code: r.get(9)?,
+            created_at: r.get(10)?,
         })
     })?;
     Ok(rows.filter_map(|r| r.ok()).collect())
