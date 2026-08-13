@@ -4,7 +4,9 @@
 //! supply only live row/endpoint counts; they must never be presented as bytes.
 
 use crate::identity::ProcessIdentity;
-use crate::model::{Capability, InterfaceThroughput, NetworkSnapshot};
+#[cfg(any(windows, test))]
+use crate::model::InterfaceThroughput;
+use crate::model::{Capability, NetworkSnapshot};
 use std::collections::HashMap;
 #[cfg(any(windows, test))]
 use std::time::Duration;
