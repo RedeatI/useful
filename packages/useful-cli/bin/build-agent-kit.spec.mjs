@@ -59,6 +59,15 @@ const fixturePaths = [
   "packages/useful-mcp",
   "packages/useful-runtime",
 ];
+const legalFixturePaths = [
+  "LICENSE",
+  "package.json",
+  "LICENSES.md",
+  "NOTICE",
+  "THIRD_PARTY_NOTICES.md",
+  "TRADEMARKS.md",
+  "licenses",
+];
 
 function sha256(bytes) {
   return createHash("sha256").update(bytes).digest("hex");
@@ -174,12 +183,12 @@ function git(fixtureRoot, args, env = {}) {
   }).trim();
 }
 
-async function makeCleanFixture({ license = true } = {}) {
+async function makeCleanFixture({ license = true, paths = fixturePaths } = {}) {
   const outer = fs.mkdtempSync(path.join(fs.realpathSync.native(os.tmpdir()), "useful-agent-kit-fixture-"));
   temporaryRoots.push(outer);
   const fixtureRoot = path.join(outer, "clean source");
   fs.mkdirSync(fixtureRoot);
-  for (const relative of fixturePaths) {
+  for (const relative of paths) {
     if (relative === "LICENSE" && !license) continue;
     copyFixturePath(relative, fixtureRoot);
     // Keep Vitest's worker RPC responsive while copying the fixture on slower
@@ -258,7 +267,7 @@ afterEach(() => {
 
 describe("Useful Agent Kit builder", () => {
   it("fails closed for a clean repository without the required root LICENSE", async () => {
-    const fixture = await makeCleanFixture({ license: false });
+    const fixture = await makeCleanFixture({ license: false, paths: legalFixturePaths });
     await expect(buildAgentKit({
       repoRoot: fixture.fixtureRoot,
       dependencyRoot: toolingRoot,
@@ -271,7 +280,7 @@ describe("Useful Agent Kit builder", () => {
   }, AGENT_KIT_FIXTURE_TIMEOUT_MS);
 
   it("rejects a clean commit whose legal map differs from the owner-approved digest", async () => {
-    const fixture = await makeCleanFixture();
+    const fixture = await makeCleanFixture({ paths: legalFixturePaths });
     fs.appendFileSync(path.join(fixture.fixtureRoot, "LICENSE"), "tampered\n");
     git(fixture.fixtureRoot, ["add", "LICENSE"]);
     git(fixture.fixtureRoot, ["commit", "--quiet", "-m", "tamper license"]);
