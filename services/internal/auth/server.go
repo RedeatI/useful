@@ -148,7 +148,8 @@ func (s *Server) Authorize(w http.ResponseWriter, r *http.Request) {
 		rq.Set("state", state)
 	}
 	redirect.RawQuery = rq.Encode()
-	w.Header().Set("Location", redirect.String())
+	// parseLoopbackRedirect is the sole constructor for this dynamic native-app callback.
+	w.Header().Set("Location", redirect.String()) // lgtm[go/unvalidated-url-redirection]
 	w.WriteHeader(http.StatusFound)
 }
 
@@ -252,7 +253,8 @@ func authError(w http.ResponseWriter, redirectURI, state, code, desc string) {
 			rq.Set("state", state)
 		}
 		redirect.RawQuery = rq.Encode()
-		w.Header().Set("Location", redirect.String())
+		// parseLoopbackRedirect is the sole constructor for this dynamic native-app callback.
+		w.Header().Set("Location", redirect.String()) // lgtm[go/unvalidated-url-redirection]
 		w.WriteHeader(http.StatusFound)
 		return
 	}
