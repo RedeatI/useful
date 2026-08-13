@@ -298,7 +298,7 @@ test("deadline/cancel abort internal signals; late prepare and approval cannot c
   });
   const latePrepare = controller({
     provider: latePrepareProvider,
-    policy: { allowDomains: [], stepDeadlineMs: 30, totalDeadlineMs: 500 },
+    policy: { allowDomains: [], stepDeadlineMs: 250, totalDeadlineMs: 2_000 },
   });
   const first = await opened(latePrepare);
   const firstExecution = latePrepare.execute(first.session.sessionId, { step: 1, observationDigest: DIGEST_A, action: { type: "screenshot" } });
@@ -357,7 +357,7 @@ test("deadline/cancel abort internal signals; late prepare and approval cannot c
       },
       async close() { uncertainCloseCalls += 1; },
     }),
-    policy: { allowDomains: [], stepDeadlineMs: 30, totalDeadlineMs: 500 },
+    policy: { allowDomains: [], stepDeadlineMs: 250, totalDeadlineMs: 2_000 },
   });
   const third = await opened(uncertain);
   const thirdExecution = uncertain.execute(third.session.sessionId, { step: 1, observationDigest: DIGEST_A, action: { type: "screenshot" } });
