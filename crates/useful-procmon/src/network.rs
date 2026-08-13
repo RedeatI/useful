@@ -6,7 +6,9 @@
 use crate::identity::ProcessIdentity;
 use crate::model::{Capability, InterfaceThroughput, NetworkSnapshot};
 use std::collections::HashMap;
-use std::time::{Duration, Instant};
+#[cfg(any(windows, test))]
+use std::time::Duration;
+use std::time::Instant;
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct EndpointCounts {
@@ -31,6 +33,7 @@ pub fn associate_endpoint_counts(
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg(any(windows, test))]
 struct RawInterface {
     key: String,
     name: String,
@@ -53,6 +56,7 @@ impl InterfaceRateTracker {
         self.sampled_at = None;
     }
 
+    #[cfg(any(windows, test))]
     fn update(
         &mut self,
         now: Instant,
@@ -113,6 +117,7 @@ impl InterfaceRateTracker {
 
 /// A reset is much more common than a real u64 wrap. Only treat values close to the
 /// numeric ends as wraparound; otherwise establish a fresh baseline and report zero.
+#[cfg(any(windows, test))]
 fn counter_delta(previous: u64, current: u64) -> u64 {
     if current >= previous {
         current - previous
@@ -125,6 +130,7 @@ fn counter_delta(previous: u64, current: u64) -> u64 {
     }
 }
 
+#[cfg(any(windows, test))]
 fn rate(bytes: u64, elapsed: Duration) -> u64 {
     let seconds = elapsed.as_secs_f64();
     if seconds <= 0.0 {
@@ -135,6 +141,7 @@ fn rate(bytes: u64, elapsed: Duration) -> u64 {
 
 pub struct NetworkCollector {
     interfaces: InterfaceRateTracker,
+    #[cfg(windows)]
     connection_capability: Capability,
     last: NetworkSnapshot,
 }
@@ -149,7 +156,8 @@ impl NetworkCollector {
     pub fn new() -> Self {
         Self {
             interfaces: InterfaceRateTracker::default(),
-            connection_capability: platform_capability(),
+            #[cfg(windows)]
+            connection_capability: Capability::available(),
             last: NetworkSnapshot::default(),
         }
     }
@@ -160,10 +168,12 @@ impl NetworkCollector {
     ) -> (NetworkSnapshot, HashMap<u32, EndpointCounts>) {
         #[cfg(not(windows))]
         {
-            let mut snapshot = NetworkSnapshot::default();
-            snapshot.etw_capability = etw_capability;
+            let snapshot = NetworkSnapshot {
+                etw_capability,
+                ..NetworkSnapshot::default()
+            };
             self.last = snapshot.clone();
-            return (snapshot, HashMap::new());
+            (snapshot, HashMap::new())
         }
 
         #[cfg(windows)]
@@ -213,17 +223,6 @@ impl NetworkCollector {
 
     pub fn snapshot(&self) -> &NetworkSnapshot {
         &self.last
-    }
-}
-
-fn platform_capability() -> Capability {
-    if cfg!(windows) {
-        Capability::available()
-    } else {
-        Capability::unavailable(
-            "platform_unsupported",
-            "当前平台不提供 Windows owner-PID 连接表；基本进程监控仍可使用。",
-        )
     }
 }
 
