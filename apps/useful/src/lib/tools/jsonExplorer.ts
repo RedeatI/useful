@@ -17,6 +17,8 @@ export interface JsonTreeBuildResult {
 
 export const JSON_TREE_LIMITS = Object.freeze({ maxNodes: 5_000, maxDepth: 64 });
 
+const OBJECT_PREVIEW_COUNT_LIMIT = 100;
+
 export function escapeJsonPointerToken(token: string): string {
   return token.replaceAll("~", "~0").replaceAll("/", "~1");
 }
@@ -27,9 +29,32 @@ function kindOf(value: JsonValue): JsonTreeRow["kind"] {
   return typeof value as JsonTreeRow["kind"];
 }
 
+function hasOwn(object: object, key: PropertyKey): boolean {
+  return Object.prototype.hasOwnProperty.call(object, key);
+}
+
+function objectPreview(value: { [key: string]: JsonValue }): string {
+  let count = 0;
+  for (const key in value) {
+    if (!hasOwn(value, key)) continue;
+    count += 1;
+    if (count > OBJECT_PREVIEW_COUNT_LIMIT) return `{${OBJECT_PREVIEW_COUNT_LIMIT}+}`;
+  }
+  return `{${count}}`;
+}
+
+function hasChildren(value: JsonValue): boolean {
+  if (Array.isArray(value)) return value.length > 0;
+  if (value === null || typeof value !== "object") return false;
+  for (const key in value) {
+    if (hasOwn(value, key)) return true;
+  }
+  return false;
+}
+
 function previewOf(value: JsonValue): string {
   if (Array.isArray(value)) return `[${value.length}]`;
-  if (value !== null && typeof value === "object") return `{${Object.keys(value).length}}`;
+  if (value !== null && typeof value === "object") return objectPreview(value);
   const serialized = JSON.stringify(value);
   return serialized.length > 120 ? `${serialized.slice(0, 117)}…` : serialized;
 }
@@ -46,11 +71,7 @@ export function buildJsonTreeRows(
       truncated = true;
       return;
     }
-    const entries: Array<[string, JsonValue]> = Array.isArray(value)
-      ? value.map((entry, index) => [String(index), entry])
-      : value !== null && typeof value === "object"
-        ? Object.entries(value)
-        : [];
+    const rowHasChildren = hasChildren(value);
     rows.push({
       pointer,
       parentPointer,
@@ -58,19 +79,36 @@ export function buildJsonTreeRows(
       depth,
       kind: kindOf(value),
       preview: previewOf(value),
-      hasChildren: entries.length > 0,
+      hasChildren: rowHasChildren,
     });
-    if (entries.length === 0) return;
+    if (!rowHasChildren) return;
     if (depth >= limits.maxDepth) {
       truncated = true;
       return;
     }
-    for (const [childKey, child] of entries) {
-      const childPointer = `${pointer}/${escapeJsonPointerToken(childKey)}`;
-      visit(child, childKey, childPointer, pointer, depth + 1);
-      if (rows.length >= limits.maxNodes) {
-        truncated = true;
-        return;
+
+    if (Array.isArray(value)) {
+      for (let index = 0; index < value.length; index += 1) {
+        const childKey = String(index);
+        const childPointer = `${pointer}/${childKey}`;
+        visit(value[index]!, childKey, childPointer, pointer, depth + 1);
+        if (rows.length >= limits.maxNodes) {
+          truncated = true;
+          return;
+        }
+      }
+      return;
+    }
+
+    if (value !== null && typeof value === "object") {
+      for (const childKey in value) {
+        if (!hasOwn(value, childKey)) continue;
+        const childPointer = `${pointer}/${escapeJsonPointerToken(childKey)}`;
+        visit(value[childKey]!, childKey, childPointer, pointer, depth + 1);
+        if (rows.length >= limits.maxNodes) {
+          truncated = true;
+          return;
+        }
       }
     }
   }

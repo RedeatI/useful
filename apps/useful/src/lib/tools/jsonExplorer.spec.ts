@@ -32,4 +32,34 @@ describe("JSON explorer", () => {
     expect(depthLimited.rows.map((row) => row.pointer)).toEqual(["", "/a"]);
     expect(depthLimited.truncated).toBe(true);
   });
+
+  it("does not read array entries beyond the node limit", () => {
+    const document = [1, 2] as JsonValue[];
+    Object.defineProperty(document, 1, {
+      configurable: true,
+      enumerable: true,
+      get: () => {
+        throw new Error("unbounded array enumeration");
+      },
+    });
+
+    const result = buildJsonTreeRows(document, { maxNodes: 2, maxDepth: 64 });
+    expect(result.rows.map((row) => row.pointer)).toEqual(["", "/0"]);
+    expect(result.truncated).toBe(true);
+  });
+
+  it("does not read object values beyond the node limit", () => {
+    const document = { first: 1 } as { [key: string]: JsonValue };
+    Object.defineProperty(document, "unreached", {
+      configurable: true,
+      enumerable: true,
+      get: () => {
+        throw new Error("unbounded object enumeration");
+      },
+    });
+
+    const result = buildJsonTreeRows(document, { maxNodes: 2, maxDepth: 64 });
+    expect(result.rows.map((row) => row.pointer)).toEqual(["", "/first"]);
+    expect(result.truncated).toBe(true);
+  });
 });
