@@ -59,14 +59,18 @@ func (s *Server) now() time.Time {
 	return time.Now().UTC()
 }
 
-// isLoopbackRedirect 仅允许 loopback IP literal（禁止 localhost 主机名）。
-func isLoopbackRedirect(raw string) bool {
+// parseLoopbackRedirect returns the only URL value that may reach a redirect
+// sink. It requires an HTTP loopback IP literal and an explicit port.
+func parseLoopbackRedirect(raw string) (*url.URL, bool) {
 	u, err := url.Parse(raw)
-	if err != nil || u.Scheme != "http" {
-		return false
+	if err != nil || !u.IsAbs() || u.Scheme != "http" || u.User != nil || u.Fragment != "" || u.Port() == "" {
+		return nil, false
 	}
 	host := u.Hostname()
-	return host == "127.0.0.1" || host == "::1"
+	if host != "127.0.0.1" && host != "::1" {
+		return nil, false
+	}
+	return u, true
 }
 
 func randToken(n int) string {
@@ -108,7 +112,8 @@ func (s *Server) Authorize(w http.ResponseWriter, r *http.Request) {
 		authError(w, redirectURI, state, "unauthorized_client", "未知 client_id")
 		return
 	}
-	if !isLoopbackRedirect(redirectURI) {
+	redirect, ok := parseLoopbackRedirect(redirectURI)
+	if !ok {
 		// redirect_uri 非法时不得回跳（防开放重定向），直接返回错误页
 		writePlain(w, http.StatusBadRequest, "redirect_uri 必须是 loopback IP literal（http://127.0.0.1:PORT）")
 		return
@@ -137,14 +142,13 @@ func (s *Server) Authorize(w http.ResponseWriter, r *http.Request) {
 	s.mu.Unlock()
 
 	// 302 回跳 loopback，仅带 code + state（token 绝不在此出现）
-	u, _ := url.Parse(redirectURI)
-	rq := u.Query()
+	rq := redirect.Query()
 	rq.Set("code", code)
 	if state != "" {
 		rq.Set("state", state)
 	}
-	u.RawQuery = rq.Encode()
-	w.Header().Set("Location", u.String())
+	redirect.RawQuery = rq.Encode()
+	w.Header().Set("Location", redirect.String())
 	w.WriteHeader(http.StatusFound)
 }
 
@@ -240,16 +244,15 @@ func (s *Server) GC() {
 }
 
 func authError(w http.ResponseWriter, redirectURI, state, code, desc string) {
-	if isLoopbackRedirect(redirectURI) {
-		u, _ := url.Parse(redirectURI)
-		rq := u.Query()
+	if redirect, ok := parseLoopbackRedirect(redirectURI); ok {
+		rq := redirect.Query()
 		rq.Set("error", code)
 		rq.Set("error_description", desc)
 		if state != "" {
 			rq.Set("state", state)
 		}
-		u.RawQuery = rq.Encode()
-		w.Header().Set("Location", u.String())
+		redirect.RawQuery = rq.Encode()
+		w.Header().Set("Location", redirect.String())
 		w.WriteHeader(http.StatusFound)
 		return
 	}

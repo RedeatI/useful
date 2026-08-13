@@ -174,9 +174,12 @@ func TestNonLoopbackRedirectRejected(t *testing.T) {
 	s := devServer()
 	_, challenge := pkcePair()
 	for _, bad := range []string{
-		"http://localhost:5000/cb", // 主机名而非 IP literal
-		"https://evil.example/cb",  // 非 loopback
-		"http://192.168.1.5/cb",    // 私网
+		"http://localhost:5000/cb",              // 主机名而非 IP literal
+		"https://evil.example/cb",               // 非 loopback
+		"http://192.168.1.5/cb",                 // 私网
+		"http://evil.example@127.0.0.1:5000/cb", // userinfo 不得混淆审计
+		"http://127.0.0.1/cb",                   // 必须显式绑定回环端口
+		"http://127.0.0.1:5000/cb#fragment",     // OAuth redirect_uri 不接受 fragment
 	} {
 		q := url.Values{}
 		q.Set("response_type", "code")

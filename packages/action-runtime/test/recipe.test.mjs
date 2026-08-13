@@ -87,6 +87,17 @@ test("recipe references and templates fail closed", () => {
     mutate(recipe);
     assert.throws(() => validateActionRecipe(recipe, registry), (error) => error.code === code);
   }
+
+  const incomplete = sampleRecipe();
+  incomplete.steps[0].input.text = "${".repeat(10000);
+  assert.doesNotThrow(() => validateActionRecipe(incomplete, registry));
+
+  const completedAfterManyStarts = sampleRecipe();
+  completedAfterManyStarts.steps[0].input.text = `${"${".repeat(10000)}}`;
+  assert.throws(
+    () => validateActionRecipe(completedAfterManyStarts, registry),
+    (error) => error.code === "ACTION_RECIPE_INTERPOLATION_FORBIDDEN",
+  );
 });
 
 test("recipe input must remain exact JSON data", () => {

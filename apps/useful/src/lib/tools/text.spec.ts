@@ -24,6 +24,8 @@ describe("HTML 实体", () => {
   });
   it("去标签", () => {
     expect(stripHtmlTags("<p>Hello <b>world</b></p>")).toBe("Hello world");
+    expect(stripHtmlTags("&lt;p&gt;encoded&lt;/p&gt;")).toBe("encoded");
+    expect(stripHtmlTags("<<script>alert(1)</script>")).toBe("alert(1)");
   });
 });
 

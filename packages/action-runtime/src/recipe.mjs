@@ -64,6 +64,11 @@ function validateReference(pointer, completed) {
   for (const segment of pointer.split("/").slice(1)) decodePointerSegment(segment);
 }
 
+function hasInterpolation(value) {
+  const start = value.indexOf("${");
+  return start >= 0 && value.indexOf("}", start + 2) >= 0;
+}
+
 function inspectTemplate(template, completed) {
   const seen = new WeakSet();
   let nodes = 0;
@@ -73,7 +78,7 @@ function inspectTemplate(template, completed) {
     if (depth > ACTION_RECIPE_LIMITS.templateDepth) fail("ACTION_RECIPE_TEMPLATE_TOO_DEEP");
     if (typeof current === "number" && !Number.isFinite(current)) fail("ACTION_RECIPE_INVALID");
     if (current === null || ["string", "boolean", "number"].includes(typeof current)) {
-      if (typeof current === "string" && /\$\{[^}]*\}/u.test(current)) fail("ACTION_RECIPE_INTERPOLATION_FORBIDDEN");
+      if (typeof current === "string" && hasInterpolation(current)) fail("ACTION_RECIPE_INTERPOLATION_FORBIDDEN");
       return;
     }
     if (typeof current !== "object") fail("ACTION_RECIPE_INVALID");

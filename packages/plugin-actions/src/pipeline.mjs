@@ -127,11 +127,16 @@ function validateReference(pointer, completed) {
   for (const segment of pointer.split("/").slice(1)) decodePointerSegment(segment);
 }
 
+function hasInterpolation(value) {
+  const start = value.indexOf("${");
+  return start >= 0 && value.indexOf("}", start + 2) >= 0;
+}
+
 function validateTemplate(template, completed) {
   const details = inspectJson(template);
   if (details.bytes > PIPELINE_LIMITS.templateBytes) fail("PIPELINE_TEMPLATE_TOO_LARGE");
   const walk = (current) => {
-    if (typeof current === "string" && /\$\{[^}]*\}/.test(current)) fail("PIPELINE_INTERPOLATION_FORBIDDEN");
+    if (typeof current === "string" && hasInterpolation(current)) fail("PIPELINE_INTERPOLATION_FORBIDDEN");
     if (Array.isArray(current)) return current.forEach(walk);
     if (!isObject(current)) return;
     if (Object.keys(current).length === 1 && Object.hasOwn(current, "$ref")) {

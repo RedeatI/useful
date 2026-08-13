@@ -62,6 +62,14 @@ test("new default utility actions share strict browser and Node semantics", asyn
     handlers["builtin.utilities.ipv4"]({ operation: "contains", cidr: "0.0.0.0/0", address: "255.255.255.255" }),
     { operation: "contains", cidr: "0.0.0.0/0", address: "255.255.255.255", contains: true },
   );
+  assert.deepEqual(
+    handlers["builtin.utilities.html"]({ operation: "strip", text: "&lt;p&gt;safe text&lt;/p&gt;" }),
+    { text: "safe text" },
+  );
+  assert.deepEqual(
+    handlers["builtin.utilities.html"]({ operation: "strip", text: "<<script>alert(1)</script>" }),
+    { text: "alert(1)" },
+  );
 
   const executor = new ActionExecutor();
   for (const input of [
@@ -74,6 +82,10 @@ test("new default utility actions share strict browser and Node semantics", asyn
   await assert.rejects(
     executor.execute("builtin.utilities.ipv4", { operation: "inspect", value: "127.0.00.1" }),
     (error) => error.code === "INPUT_INVALID",
+  );
+  assert.deepEqual(
+    (await executor.execute("builtin.utilities.html", { operation: "strip", text: "&lt;p&gt;safe text&lt;/p&gt;" })).output,
+    { text: "safe text" },
   );
 });
 

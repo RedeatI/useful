@@ -38,7 +38,7 @@ test("same exact source and dependencies produce byte-identical SBOMs", async ()
     assert.deepEqual(second.bom, first.bom);
     assert.deepEqual(await readFile(secondPath), await readFile(firstPath));
     assert.equal(first.bom.metadata.timestamp, "2023-11-14T22:13:20.000Z");
-    assert.match(first.bom.serialNumber, /^urn:uuid:[0-9a-f]{8}-[0-9a-f]{4}-5[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+    assert.match(first.bom.serialNumber, /^urn:uuid:[0-9a-f]{8}-[0-9a-f]{4}-8[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
     assert.deepEqual(
       first.bom.components.filter(({ name }) => ["ffmpeg", "ffprobe", "mpv"].includes(name)).map(({ name, version }) => [name, version]),
       [["ffmpeg", "8.1.2"], ["ffprobe", "8.1.2"], ["mpv", "20260610-git-304426c"]],

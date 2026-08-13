@@ -471,12 +471,25 @@ function decodeHtml(text) {
       .replace(/&#x([0-9a-fA-F]+);/g, (_, value) => String.fromCodePoint(parseInt(value, 16)));
   } catch (cause) { throw actionInputError("HTML 实体非法", cause); }
 }
+function stripTagLikeSegments(text) {
+  let result = "";
+  let cursor = 0;
+  while (cursor < text.length) {
+    const start = text.indexOf("<", cursor);
+    if (start < 0) return result + text.slice(cursor);
+    const end = text.indexOf(">", start + 1);
+    if (end < 0) return result + text.slice(cursor);
+    result += text.slice(cursor, start);
+    cursor = end + 1;
+  }
+  return result;
+}
 function htmlHandler(input) {
   assertExactObject(input, ["operation", "text"]);
   if (typeof input.text !== "string" || !["encode", "decode", "strip"].includes(input.operation)) throw actionInputError("HTML action 输入不符合契约");
   if (input.operation === "encode") return { text: input.text.replace(/[&<>"']/g, (character) => HTML_ESCAPE[character]) };
   if (input.operation === "decode") return { text: decodeHtml(input.text) };
-  return { text: decodeHtml(input.text.replace(/<[^>]*>/g, "")).replace(/\s+/g, " ").trim() };
+  return { text: stripTagLikeSegments(decodeHtml(input.text)).replace(/\s+/g, " ").trim() };
 }
 
 function hexTextHandler(input) {

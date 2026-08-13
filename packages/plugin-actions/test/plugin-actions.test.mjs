@@ -161,6 +161,14 @@ test("templates reject dangerous keys, excess depth/bytes, arbitrary expressions
   interpolated.pipeline.steps[0].input.text = "${input.text}";
   expectCode(() => descriptorAndHandler(interpolated), "PIPELINE_INTERPOLATION_FORBIDDEN");
 
+  const incomplete = validSpec();
+  incomplete.pipeline.steps[0].input.text = "${".repeat(10000);
+  assert.doesNotThrow(() => descriptorAndHandler(incomplete));
+
+  const completedAfterManyStarts = validSpec();
+  completedAfterManyStarts.pipeline.steps[0].input.text = `${"${".repeat(10000)}}`;
+  expectCode(() => descriptorAndHandler(completedAfterManyStarts), "PIPELINE_INTERPOLATION_FORBIDDEN");
+
   const deep = validSpec();
   let nested = {};
   for (let index = 0; index < 40; index += 1) nested = { value: nested };

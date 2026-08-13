@@ -30,9 +30,23 @@ export function htmlDecode(text: string): string {
     .replace(/&#x([0-9a-fA-F]+);/g, (_, h) => String.fromCodePoint(parseInt(h, 16)));
 }
 
+function stripTagLikeSegments(text: string): string {
+  let result = "";
+  let cursor = 0;
+  while (cursor < text.length) {
+    const start = text.indexOf("<", cursor);
+    if (start < 0) return result + text.slice(cursor);
+    const end = text.indexOf(">", start + 1);
+    if (end < 0) return result + text.slice(cursor);
+    result += text.slice(cursor, start);
+    cursor = end + 1;
+  }
+  return result;
+}
+
 /** 去除所有 HTML 标签，保留文本（折叠空白）。 */
 export function stripHtmlTags(html: string): string {
-  return htmlDecode(html.replace(/<[^>]*>/g, "")).replace(/\s+/g, " ").trim();
+  return stripTagLikeSegments(htmlDecode(html)).replace(/\s+/g, " ").trim();
 }
 
 // ---------- 十六进制 ↔ 文本 ----------
