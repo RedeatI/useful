@@ -4967,7 +4967,7 @@ dependencies = [
 
 [[package]]
 name = "useful-app"
-version = "0.1.0-beta.4"
+version = "0.1.0-beta.5"
 dependencies = [
  "anyhow",
  "dunce",
@@ -5004,7 +5004,7 @@ dependencies = [
 
 [[package]]
 name = "useful-bootstrap"
-version = "0.1.0-beta.4"
+version = "0.1.0-beta.5"
 dependencies = [
  "ed25519-dalek",
  "hex",
@@ -5023,7 +5023,7 @@ dependencies = [
 
 [[package]]
 name = "useful-core"
-version = "0.1.0-beta.4"
+version = "0.1.0-beta.5"
 dependencies = [
  "dunce",
  "rusqlite",
@@ -5037,7 +5037,7 @@ dependencies = [
 
 [[package]]
 name = "useful-media"
-version = "0.1.0-beta.4"
+version = "0.1.0-beta.5"
 dependencies = [
  "dunce",
  "ed25519-dalek",
@@ -5059,7 +5059,7 @@ dependencies = [
 
 [[package]]
 name = "useful-plugin"
-version = "0.1.0-beta.4"
+version = "0.1.0-beta.5"
 dependencies = [
  "dunce",
  "ed25519-dalek",
@@ -5081,7 +5081,7 @@ dependencies = [
 
 [[package]]
 name = "useful-procmon"
-version = "0.1.0-beta.4"
+version = "0.1.0-beta.5"
 dependencies = [
  "serde",
  "serde_json",
@@ -5094,7 +5094,7 @@ dependencies = [
 
 [[package]]
 name = "useful-repository-client"
-version = "0.1.0-beta.4"
+version = "0.1.0-beta.5"
 dependencies = [
  "ed25519-dalek",
  "hex",
@@ -5109,7 +5109,7 @@ dependencies = [
 
 [[package]]
 name = "useful-shortcuts"
-version = "0.1.0-beta.4"
+version = "0.1.0-beta.5"
 dependencies = [
  "serde",
  "tempfile",
@@ -5120,7 +5120,7 @@ dependencies = [
 
 [[package]]
 name = "useful-source-accounts"
-version = "0.1.0-beta.4"
+version = "0.1.0-beta.5"
 dependencies = [
  "base64 0.22.1",
  "rand 0.8.7",

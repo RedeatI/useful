@@ -73,6 +73,38 @@ function inspectDependencyReviewWorkflow(file, workflow) {
   }
 }
 
+function hasFrozenPnpmBootstrap(steps) {
+  const pnpmIndex = steps.findIndex((step) => (
+    String(step?.uses ?? "").startsWith("pnpm/action-setup@")
+    && String(step?.with?.version ?? "") === "9.15.0"
+  ));
+  const nodeIndex = steps.findIndex((step) => (
+    String(step?.uses ?? "").startsWith("actions/setup-node@")
+    && String(step?.with?.["node-version"] ?? "") === "20"
+    && String(step?.with?.cache ?? "") === "pnpm"
+  ));
+  const installIndex = steps.findIndex((step) => stepRunsExact(step, "pnpm install --frozen-lockfile"));
+  return pnpmIndex >= 0 && pnpmIndex < nodeIndex && nodeIndex < installIndex;
+}
+
+function inspectCodeqlWorkflow(file, workflow) {
+  const analyze = workflow.jobs?.analyze;
+  const include = analyze?.strategy?.matrix?.include ?? [];
+  const modes = new Map(include.map((entry) => [entry?.language, entry?.["build-mode"]]));
+  const init = (analyze?.steps ?? []).find((step) => (
+    String(step?.uses ?? "").startsWith("github/codeql-action/init@")
+  ));
+  if (
+    include.length !== 2
+    || modes.get("javascript-typescript") !== "none"
+    || modes.get("go") !== "autobuild"
+    || String(init?.with?.languages ?? "") !== "${{ matrix.language }}"
+    || String(init?.with?.["build-mode"] ?? "") !== "${{ matrix.build-mode }}"
+  ) {
+    violations.push({ file, code: "codeql-language-build-mode-invalid" });
+  }
+}
+
 function inspectSteps(file, steps, location) {
   if (!Array.isArray(steps)) return;
   for (const [index, step] of steps.entries()) {
@@ -301,6 +333,12 @@ function inspectCiWorkflow(file, workflow) {
   if (cliSteps.length !== 1) {
     violations.push({ file, code: "ci-useful-cli-working-directory-invalid" });
   }
+  if (!hasFrozenPnpmBootstrap(workflow.jobs?.["compose-e2e"]?.steps ?? [])) {
+    violations.push({ file, code: "ci-compose-dependency-bootstrap-missing" });
+  }
+  if (!hasFrozenPnpmBootstrap(workflow.jobs?.["platform-limited-matrix"]?.steps ?? [])) {
+    violations.push({ file, code: "ci-platform-matrix-dependency-bootstrap-missing" });
+  }
   const tauriStep = buildSteps
     .find((step) => String(step?.run ?? "").includes("tauri build --no-bundle"));
   if (
@@ -395,7 +433,12 @@ function inspectPlatformBundlesWorkflow(file, workflow) {
   if (!iconStep) {
     violations.push({ file, code: "platform-bundles-committed-icon-gate-missing", details: "platform icon step" });
   }
-  if (!steps.some((step) => stepRunsExact(step, "cargo check -p useful-app --lib --target ${{ matrix.target }}"))) {
+  const frontendIndex = steps.findIndex((step) => stepRunsExact(step, "pnpm --filter @useful/app build"));
+  const nativeIndex = steps.findIndex((step) => stepRunsExact(step, "cargo check -p useful-app --lib --target ${{ matrix.target }}"));
+  if (frontendIndex < 0 || nativeIndex < 0 || frontendIndex >= nativeIndex) {
+    violations.push({ file, code: "platform-bundles-frontend-before-native-missing" });
+  }
+  if (nativeIndex < 0) {
     violations.push({ file, code: "platform-bundles-native-command-missing", details: "cargo check -p useful-app" });
   }
   if (!steps.some((step) => stepRunsExact(step, "pnpm --filter @useful/app tauri build --target ${{ matrix.target }}"))) {
@@ -1155,6 +1198,7 @@ for (const file of files) {
   }
   if (file === "ci.yml" || file === "platform-bundles.yml") inspectPreviewWorkflow(file, workflow);
   if (file === "ci.yml") inspectCiWorkflow(file, workflow);
+  if (file === "codeql.yml") inspectCodeqlWorkflow(file, workflow);
   if (file === "dependency-review.yml") inspectDependencyReviewWorkflow(file, workflow);
   if (file === "platform-bundles.yml") inspectPlatformBundlesWorkflow(file, workflow);
   if (file === "release.yml") inspectReleaseWorkflow(file, workflow);

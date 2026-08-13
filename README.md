@@ -21,7 +21,7 @@ AI model. Useful does not change the configuration of Codex, Claude, or other Ag
 > [!IMPORTANT]
 > Useful is a developer preview. Official **signed** installers and a production
 > update feed are not available. An **unsigned** Windows desktop preview is on the
-> [v0.1.0-beta.4](https://github.com/RedeatI/useful/releases/tag/v0.1.0-beta.4) release
+> [v0.1.0-beta.5](https://github.com/RedeatI/useful/releases/tag/v0.1.0-beta.5) release
 > (portable zip preferred). Windows is the main development platform. Some native
 > features do not work on macOS or Linux. Read
 > [Known limitations](docs/KNOWN-LIMITATIONS.en.md).
@@ -39,24 +39,24 @@ AI model. Useful does not change the configuration of Codex, Claude, or other Ag
 
 ### Download (unsigned Windows preview)
 
-Release: [v0.1.0-beta.4](https://github.com/RedeatI/useful/releases/tag/v0.1.0-beta.4)
+Release: [v0.1.0-beta.5](https://github.com/RedeatI/useful/releases/tag/v0.1.0-beta.5)
 
 **Preferred: portable zip**
 
-1. Download `Useful-0.1.0-beta.4-windows-x64-portable.zip`
+1. Download `Useful-0.1.0-beta.5-windows-x64-portable-lite.zip`
 2. Extract the archive
 3. Open the nested folder `Useful`
 4. Run `Useful.exe` (keep `portable.flag` next to it)
 5. App data is written under `Useful\data\`
 
-Optional: `.msi` / `-setup.exe`, or `Useful-0.1.0-beta.4-windows-x64-bundle.zip`.
+Optional: `Useful-0.1.0-beta.5-windows-x64-setup-lite.exe`.
 Windows SmartScreen may warn. These builds are **not** Authenticode-signed production packages.
 
-Verify the portable archive against `SHA256SUMS-0.1.0-beta.4.txt` from the same release:
+Verify the portable archive against `SHA256SUMS.txt` from the same release:
 
 ```powershell
-$asset = "Useful-0.1.0-beta.4-windows-x64-portable.zip"
-$expected = ((Select-String -Path .\SHA256SUMS-0.1.0-beta.4.txt -Pattern ([regex]::Escape($asset) + '$')).Line -split '\s+')[0].ToLowerInvariant()
+$asset = "Useful-0.1.0-beta.5-windows-x64-portable-lite.zip"
+$expected = ((Select-String -Path .\SHA256SUMS.txt -Pattern ([regex]::Escape($asset) + '$')).Line -split '\s+')[0].ToLowerInvariant()
 $actual = (Get-FileHash ".\$asset" -Algorithm SHA256).Hash.ToLowerInvariant()
 if ($actual -ne $expected) { throw "SHA-256 mismatch for $asset" }
 ```

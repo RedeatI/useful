@@ -350,6 +350,34 @@ test("CI ignores a misleading CLI step name and binds the command to its workspa
   assert.equal(run.result.ok, true);
 });
 
+test("CI Compose E2E requires frozen pnpm dependencies before preparation", async (t) => {
+  const root = await createFixture(t);
+  await mutateWorkflow(root, "ci.yml", (workflow) => {
+    workflow.jobs["compose-e2e"].steps = workflow.jobs["compose-e2e"].steps
+      .filter((step) => String(step.run ?? "") !== "pnpm install --frozen-lockfile");
+  });
+  assertViolation(runChecker(root), "ci.yml", "ci-compose-dependency-bootstrap-missing");
+});
+
+test("CI platform matrix requires frozen pnpm dependencies", async (t) => {
+  const root = await createFixture(t);
+  await mutateWorkflow(root, "ci.yml", (workflow) => {
+    workflow.jobs["platform-limited-matrix"].steps = workflow.jobs["platform-limited-matrix"].steps
+      .filter((step) => !String(step.uses ?? "").startsWith("pnpm/action-setup@"));
+  });
+  assertViolation(runChecker(root), "ci.yml", "ci-platform-matrix-dependency-bootstrap-missing");
+});
+
+test("CodeQL uses a supported build mode for each language", async (t) => {
+  const root = await createFixture(t);
+  await mutateWorkflow(root, "codeql.yml", (workflow) => {
+    const go = workflow.jobs.analyze.strategy.matrix.include
+      .find((entry) => entry.language === "go");
+    go["build-mode"] = "none";
+  });
+  assertViolation(runChecker(root), "codeql.yml", "codeql-language-build-mode-invalid");
+});
+
 test("platform bundles require the committed Useful application paths", async (t) => {
   const root = await createFixture(t);
   await mutateWorkflow(root, "platform-bundles.yml", (workflow) => {
@@ -362,6 +390,22 @@ test("platform bundles require the committed Useful application paths", async (t
     "platform-bundles.yml",
     "platform-bundles-committed-icon-gate-missing",
     "platform icon step",
+  );
+});
+
+test("platform bundles build the frontend before native compilation", async (t) => {
+  const root = await createFixture(t);
+  await mutateWorkflow(root, "platform-bundles.yml", (workflow) => {
+    const steps = workflow.jobs.bundle.steps;
+    const frontendIndex = steps.findIndex((step) => String(step.run ?? "") === "pnpm --filter @useful/app build");
+    const [frontend] = steps.splice(frontendIndex, 1);
+    const nativeIndex = steps.findIndex((step) => String(step.run ?? "").includes("cargo check -p useful-app"));
+    steps.splice(nativeIndex + 1, 0, frontend);
+  });
+  assertViolation(
+    runChecker(root),
+    "platform-bundles.yml",
+    "platform-bundles-frontend-before-native-missing",
   );
 });
 

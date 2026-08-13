@@ -99,6 +99,8 @@ jobs:
           esac
           test -f "$icon"
           test -s "$icon"
+      - name: Build frontend required by Tauri context
+        run: pnpm --filter @useful/app build
       - name: Compile native host for target
         run: cargo check -p useful-app --lib --target ${{ matrix.target }}
       - name: Build development-trust unsigned preview platform bundle
