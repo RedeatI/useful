@@ -28,7 +28,9 @@ const requireFromMcp = createRequire(path.join(toolingRoot, "packages/useful-mcp
 const { Client } = await import(pathToFileURL(requireFromMcp.resolve("@modelcontextprotocol/client")).href);
 const { StdioClientTransport } = await import(pathToFileURL(requireFromMcp.resolve("@modelcontextprotocol/client/stdio")).href);
 const temporaryRoots = [];
-const AGENT_KIT_FIXTURE_TIMEOUT_MS = 30_000;
+// Fixture creation copies and commits the public Agent Kit closure. Keep a finite
+// ceiling with enough headroom for variable Windows runner filesystem latency.
+const AGENT_KIT_FIXTURE_TIMEOUT_MS = 120_000;
 const expectedDefaultActionIds = Object.freeze(
   [...Object.values(ACTION_IDS), ...Object.values(OFFICE_ACTION_IDS)].sort(),
 );
@@ -158,6 +160,10 @@ function copyFixturePath(relative, fixtureRoot) {
   });
 }
 
+function yieldToEventLoop() {
+  return new Promise((resolve) => setImmediate(resolve));
+}
+
 function git(fixtureRoot, args, env = {}) {
   return execFileSync("git", args, {
     cwd: fixtureRoot,
@@ -168,7 +174,7 @@ function git(fixtureRoot, args, env = {}) {
   }).trim();
 }
 
-function makeCleanFixture({ license = true } = {}) {
+async function makeCleanFixture({ license = true } = {}) {
   const outer = fs.mkdtempSync(path.join(fs.realpathSync.native(os.tmpdir()), "useful-agent-kit-fixture-"));
   temporaryRoots.push(outer);
   const fixtureRoot = path.join(outer, "clean source");
@@ -176,6 +182,9 @@ function makeCleanFixture({ license = true } = {}) {
   for (const relative of fixturePaths) {
     if (relative === "LICENSE" && !license) continue;
     copyFixturePath(relative, fixtureRoot);
+    // Keep Vitest's worker RPC responsive while copying the fixture on slower
+    // Windows runners. The copied bytes and Git snapshot remain unchanged.
+    await yieldToEventLoop();
   }
   git(fixtureRoot, ["init", "--quiet"]);
   git(fixtureRoot, ["config", "user.name", "Useful Agent Kit Test"]);
@@ -249,7 +258,7 @@ afterEach(() => {
 
 describe("Useful Agent Kit builder", () => {
   it("fails closed for a clean repository without the required root LICENSE", async () => {
-    const fixture = makeCleanFixture({ license: false });
+    const fixture = await makeCleanFixture({ license: false });
     await expect(buildAgentKit({
       repoRoot: fixture.fixtureRoot,
       dependencyRoot: toolingRoot,
@@ -262,7 +271,7 @@ describe("Useful Agent Kit builder", () => {
   }, AGENT_KIT_FIXTURE_TIMEOUT_MS);
 
   it("rejects a clean commit whose legal map differs from the owner-approved digest", async () => {
-    const fixture = makeCleanFixture();
+    const fixture = await makeCleanFixture();
     fs.appendFileSync(path.join(fixture.fixtureRoot, "LICENSE"), "tampered\n");
     git(fixture.fixtureRoot, ["add", "LICENSE"]);
     git(fixture.fixtureRoot, ["commit", "--quiet", "-m", "tamper license"]);
@@ -278,7 +287,7 @@ describe("Useful Agent Kit builder", () => {
   }, AGENT_KIT_FIXTURE_TIMEOUT_MS);
 
   it("rejects relevant dirty and untracked source instead of attributing it to HEAD", async () => {
-    const fixture = makeCleanFixture();
+    const fixture = await makeCleanFixture();
     fs.appendFileSync(path.join(fixture.fixtureRoot, "packages/action-runtime/src/action-suggest.mjs"), "\n");
     fs.appendFileSync(path.join(fixture.fixtureRoot, "packages/action-runtime/src/recipe.mjs"), "\n");
     fs.writeFileSync(path.join(fixture.fixtureRoot, "packages/useful-cli/untracked.txt"), "dirty\n");
@@ -290,7 +299,7 @@ describe("Useful Agent Kit builder", () => {
   }, AGENT_KIT_FIXTURE_TIMEOUT_MS);
 
   it("rejects dirty agent integration source", async () => {
-    const fixture = makeCleanFixture();
+    const fixture = await makeCleanFixture();
     fs.appendFileSync(path.join(fixture.fixtureRoot, "packages/agent-integrations/src/integration.mjs"), "\n");
     await expect(buildAgentKit({
       repoRoot: fixture.fixtureRoot,
@@ -300,7 +309,7 @@ describe("Useful Agent Kit builder", () => {
   }, AGENT_KIT_FIXTURE_TIMEOUT_MS);
 
   it("rejects dirty Computer Use contract, browser adapter, or probe protocol source", async () => {
-    const fixture = makeCleanFixture();
+    const fixture = await makeCleanFixture();
     fs.appendFileSync(path.join(fixture.fixtureRoot, "packages/computer-use-contract/src/index.mjs"), "\n");
     fs.appendFileSync(path.join(fixture.fixtureRoot, "packages/computer-use-browser-adapter/src/index.mjs"), "\n");
     fs.appendFileSync(path.join(fixture.fixtureRoot, "packages/protocol/src/computer-use-probe.mjs"), "\n");
@@ -312,7 +321,7 @@ describe("Useful Agent Kit builder", () => {
   }, AGENT_KIT_FIXTURE_TIMEOUT_MS);
 
   it("rejects linked repository and output path components before reading or creating through them", async () => {
-    const fixture = makeCleanFixture();
+    const fixture = await makeCleanFixture();
     const linkedRoot = path.join(fixture.outer, "linked source");
     fs.symlinkSync(fixture.fixtureRoot, linkedRoot, process.platform === "win32" ? "junction" : "dir");
     await expect(buildAgentKit({
@@ -333,7 +342,7 @@ describe("Useful Agent Kit builder", () => {
   }, AGENT_KIT_FIXTURE_TIMEOUT_MS);
 
   it("is byte-reproducible, closed, non-overwriting, and runnable from a Chinese path with spaces", async () => {
-    const fixture = makeCleanFixture();
+    const fixture = await makeCleanFixture();
     const firstOut = path.join(fixture.outer, "产物 一");
     const secondOut = path.join(fixture.outer, "产物 二");
     const buildOptions = {
@@ -1150,7 +1159,7 @@ describe("Useful Agent Kit builder", () => {
   }, 120000);
 
   it("rejects hostile local/central ZIP metadata disagreement", async () => {
-    const fixture = makeCleanFixture();
+    const fixture = await makeCleanFixture();
     const built = await buildAgentKit({
       repoRoot: fixture.fixtureRoot,
       dependencyRoot: toolingRoot,
