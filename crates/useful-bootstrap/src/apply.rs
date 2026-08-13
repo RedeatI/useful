@@ -40,7 +40,7 @@ pub fn ensure_app_exited(app_exe: &Path) -> Result<(), ApplyError> {
     #[cfg(not(windows))]
     {
         let _ = app_exe;
-        return Err(ApplyError::UnsupportedPlatform);
+        Err(ApplyError::UnsupportedPlatform)
     }
     #[cfg(windows)]
     {

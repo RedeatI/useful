@@ -387,6 +387,15 @@ test("CI Compose E2E runs public release policy on Linux", async (t) => {
   assertViolation(runChecker(root), "ci.yml", "ci-compose-linux-policy-tests-missing");
 });
 
+test("CI matches the Linux release Clippy gate", async (t) => {
+  const root = await createFixture(t);
+  await mutateWorkflow(root, "ci.yml", (workflow) => {
+    workflow.jobs["linux-rust-lint"].steps = workflow.jobs["linux-rust-lint"].steps
+      .filter((step) => String(step.run ?? "") !== "cargo clippy --workspace --all-targets -- -D warnings");
+  });
+  assertViolation(runChecker(root), "ci.yml", "ci-linux-release-clippy-missing");
+});
+
 test("release Compose E2E requires frozen pnpm dependencies and SDK build", async (t) => {
   const root = await createFixture(t);
   await mutateWorkflow(root, "release.yml", (workflow) => {

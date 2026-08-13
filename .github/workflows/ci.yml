@@ -13,6 +13,22 @@ on:
 # 第三方 Action 固定到解析过的 commit SHA；尾注保留对应主版本便于审计更新。
 
 jobs:
+  linux-rust-lint:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Install Rust with Clippy
+        uses: dtolnay/rust-toolchain@4cda84d5c5c54efe2404f9d843567869ab1699d4 # 1.97.1
+        with:
+          toolchain: 1.97.1
+          components: clippy
+      - name: Cache Cargo
+        uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
+        with:
+          workspaces: "."
+      - name: Match the Linux release lint gate
+        run: cargo clippy --workspace --all-targets -- -D warnings
+
   # ---- 桌面端 / 前端 / Rust ----
   build-and-test:
     runs-on: windows-latest
