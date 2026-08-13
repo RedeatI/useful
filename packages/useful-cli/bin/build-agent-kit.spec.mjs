@@ -28,7 +28,9 @@ const requireFromMcp = createRequire(path.join(toolingRoot, "packages/useful-mcp
 const { Client } = await import(pathToFileURL(requireFromMcp.resolve("@modelcontextprotocol/client")).href);
 const { StdioClientTransport } = await import(pathToFileURL(requireFromMcp.resolve("@modelcontextprotocol/client/stdio")).href);
 const temporaryRoots = [];
-const AGENT_KIT_FIXTURE_TIMEOUT_MS = 30_000;
+// Fixture creation copies and commits the public Agent Kit closure. Keep a finite
+// ceiling with enough headroom for variable Windows runner filesystem latency.
+const AGENT_KIT_FIXTURE_TIMEOUT_MS = 120_000;
 const expectedDefaultActionIds = Object.freeze(
   [...Object.values(ACTION_IDS), ...Object.values(OFFICE_ACTION_IDS)].sort(),
 );
