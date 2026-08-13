@@ -400,6 +400,22 @@ test("CI matches the Linux release Clippy gate", async (t) => {
   assertViolation(runChecker(root), "ci.yml", "ci-linux-release-clippy-missing");
 });
 
+test("CI matches the Linux release test gate after Clippy", async (t) => {
+  const root = await createFixture(t);
+  await mutateWorkflow(root, "ci.yml", (workflow) => {
+    workflow.jobs["linux-rust-lint"].steps = workflow.jobs["linux-rust-lint"].steps
+      .filter((step) => String(step.run ?? "") !== "cargo test --workspace");
+  });
+  assertViolation(runChecker(root), "ci.yml", "ci-linux-release-tests-missing");
+
+  await mutateWorkflow(root, "ci.yml", (workflow) => {
+    const steps = workflow.jobs["linux-rust-lint"].steps;
+    const clippyIndex = steps.findIndex((step) => String(step.run ?? "").includes("cargo clippy"));
+    steps.splice(clippyIndex, 0, { run: "cargo test --workspace" });
+  });
+  assertViolation(runChecker(root), "ci.yml", "ci-linux-release-tests-order-invalid");
+});
+
 test("CI Linux release Clippy installs the release desktop dependencies", async (t) => {
   const root = await createFixture(t);
   await mutateWorkflow(root, "ci.yml", (workflow) => {
@@ -623,6 +639,23 @@ test("release publish default true is rejected", async (t) => {
     workflow.on.workflow_dispatch.inputs.publish.default = true;
   });
   assertViolation(runChecker(root), "release.yml", "release-publish-input-not-fail-closed");
+});
+
+test("release requires the Linux Rust check before and during publish", async (t) => {
+  const root = await createFixture(t);
+  await mutateWorkflow(root, "release.yml", (workflow) => {
+    const identityStep = workflow.jobs.identity.steps
+      .find((step) => String(step.run ?? "").includes("Require all exact-commit") || String(step.name ?? "").includes("Require all exact-commit"));
+    identityStep.run = identityStep.run.replace(/^\s*linux-rust-lint\s*$/m, "");
+  });
+  assertViolation(runChecker(root), "release.yml", "release-linux-rust-check-not-required-before-publish");
+
+  await mutateWorkflow(root, "release.yml", (workflow) => {
+    const publishStep = workflow.jobs.publish.steps
+      .find((step) => String(step.name ?? "").includes("Revalidate exact-commit CI checks"));
+    publishStep.run = publishStep.run.replace(/^\s*linux-rust-lint\s*$/m, "");
+  });
+  assertViolation(runChecker(root), "release.yml", "release-linux-rust-check-not-revalidated-at-publish");
 });
 
 test("release actor allowlist preserves a newline for a single configured actor", async (t) => {

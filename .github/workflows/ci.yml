@@ -55,6 +55,8 @@ jobs:
         run: pnpm -r build
       - name: Match the Linux release lint gate
         run: cargo clippy --workspace --all-targets -- -D warnings
+      - name: Match the Linux release test gate
+        run: cargo test --workspace
 
   # ---- 桌面端 / 前端 / Rust ----
   build-and-test:

@@ -20,7 +20,7 @@ Useful 包含：
 
 > [!IMPORTANT]
 > Useful 是开发者预览版。官方**签名**安装包和生产更新源尚不可用。未签名的 Windows 桌面预览包已在
-> [v0.1.0-beta.7](https://github.com/RedeatI/useful/releases/tag/v0.1.0-beta.7) 发布（推荐便携 zip）。
+> [v0.1.0-beta.8](https://github.com/RedeatI/useful/releases/tag/v0.1.0-beta.8) 发布（推荐便携 zip）。
 > Windows 是主要开发平台。部分原生功能在 macOS 或 Linux 上不可用。阅读
 > [已知限制](docs/KNOWN-LIMITATIONS.md)。
 
@@ -44,23 +44,23 @@ Useful 包含：
 
 ### 下载（未签名 Windows 预览）
 
-发布页：[v0.1.0-beta.7](https://github.com/RedeatI/useful/releases/tag/v0.1.0-beta.7)
+发布页：[v0.1.0-beta.8](https://github.com/RedeatI/useful/releases/tag/v0.1.0-beta.8)
 
 **首选：便携 zip**
 
-1. 下载 `Useful-0.1.0-beta.7-windows-x64-portable-lite.zip`
+1. 下载 `Useful-0.1.0-beta.8-windows-x64-portable-lite.zip`
 2. 解压
 3. 打开内层文件夹 `Useful`
 4. 运行 `Useful.exe`（保留旁边的 `portable.flag`）
 5. 数据目录为 `Useful\data\`
 
-可选：`Useful-0.1.0-beta.7-windows-x64-setup-lite.exe`。
+可选：`Useful-0.1.0-beta.8-windows-x64-setup-lite.exe`。
 可能出现 SmartScreen 警告。当前**不是** Authenticode 签名的生产包。
 
 请同时下载发布页中的 `SHA256SUMS.txt`，校验便携包：
 
 ```powershell
-$asset = "Useful-0.1.0-beta.7-windows-x64-portable-lite.zip"
+$asset = "Useful-0.1.0-beta.8-windows-x64-portable-lite.zip"
 $expected = ((Select-String -Path .\SHA256SUMS.txt -Pattern ([regex]::Escape($asset) + '$')).Line -split '\s+')[0].ToLowerInvariant()
 $actual = (Get-FileHash ".\$asset" -Algorithm SHA256).Hash.ToLowerInvariant()
 if ($actual -ne $expected) { throw "$asset 的 SHA-256 不匹配" }
