@@ -69,6 +69,7 @@ node scripts/release-publish-gate.mjs `
   --actor <YOUR_GITHUB_LOGIN> `
   --allowed-actors "<paste USEFUL_RELEASE_ACTORS value>" `
   --publish true `
+  --scope desktop-lite `
   --channel beta `
   --update-root-pubkey "<64-hex-ed25519-pubkey>" `
   --update-feed-template "https://updates.example.com/{channel}/{platform}/{arch}/latest.json" `
@@ -277,6 +278,7 @@ node scripts/release-publish-gate.mjs `
   --actor <login-in-USEFUL_RELEASE_ACTORS> `
   --allowed-actors "<USEFUL_RELEASE_ACTORS>" `
   --publish true `
+  --scope desktop-lite `
   --channel beta `
   --update-root-pubkey "<USEFUL_UPDATE_ROOT_PUBKEY_HEX>" `
   --update-feed-template "<USEFUL_UPDATE_FEED_URL_TEMPLATE>" `
@@ -291,6 +293,7 @@ Exit 0 is required before trusting a workflow publish run.
 1. Push/create the **existing** tag on the frozen commit (workflow requires `ref_type=tag`).
 2. Actions → **Useful Release** → Run workflow  
    - Use workflow from the **tag**  
+   - scope: `desktop-lite` for the Windows Lite closed set, or `desktop-full` only after the media Owner Gate closes
    - channel: `beta` or `stable`  
    - publish: `true` only when gates are ready  
 3. Confirm required checks on that SHA are green (listed in `release.yml`).

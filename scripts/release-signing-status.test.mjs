@@ -22,7 +22,7 @@ test("Windows release manifest distinguishes Setup Lite and both portable editio
   ]);
 });
 
-async function fixture(overrides = {}) {
+async function fixture(overrides = {}, scope = "desktop-full") {
   const root = await mkdtemp(path.join(os.tmpdir(), "useful-signing-status-"));
   const entries = {
     "windows-x64": { platform: "windows", arch: "x64", version: VERSION, signingStatus: "verified", verification: "Get-AuthenticodeSignature=Valid" },
@@ -33,13 +33,15 @@ async function fixture(overrides = {}) {
   };
   await mkdir(path.join(root, "nested"));
   await mkdir(path.join(root, "nested", "release-assets"));
+  const allowedReceipts = scope === "desktop-lite" ? new Set(["windows-x64"]) : new Set(Object.keys(entries));
   for (const [name, entry] of Object.entries(entries)) {
+    if (!allowedReceipts.has(name)) continue;
     if (entry === null) continue;
     await writeFile(path.join(root, "nested", `signing-${name}.json`), JSON.stringify(entry), "utf8");
   }
   const agentZip = `Useful-${VERSION}-agent-kit.zip`;
   const agentReceipt = `${agentZip}.sha256`;
-  for (const name of [...expectedReleaseAssets(VERSION).values()].flat().filter((name) => name !== agentReceipt)) {
+  for (const name of [...expectedReleaseAssets(VERSION, scope).values()].flat().filter((name) => name !== agentReceipt)) {
     await writeFile(path.join(root, "nested", "release-assets", name), `${name}\n`, "utf8");
   }
   const agentZipBytes = await readFile(path.join(root, "nested", "release-assets", agentZip));
@@ -51,8 +53,8 @@ async function fixture(overrides = {}) {
   return root;
 }
 
-async function withFixture(overrides, callback) {
-  const root = await fixture(overrides);
+async function withFixture(overrides, callback, scope = "desktop-full") {
+  const root = await fixture(overrides, scope);
   try {
     return await callback(root);
   } finally {
@@ -83,7 +85,7 @@ test("signing CLI rejects unknown or duplicate options and never overwrites outp
   await assert.rejects(() => runCli(["--version", VERSION, "--version", VERSION], {}), /重复参数/);
   await withFixture({}, async (root) => {
     const output = path.join(root, "SIGNING-STATUS.json");
-    const args = ["--root", root, "--version", VERSION, "--output", output];
+    const args = ["--root", root, "--version", VERSION, "--scope", "desktop-full", "--output", output];
     await runCli(args, {});
     const first = await readFile(output, "utf8");
     await assert.rejects(() => runCli(args, {}), /EEXIST|exist|拒绝覆盖/i);
@@ -137,6 +139,7 @@ test("published signing summary is closed and bound to exact candidate asset byt
       "--status", statusPath,
       "--asset-root", path.join(root, "nested", "release-assets"),
       "--version", VERSION,
+      "--scope", "desktop-full",
     ], {}), summary);
 
     const firstAsset = summary.artifacts[0].name;
@@ -146,6 +149,19 @@ test("published signing summary is closed and bound to exact candidate asset byt
       /artifact digest 不匹配|artifact manifest 不匹配/,
     );
   });
+});
+
+test("desktop-lite signing evidence closes over Windows Lite and Agent Kit assets only", async () => {
+  await withFixture({}, async (root) => {
+    const result = await aggregateSigningStatus(root, VERSION, "desktop-lite");
+    assert.equal(result.scope, "desktop-lite");
+    assert.deepEqual(result.platforms.map(({ platform, arch }) => `${platform}/${arch}`), ["windows/x64"]);
+    assert.deepEqual(
+      result.artifacts.map(({ name }) => name),
+      [...expectedReleaseAssets(VERSION, "desktop-lite").values()].flat(),
+    );
+    assert.ok(result.artifacts.every(({ name }) => !name.includes("portable-full") && !name.includes("macos") && !name.includes("linux")));
+  }, "desktop-lite");
 });
 
 test("published signing summary rejects version, cardinality, and status drift", async () => {

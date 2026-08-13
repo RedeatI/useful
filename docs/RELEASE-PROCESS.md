@@ -21,12 +21,15 @@
 
 ## Release workflow 的闭集 scope
 
-`.github/workflows/release.yml` 的 `scope` 只能是下列两项：
+`.github/workflows/release.yml` 的 `scope` 只能是下列三项：
 
 - `source-agent-kit`：非桌面 prerelease，只生成并校验公开源码证据、Agent Kit、CycloneDX SBOM、
   根 legal 闭集、源码 manifest、provenance、`RELEASE-ASSETS.txt` 与 `SHA256SUMS.txt`。它不构建桌面
   程序，不读取桌面签名、更新根/feed 或媒体 Full 门禁，也不得选择 stable 通道。Agent Kit builder 的
   `publicationAuthorized=false` 保持原义；发布授权来自独立 workflow Owner gate，不能改写该字段。
+- `desktop-lite`：只公开 Windows x64 Setup Lite、Portable Lite，以及 source/Agent Kit/SBOM/签名状态/
+  provenance/legal 证据闭集。它明确排除 Portable Full、媒体运行时、macOS 和 Linux 桌面资产；仍执行
+  桌面源码、CI、更新信任、Owner allowlist、精确 tag/commit、签名状态和 environment 门禁。
 - `desktop-full`：保留本文其余章节描述的多平台构建、签名/公证、更新信任、媒体合规、验证与发布
   全部门禁；source scope 的存在不构成任何豁免。
 

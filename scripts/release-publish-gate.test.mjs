@@ -21,6 +21,7 @@ const valid = {
   actor: "release-owner",
   allowedActors: "other-owner,release-owner",
   publish: false,
+  scope: "desktop-full",
   channel: "beta",
   updateRootPublicKey: productionRoot,
   updateFeedUrlTemplate: "https://updates.example.org/useful/{channel}/{platform}-{arch}.json",
@@ -85,6 +86,7 @@ function baseCliArgs(root, publish, channel = "beta") {
     "--actor", "release-owner",
     "--allowed-actors", "release-owner",
     "--publish", String(publish),
+    "--scope", "desktop-full",
     "--channel", channel,
     "--update-root-pubkey", productionRoot,
     "--update-feed-template", "https://updates.example.org/useful/{channel}/{platform}-{arch}.json",
@@ -166,6 +168,31 @@ test("Full candidate is explicit compliance-pending, while every public channel 
   }
 });
 
+test("desktop-lite publish excludes media runtimes without weakening repository or actor gates", async () => {
+  const root = await mkdtemp(path.join(tmpdir(), "useful-lite-owner-gate-"));
+  try {
+    const args = baseCliArgs(root, true).map((value, index, values) => (
+      values[index - 1] === "--scope" ? "desktop-lite" : value
+    ));
+    const result = await runCli(args, {});
+    assert.equal(result.scope, "desktop-lite");
+    assert.deepEqual(result.mediaSourceCompliance, {
+      status: "not-applicable",
+      distribution: "NOT-INCLUDED",
+      reason: "desktop-lite excludes Portable Full and all media runtime assets",
+      requiredActions: [],
+      evidence: null,
+      releaseAssets: [],
+    });
+    await assert.rejects(
+      () => runCli(args.map((value, index, values) => values[index - 1] === "--actor" ? "intruder" : value), {}),
+      /未获发布授权/,
+    );
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test("stable publish requires a repository evidence file with matching digest and closed checks", async () => {
   const root = await mkdtemp(path.join(tmpdir(), "useful-stable-evidence-"));
   const media = await createMediaComplianceFixture(root);
@@ -197,6 +224,7 @@ test("stable publish requires a repository evidence file with matching digest an
     "--actor", "release-owner",
     "--allowed-actors", "release-owner",
     "--publish", "true",
+    "--scope", "desktop-full",
     "--channel", "stable",
     "--update-root-pubkey", productionRoot,
     "--update-feed-template", "https://updates.example.org/useful/{channel}/{platform}-{arch}.json",
@@ -247,6 +275,7 @@ test("stable evidence rejects a symlink or junction in any intermediate path bef
       "--actor", "release-owner",
       "--allowed-actors", "release-owner",
       "--publish", "true",
+      "--scope", "desktop-full",
       "--channel", "stable",
       "--update-root-pubkey", productionRoot,
       "--update-feed-template", "https://updates.example.org/useful/{channel}/{platform}-{arch}.json",
