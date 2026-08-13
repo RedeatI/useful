@@ -332,6 +332,9 @@ function inspectCiWorkflow(file, workflow) {
   if (!buildSteps.some((step) => stepRunsExact(step, "node scripts/release-readiness.mjs --json"))) {
     violations.push({ file, code: "ci-release-readiness-gate-missing" });
   }
+  if (!buildSteps.some((step) => stepRunsExact(step, "pnpm -r --workspace-concurrency=1 test"))) {
+    violations.push({ file, code: "ci-workspace-tests-not-serialized" });
+  }
   const cliSteps = (workflow.jobs?.["protocol-and-cli"]?.steps ?? []).filter((step) => (
     String(step?.["working-directory"] ?? "") === "packages/useful-cli"
     && stepRunsExact(step, "npx vitest run")
@@ -810,7 +813,7 @@ function inspectReleaseWorkflow(file, workflow) {
     "node scripts/check-brand.mjs --json",
     "pnpm policy:test",
     "node scripts/release-readiness.mjs --json",
-    "pnpm -r test",
+    "pnpm -r --workspace-concurrency=1 test",
     "cargo test --workspace",
     "go test -race ./...",
   ]) {

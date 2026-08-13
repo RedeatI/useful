@@ -135,6 +135,16 @@ test("CI requires the fail-closed release-readiness command", async (t) => {
   assertViolation(runChecker(root), "ci.yml", "ci-release-readiness-gate-missing");
 });
 
+test("CI serializes workspace tests to avoid runner-load RPC timeouts", async (t) => {
+  const root = await createFixture(t);
+  await mutateWorkflow(root, "ci.yml", (workflow) => {
+    const step = workflow.jobs["build-and-test"].steps
+      .find((candidate) => String(candidate.run ?? "").includes("workspace-concurrency"));
+    step.run = "pnpm -r test";
+  });
+  assertViolation(runChecker(root), "ci.yml", "ci-workspace-tests-not-serialized");
+});
+
 test("CI requires size measurement and production enforcement after Lite packaging", async (t) => {
   const root = await createFixture(t);
   await mutateWorkflow(root, "ci.yml", (workflow) => {
@@ -409,6 +419,21 @@ test("platform bundles require the committed Useful application paths", async (t
     "platform-bundles.yml",
     "platform-bundles-committed-icon-gate-missing",
     "platform icon step",
+  );
+});
+
+test("release verification serializes workspace tests", async (t) => {
+  const root = await createFixture(t);
+  await mutateWorkflow(root, "release.yml", (workflow) => {
+    const step = workflow.jobs.verify.steps
+      .find((candidate) => String(candidate.run ?? "").includes("workspace-concurrency"));
+    step.run = "pnpm -r test";
+  });
+  assertViolation(
+    runChecker(root),
+    "release.yml",
+    "release-verification-command-missing",
+    "pnpm -r --workspace-concurrency=1 test",
   );
 });
 

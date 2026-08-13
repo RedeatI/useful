@@ -13,7 +13,7 @@
     "templates"
   ],
   "scripts": {
-    "test": "vitest run --maxWorkers=2",
+    "test": "vitest run --maxWorkers=1 --no-file-parallelism",
     "lint": "eslint bin --ext .mjs --max-warnings 0"
   },
   "dependencies": {
