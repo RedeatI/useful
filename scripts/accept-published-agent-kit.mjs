@@ -179,18 +179,23 @@ function inheritedEnvironment() {
   return Object.fromEntries(Object.entries(process.env).filter(([, value]) => value !== undefined));
 }
 
-function launcherInvocation(launcher, args) {
-  if (process.platform !== "win32") return { command: launcher, args };
+export function launcherInvocation(launcher, args, platform = process.platform) {
+  if (platform !== "win32") return { command: launcher, args };
+  const launcherName = path.win32.basename(launcher);
+  if (!["useful.cmd", "useful-runtime.cmd", "useful-mcp.cmd"].includes(launcherName)) {
+    fail(`unexpected Windows launcher name: ${launcherName}`);
+  }
   return {
-    command: process.env.ComSpec || "cmd.exe",
-    args: ["/d", "/s", "/c", "call", launcher, ...args],
+    command: "C:\\Windows\\System32\\cmd.exe",
+    args: ["/d", "/s", "/c", "call", `.\\${launcherName}`, ...args],
+    cwd: path.win32.dirname(launcher),
   };
 }
 
 function runJsonLauncher(launcher, args, { cwd, input } = {}) {
   const invocation = launcherInvocation(launcher, args);
   const result = spawnSync(invocation.command, invocation.args, {
-    cwd,
+    cwd: invocation.cwd ?? cwd,
     input,
     encoding: "utf8",
     env: inheritedEnvironment(),
@@ -326,7 +331,7 @@ async function accept(options) {
   const mcp = [];
   mcp.push(await exerciseMcp({
     ...launcherMcp,
-    cwd: options.extractRoot,
+    cwd: launcherMcp.cwd ?? options.extractRoot,
     label: `${commandKey}-launcher-legacy`,
   }));
   mcp.push(await exerciseMcp({

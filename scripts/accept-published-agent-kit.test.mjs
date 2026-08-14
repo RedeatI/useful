@@ -7,6 +7,7 @@ import test from "node:test";
 
 import {
   extractArchive,
+  launcherInvocation,
   normalizeArchivePath,
   parseArguments,
 } from "./accept-published-agent-kit.mjs";
@@ -44,6 +45,19 @@ test("archive path normalization rejects traversal and Windows aliases", () => {
   for (const unsafe of ["../escape", "a/../escape", "/rooted", "C:/drive", "a\\b", "a//b", "./a"]) {
     assert.throws(() => normalizeArchivePath(unsafe), /unsafe archive entry path/);
   }
+});
+
+test("Windows launchers use a fixed command and a closed basename from their own directory", () => {
+  const invocation = launcherInvocation("C:\\safe root\\bin\\useful.cmd", ["agent-contract", "--json"], "win32");
+  assert.deepEqual(invocation, {
+    command: "C:\\Windows\\System32\\cmd.exe",
+    args: ["/d", "/s", "/c", "call", ".\\useful.cmd", "agent-contract", "--json"],
+    cwd: "C:\\safe root\\bin",
+  });
+  assert.throws(
+    () => launcherInvocation("C:\\safe root\\bin\\unexpected.cmd", [], "win32"),
+    /unexpected Windows launcher name/,
+  );
 });
 
 test("archive extraction creates regular files without overwriting a target", async (t) => {
