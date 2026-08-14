@@ -2,7 +2,7 @@
 //!
 //! 解析顺序：
 //! 1. 环境变量覆盖（USEFUL_FFMPEG / USEFUL_FFPROBE / USEFUL_MPV）
-//! 2. 已验证并激活的应用数据 MediaPack
+//! 2. 已验证并激活的应用数据上游运行时或旧版 MediaPack
 //! 3. 可执行文件旁 `binaries/<name>`
 //! 4. 可执行文件旁 `<name>`
 //! 5. 不可用（默认不搜索系统 PATH，避免执行未绑定的同名程序）
@@ -79,7 +79,7 @@ fn resolve_one(base: &str, env_key: &str, exe_dir: &Path, media_root: Option<&Pa
             return found(base, &p);
         }
     }
-    // 2) 已验证并激活的应用数据 MediaPack
+    // 2) 已验证并激活的应用数据上游运行时或旧版 MediaPack
     let mut media_pack_damaged = false;
     if let Some(root) = media_root {
         let pack_id = if base == "mpv" {
@@ -87,10 +87,14 @@ fn resolve_one(base: &str, env_key: &str, exe_dir: &Path, media_root: Option<&Pa
         } else {
             "transcode"
         };
+        if let Some(path) = crate::upstream::resolve_installed_component(root, pack_id, &file) {
+            return found(base, &path);
+        }
         if let Some(path) = crate::pack::resolve_installed_component(root, pack_id, &file) {
             return found(base, &path);
         }
-        media_pack_damaged = crate::pack::installed_status(root, pack_id).damaged;
+        media_pack_damaged = crate::upstream::installed_status(root, pack_id).damaged
+            || crate::pack::installed_status(root, pack_id).damaged;
     }
     // 3) exe_dir/binaries/<name>
     let in_binaries = exe_dir.join("binaries").join(&file);

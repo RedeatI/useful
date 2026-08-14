@@ -108,6 +108,7 @@ PDF `inspect` 的自动化证据还应逐页固定 `pageDetails.index/widthPoint
 | 文档命令 smoke | `node scripts/doc-smoke.mjs` | 只证明本地 CLI 文档示例实际执行到的路径 |
 | Portable 路径合同 | `cargo test -p useful-core paths::tests` | 证明路径选择和写探针合同；不替代真实只读介质启动 |
 | MediaPack Rust 安装链 | `cargo test -p useful-media pack::tests` | 证明 catalog、签名、损坏恢复与回滚合同 |
+| 上游媒体运行时安装链 | `cargo test -p useful-media upstream::tests` | 证明构建固定 lock、ZIP 白名单提取、文件闭集、哈希校验、原子激活与篡改停用合同 |
 | MediaPack 下载响应合同 | `cargo test -p useful-app commands::media_pack::tests` | 证明 HTTP 响应事实、续传和重试边界 |
 | MediaPack catalog 供应链 | `node --test scripts/media-pack-catalog.test.mjs` | 证明离线 lock/manifest/hash/size/statement 合同；不产生生产签名 |
 | MediaPack 安装界面 | `pnpm --filter @useful/app test -- MediaRuntimeView.spec.ts` | 证明组件测试覆盖；不替代真实原生界面验收 |

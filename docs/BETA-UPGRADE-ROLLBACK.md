@@ -1,7 +1,7 @@
 # Beta 安装、升级、通道切换与回滚
 
 本页描述已发布的未签名预览版
-[`v0.1.0-beta.10`](https://github.com/RedeatI/useful/releases/tag/v0.1.0-beta.10) 的安装与本地恢复操作。
+[`v0.1.0-beta.11`](https://github.com/RedeatI/useful/releases/tag/v0.1.0-beta.11) 的安装与本地恢复操作。
 它不是正式签名版本，也没有生产在线更新 feed。
 
 Useful 的 Windows x64 edition 约定为 setup Lite、Portable Lite 和 Portable Full。Lite 不内置媒体
@@ -11,8 +11,8 @@ Useful 的 Windows x64 edition 约定为 setup Lite、Portable Lite 和 Portable
 
 ## 安装预览资产
 
-1. 从同一 GitHub Release 下载 `Useful-0.1.0-beta.10-windows-x64-portable-lite.zip` 或
-   `Useful-0.1.0-beta.10-windows-x64-setup-lite.exe`，并按其中的 `SHA256SUMS.txt` 校验。
+1. 从同一 GitHub Release 下载 `Useful-0.1.0-beta.11-windows-x64-portable-lite.zip` 或
+   `Useful-0.1.0-beta.11-windows-x64-setup-lite.exe`，并按其中的 `SHA256SUMS.txt` 校验。
 2. Portable Lite ZIP 应解压到新的可写空目录；setup Lite 使用安装程序。不要覆盖
    正式用户目录，也不要混用不同候选版本的文件。
    Portable 启动时会对隔离数据树执行写探针；不可写时会在打开数据库前停止并提示，不会静默改用 AppData。
@@ -37,7 +37,7 @@ Useful 的 Windows x64 edition 约定为 setup Lite、Portable Lite 和 Portable
 3. 应用前备份旧版本；新版本启动成功后才写入 `current-version.txt`。
 4. 签名、摘要或启动失败时返回非零，不更新版本号，并保留失败证据。
 
-这些是升级契约，不表示 `v0.1.0-beta.10` 已接入生产更新链路。
+这些是升级契约，不表示 `v0.1.0-beta.11` 已接入生产更新链路。
 
 ## 自动回滚
 

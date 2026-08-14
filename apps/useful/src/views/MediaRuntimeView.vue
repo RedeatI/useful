@@ -55,13 +55,15 @@ const packDefinitions = [
   {
     id: "preview" as const,
     icon: "video",
-    bytes: 45_356_407,
+    bytes: 77_205_127,
+    sourceName: "mpv project",
     components: ["mpv"] as const,
   },
   {
     id: "transcode" as const,
     icon: "wand",
-    bytes: 183_797_099,
+    bytes: 109_728_040,
+    sourceName: "gyan.dev",
     components: ["ffmpeg", "ffprobe"] as const,
   },
 ];
@@ -82,6 +84,7 @@ const packs = computed(() => packDefinitions.map((definition) => {
   return {
     ...definition,
     bytes: trusted?.downloadBytes ?? definition.bytes,
+    sourceName: trusted?.sourceName ?? definition.sourceName,
     state,
     trusted,
     operation: operations[definition.id],
@@ -89,6 +92,7 @@ const packs = computed(() => packDefinitions.map((definition) => {
 }));
 const allDetected = computed(() => packs.value.every((pack) => pack.state === "detected"));
 const trustReady = computed(() => catalog.value?.trustState === "ready");
+const canInstall = computed(() => trustReady.value && !error.value);
 
 function stateLabel(state: PackState): string {
   return t(`mediaRuntime.state.${state}`);
@@ -112,7 +116,7 @@ async function refresh(): Promise<void> {
     catalog.value = catalogResult.value;
     catalogError.value = catalogResult.value.trustState === "unavailable";
   } else {
-    catalog.value = { trustState: "unavailable", reason: "catalog-unavailable", publicKeyFingerprint: null, packs: [] };
+    catalog.value = { trustState: "unavailable", reason: "catalog-unavailable", sourceLockSha256: null, packs: [] };
     catalogError.value = true;
   }
   loading.value = false;
@@ -132,6 +136,7 @@ async function install(packId: PackId, bytes: number, repair: boolean): Promise<
   if (!window.confirm(t(repair ? "mediaRuntime.repairConfirm" : "mediaRuntime.installConfirm", {
     pack: t(`mediaRuntime.pack.${packId}.title`),
     size: formatBytes(bytes),
+    source: packs.value.find((pack) => pack.id === packId)?.sourceName ?? "upstream",
   }))) return;
   const operation = operations[packId];
   operation.status = "running";
@@ -259,6 +264,10 @@ onUnmounted(() => {
             <dt>{{ t("mediaRuntime.downloadSize") }}</dt>
             <dd>{{ formatBytes(pack.bytes) }}</dd>
           </div>
+          <div>
+            <dt>{{ t("mediaRuntime.source") }}</dt>
+            <dd>{{ pack.sourceName }}</dd>
+          </div>
         </dl>
 
         <p v-if="requiredPack === pack.id && pack.state !== 'detected'" class="runtime-required">
@@ -278,7 +287,7 @@ onUnmounted(() => {
           </button>
         </div>
         <button
-          v-else-if="pack.state !== 'detected' && trustReady"
+          v-else-if="pack.state !== 'detected' && canInstall"
           class="useful-btn useful-btn--primary"
           :data-testid="`install-${pack.id}`"
           @click="install(pack.id, pack.bytes, pack.state === 'damaged')"

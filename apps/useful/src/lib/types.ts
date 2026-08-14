@@ -322,8 +322,10 @@ export interface MediaPackCatalogEntry {
   id: "preview" | "transcode";
   downloadBytes: number;
   archiveBytes: number;
-  correspondingSourceUrl: string;
-  correspondingSourceSha256: string;
+  sourceName: string;
+  sourcePageUrl: string;
+  sourceCodeUrl: string;
+  archiveSha256: string;
   installed: boolean;
   previousAvailable: boolean;
   damaged: boolean;
@@ -332,7 +334,7 @@ export interface MediaPackCatalogEntry {
 export interface MediaPackCatalogView {
   trustState: MediaPackTrustState;
   reason: string | null;
-  publicKeyFingerprint: string | null;
+  sourceLockSha256: string | null;
   packs: MediaPackCatalogEntry[];
 }
 

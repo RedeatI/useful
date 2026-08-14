@@ -109,7 +109,7 @@ pub fn build_ffmpeg_args(input: &Path, output: &Path, spec: &ExportSpec) -> Vec<
             args.push("-c:v".into());
             args.push(video_encoder_name(*codec, *encoder).into());
             // 质量参数按编码器族区分
-            push_quality_args(&mut args, *encoder, *quality);
+            push_quality_args(&mut args, *codec, *encoder, *quality);
             args.push("-c:a".into());
             args.push("aac".into());
         }
@@ -174,11 +174,11 @@ fn video_encoder_name(codec: VideoCodec, encoder: HwEncoder) -> &'static str {
         (VideoCodec::Av1, HwEncoder::Nvenc) => "av1_nvenc",
         (VideoCodec::Av1, HwEncoder::Qsv) => "av1_qsv",
         (VideoCodec::Av1, HwEncoder::Amf) => "av1_amf",
-        (VideoCodec::Av1, HwEncoder::Software) => "libsvtav1",
+        (VideoCodec::Av1, HwEncoder::Software) => "libaom-av1",
     }
 }
 
-fn push_quality_args(args: &mut Vec<String>, encoder: HwEncoder, quality: u8) {
+fn push_quality_args(args: &mut Vec<String>, codec: VideoCodec, encoder: HwEncoder, quality: u8) {
     match encoder {
         HwEncoder::Nvenc => {
             args.push("-cq".into());
@@ -193,6 +193,14 @@ fn push_quality_args(args: &mut Vec<String>, encoder: HwEncoder, quality: u8) {
             args.push(quality.to_string());
         }
         HwEncoder::Software => {
+            if codec == VideoCodec::Av1 {
+                // libaom uses CRF as constant quality only when the bitrate target is disabled.
+                // A moderate cpu-used value keeps the fallback usable on ordinary desktops.
+                args.push("-b:v".into());
+                args.push("0".into());
+                args.push("-cpu-used".into());
+                args.push("6".into());
+            }
             args.push("-crf".into());
             args.push(quality.to_string());
         }
@@ -285,6 +293,25 @@ mod tests {
         );
         assert!(args.windows(2).any(|w| w == ["-c:v", "libx264"]));
         assert!(args.windows(2).any(|w| w == ["-crf", "18"]));
+    }
+
+    #[test]
+    fn av1_software_fallback_matches_upstream_essentials_build() {
+        let args = build_ffmpeg_args(
+            Path::new("in.mp4"),
+            Path::new("out.mp4"),
+            &ExportSpec::PreciseCut {
+                start_sec: 0.0,
+                end_sec: 5.0,
+                codec: VideoCodec::Av1,
+                encoder: HwEncoder::Software,
+                quality: 30,
+            },
+        );
+        assert!(args.windows(2).any(|w| w == ["-c:v", "libaom-av1"]));
+        assert!(args.windows(2).any(|w| w == ["-b:v", "0"]));
+        assert!(args.windows(2).any(|w| w == ["-cpu-used", "6"]));
+        assert!(args.windows(2).any(|w| w == ["-crf", "30"]));
     }
 
     #[test]

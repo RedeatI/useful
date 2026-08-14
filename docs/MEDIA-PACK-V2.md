@@ -1,5 +1,9 @@
 # Media Pack v2（候选基础设施）
 
+> 本文保留 Useful 自托管、签名 Media Pack 的内部候选与离线评估合同。Windows x64 用户的应用内
+> 按需安装已经改用 `scripts/media-runtimes.upstream.lock.json` 固定的上游原始 ZIP，不再等待本候选
+> 的生产公钥或 catalog；本候选仍不得作为公开 Release 资产发布。
+
 Media Pack v2 把 Windows 媒体运行时拆成两个独立下载单元：
 
 | pack | 组件 | 用途 |
@@ -194,3 +198,6 @@ previous 始终指向上一代，三代版本化目录都保留。本阶段没�
 总体积。上一轮 essentials 评估约可把 Full ZIP 从 224 MB 降到 120 MB，但缺少 `libsvtav1`。
 只有产品明确接受 AV1 软件编码降级且 GPL Owner Gate 闭合后，才能把 v2 archive pin 切换到
 essentials；pack 化本身不能替代这项产品决策。
+
+应用内上游直连路径与本内部候选不同：它使用 essentials ZIP，并已把软件 AV1 后端切换到该真实归档
+验证存在的 `libaom-av1`，因此没有从界面移除 AV1；性能和质量差异仍需原生视频回归。

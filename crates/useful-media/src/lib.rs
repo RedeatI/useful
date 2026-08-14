@@ -12,6 +12,7 @@ pub mod pack;
 pub mod progress;
 pub mod sidecar;
 pub mod thumbnail;
+pub mod upstream;
 
 pub use ffargs::{AudioFormat, ExportSpec, HwEncoder, VideoCodec};
 pub use ffprobe::MediaInfo;

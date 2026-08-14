@@ -65,7 +65,7 @@ that a remote job ran. It does not show that a platform binary works.
 
 - Public repository: `https://github.com/RedeatI/useful`.
 - The current source, Agent Kit, and unsigned Windows desktop preview are published as
-  [`v0.1.0-beta.10`](https://github.com/RedeatI/useful/releases/tag/v0.1.0-beta.10).
+  [`v0.1.0-beta.11`](https://github.com/RedeatI/useful/releases/tag/v0.1.0-beta.11).
 - Official **signed** desktop installers and a production update feed are not available unless a
   later release explicitly provides signature evidence.
 - Development-trust Windows installers or portable packages are preview artifacts. They are not a
@@ -98,7 +98,7 @@ that a remote job ran. It does not show that a platform binary works.
 ### Historical desktop preview note (beta.4)
 
 - Some binaries attached to `v0.1.0-beta.4` may still show an in-app badge of `0.1.0-beta.1`.
-  That historical Release remains unchanged. The current `v0.1.0-beta.10` assets were rebuilt from
+  That historical Release remains unchanged. The current `v0.1.0-beta.11` assets were rebuilt from
   version-aligned source; do not mix files from the two Releases.
 
 ## Related documents

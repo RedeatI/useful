@@ -1,7 +1,7 @@
 # Beta 反馈与诊断
 
 设置页的“Beta 反馈与诊断”用于先在本地预览、再由用户决定是否分享诊断信息。当前公开版本是
-[`v0.1.0-beta.10`](https://github.com/RedeatI/useful/releases/tag/v0.1.0-beta.10)，客户端不会自动上传
+[`v0.1.0-beta.11`](https://github.com/RedeatI/useful/releases/tag/v0.1.0-beta.11)，客户端不会自动上传
 反馈或诊断包。
 
 1. 点击“预览诊断包内容”，逐项检查将要导出的文件与摘要。

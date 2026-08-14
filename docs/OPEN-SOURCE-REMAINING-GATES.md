@@ -1,8 +1,9 @@
 # Open-source remaining gates (status)
 
-Date: 2026-08-14
+Date: 2026-08-15
 Public repository: `https://github.com/RedeatI/useful`  
-Baseline commit for this note: `737d9bc` (`v0.1.0-beta.10` unsigned preview release commit).
+Baseline for this note: the `v0.1.0-beta.11` unsigned preview release candidate; the immutable tag
+identifies the exact release commit.
 
 This page is a working status against [OPEN-SOURCE-RELEASE.md](OPEN-SOURCE-RELEASE.md).  
 It is not a publication authorization.
@@ -30,8 +31,8 @@ It is not a publication authorization.
 | Gate | Status | Notes |
 | --- | --- | --- |
 | Sanitized public history | done | Public main exists |
-| Source + Agent Kit preview Release | done | Current closed-set Agent Kit is on [`v0.1.0-beta.10`](https://github.com/RedeatI/useful/releases/tag/v0.1.0-beta.10) |
-| Unsigned Windows desktop preview Release | done | `v0.1.0-beta.10` Portable Lite + Setup Lite + `SHA256SUMS.txt` (development-trust only) |
+| Source + Agent Kit preview Release | done | Current closed-set Agent Kit is on [`v0.1.0-beta.11`](https://github.com/RedeatI/useful/releases/tag/v0.1.0-beta.11) |
+| Unsigned Windows desktop preview Release | done | `v0.1.0-beta.11` Portable Lite + Setup Lite + `SHA256SUMS.txt` (development-trust only) |
 | Desktop binaries in an official signed Release | blocked | Windows Authenticode and production update trust missing |
 
 ## 3. Local and remote verification
@@ -53,9 +54,9 @@ It is not a publication authorization.
 | macOS signing and notarization | blocked | Owner credentials / six `APPLE_*` secrets |
 | Production update root variables | done | `USEFUL_UPDATE_ROOT_*` + feed template present; `updateTrustReady=true` |
 | Production update feed with real signed manifests | blocked | Placeholders only until signed Release |
-| Development-trust unsigned Windows preview packages | done | Published on `v0.1.0-beta.10`; labeled unsigned prerelease |
+| Development-trust unsigned Windows preview packages | done | Published on `v0.1.0-beta.11`; labeled unsigned prerelease |
 | Portable Full / GPL media | blocked | Corresponding-source Owner Gate |
-| Agent Kit closed MANIFEST + legal files | done | `v0.1.0-beta.10` attached the kit, source manifest, legal files, provenance, and checksums as one read-back-verified closed set |
+| Agent Kit closed MANIFEST + legal files | done | `v0.1.0-beta.11` attached the kit, source manifest, legal files, provenance, and checksums as one read-back-verified closed set |
 | `signedBetaPublishReady` | blocked | `node scripts/check-owner-signing-gates.mjs --json` → false until Windows secrets |
 
 ## 5. Third-party Agent path

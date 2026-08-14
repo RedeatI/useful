@@ -57,7 +57,7 @@ $requiredEncoders = @(
 )
 # Soft requirements = PreciseCut optional codecs; fail = report but may still ship essentials
 # with degraded options if hard requirements pass.
-$softEncoders = @("libx265", "libsvtav1")
+$softEncoders = @("libx265", "libaom-av1")
 # Decoders: name may be codec id (h264) or library (libdav1d for av1).
 $requiredDecoderAny = @{
     h264 = @("h264")
@@ -71,7 +71,7 @@ $requiredDecoderAny = @{
 }
 $requiredFilters = @("scale")
 $requiredMuxers = @("mp4", "matroska", "mp3", "flac", "wav", "adts", "ipod")
-$optionalHwEncoders = @("h264_nvenc", "hevc_nvenc", "h264_qsv", "hevc_qsv", "h264_amf", "hevc_amf")
+$optionalHwEncoders = @("h264_nvenc", "hevc_nvenc", "av1_nvenc", "h264_qsv", "hevc_qsv", "av1_qsv", "h264_amf", "hevc_amf", "av1_amf")
 
 function Get-Sha256([string]$path) {
     return (Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash.ToLowerInvariant()
@@ -427,7 +427,7 @@ if ($full -and $ess) {
 $recommendation = if (-not $essHardOk) {
     "KEEP_FULL_BUILD -- essentials failed hard product matrix; do not switch lock"
 } elseif (-not $essSoftOk) {
-    "CANDIDATE_ESSENTIALS_WITH_GAPS -- hard paths pass; soft codecs missing (e.g. libx265/libsvtav1). Switch only if product accepts reduced PreciseCut codec menu + Owner GPL gate."
+    "CANDIDATE_ESSENTIALS_WITH_GAPS -- hard paths pass; soft codecs missing (e.g. libx265/libaom-av1). Switch only if product accepts reduced PreciseCut codec menu + Owner GPL gate."
 } elseif ($deltaBins -lt (20 * 1MB)) {
     "KEEP_FULL_BUILD -- essentials fully passes but bin savings under 20 MB"
 } else {
@@ -444,7 +444,7 @@ $report = [ordered]@{
         muxers = $requiredMuxers
         notes = @(
             "LosslessCut: stream copy",
-            "PreciseCut: libx264/libx265/libsvtav1 + aac (+ optional nvenc/qsv/amf)",
+            "PreciseCut: libx264/libx265/libaom-av1 + aac (+ optional nvenc/qsv/amf)",
             "AudioExtract: copy/mp3/aac/flac/wav",
             "Thumbnail: scale filter + png"
         )
@@ -471,7 +471,7 @@ $report = [ordered]@{
         "Full public release remains Owner-gated for GPL corresponding source.",
         "mpv is unchanged; savings come only from ffmpeg/ffprobe build flavor.",
         "Hard matrix = libx264/aac/mp3/flac/pcm + decode h264/hevc/aac/mp3/flac/opus/vp9/av1 + scale + product runtime smokes.",
-        "Soft matrix = libx265/libsvtav1 software encode (PreciseCut optional codecs)."
+        "Soft matrix = libx265/libaom-av1 software encode (PreciseCut optional codecs)."
     )
 }
 

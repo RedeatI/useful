@@ -17,7 +17,35 @@ import {
 
 const scriptRoot = path.dirname(fileURLToPath(import.meta.url));
 const candidateLockPath = path.join(scriptRoot, "media-runtimes.v2.candidate.lock.json");
+const upstreamLockPath = path.join(scriptRoot, "media-runtimes.upstream.lock.json");
 const execFileAsync = promisify(execFile);
+
+test("upstream runtime lock pins original stable ZIPs and selected file hashes", async () => {
+  const lock = JSON.parse(await readFile(upstreamLockPath, "utf8"));
+  assert.equal(lock.schemaVersion, "useful.media-runtimes-upstream.v1");
+  assert.equal(lock.platform, "windows");
+  assert.equal(lock.arch, "x64");
+  assert.deepEqual(lock.packs.map(({ id }) => id), ["preview", "transcode"]);
+  const preview = lock.packs[0];
+  const transcode = lock.packs[1];
+  assert.equal(preview.providerPageUrl, "https://mpv.io/installation/");
+  assert.match(preview.archive.url, /\/mpv-player\/mpv\/releases\/download\/v0\.41\.0\//);
+  assert.equal(preview.archive.sha256, "4e197f729f5071c6772f35fffd96e0f36e3e8a044bd9479b136bb09b7c6a80ff");
+  assert.deepEqual(preview.files.map(({ targetName }) => targetName), ["mpv.exe", "vulkan-1.dll"]);
+  assert.equal(transcode.providerPageUrl, "https://ffmpeg.org/download.html");
+  assert.equal(transcode.archive.url, "https://www.gyan.dev/ffmpeg/builds/packages/ffmpeg-8.1.2-essentials_build.zip");
+  assert.equal(transcode.archive.sha256, "db580001caa24ac104c8cb856cd113a87b0a443f7bdf47d8c12b1d740584a2ec");
+  assert.deepEqual(transcode.files.map(({ targetName }) => targetName), ["ffmpeg.exe", "ffprobe.exe"]);
+  for (const pack of lock.packs) {
+    assert.doesNotMatch(pack.archive.url, /latest|git-release|unsigned-candidate/);
+    assert.match(pack.archive.sha256, /^[0-9a-f]{64}$/);
+    assert.ok(pack.archive.sizeBytes > 0);
+    for (const file of pack.files) {
+      assert.match(file.sha256, /^[0-9a-f]{64}$/);
+      assert.ok(file.sizeBytes > 0);
+    }
+  }
+});
 
 async function createFixture(root) {
   const binaries = path.join(root, "binaries");
@@ -161,20 +189,20 @@ test("PowerShell packager emits the closed candidate asset set and refuses overw
   }
 });
 
-test("in-app MediaPack trust, proxy, and resume boundaries are build-pinned", async () => {
-  const [native, sidecar, paths, appNative, ipc, view] = await Promise.all([
+test("in-app upstream runtime trust, proxy, extraction, and resume boundaries are build-pinned", async () => {
+  const [native, upstream, lock, sidecar, paths, appNative, ipc, view] = await Promise.all([
     readFile(path.join(scriptRoot, "../apps/useful/src-tauri/src/commands/media_pack.rs"), "utf8"),
+    readFile(path.join(scriptRoot, "../crates/useful-media/src/upstream.rs"), "utf8"),
+    readFile(path.join(scriptRoot, "media-runtimes.upstream.lock.json"), "utf8"),
     readFile(path.join(scriptRoot, "../crates/useful-media/src/sidecar.rs"), "utf8"),
     readFile(path.join(scriptRoot, "../crates/useful-core/src/paths.rs"), "utf8"),
     readFile(path.join(scriptRoot, "../apps/useful/src-tauri/src/lib.rs"), "utf8"),
     readFile(path.join(scriptRoot, "../apps/useful/src/lib/ipc.ts"), "utf8"),
     readFile(path.join(scriptRoot, "../apps/useful/src/views/MediaRuntimeView.vue"), "utf8"),
   ]);
-  assert.match(native, /option_env!\("USEFUL_MEDIA_PACK_CATALOG_URL"\)/);
-  assert.match(native, /option_env!\("USEFUL_MEDIA_PACK_CATALOG_SIGNATURE_URL"\)/);
-  assert.match(native, /option_env!\("USEFUL_MEDIA_PACK_PUBLIC_KEY_HEX"\)/);
-  assert.doesNotMatch(native, /std::env::var(?:_os)?\([^\r\n]*USEFUL_MEDIA_PACK/);
-  assert.match(native, /redirect\(reqwest::redirect::Policy::none\(\)\)/);
+  assert.doesNotMatch(native, /option_env!|std::env::var(?:_os)?\([^\r\n]*USEFUL_MEDIA_PACK/);
+  assert.match(native, /redirect\(reqwest::redirect::Policy::custom/);
+  assert.match(native, /release-assets\.githubusercontent\.com/);
   assert.match(native, /\.no_gzip\(\)/);
   assert.match(native, /\.read_timeout\(Duration::from_secs\(30\)\)/);
   assert.match(native, /MAX_DOWNLOAD_ATTEMPTS:\s*u8\s*=\s*3/);
@@ -184,9 +212,19 @@ test("in-app MediaPack trust, proxy, and resume boundaries are build-pinned", as
   assert.match(native, /CONTENT_RANGE/);
   assert.doesNotMatch(native, /\.no_proxy\(\)|Proxy::|\.proxy\(/);
   assert.match(native, /\.part/);
-  assert.match(native, /pack::install_verified_pack/);
+  assert.match(native, /upstream::install_upstream_pack/);
   assert.doesNotMatch(native, /remove_dir_all/);
-  assert.match(native, /damaged:\s*installed\.damaged/);
+  assert.match(native, /upstream_installed\.damaged\s*\|\|\s*legacy_installed\.damaged/);
+  assert.match(upstream, /include_bytes!\(concat!/);
+  assert.match(upstream, /extract_selected_files/);
+  assert.match(upstream, /selected entry set is incomplete/);
+  assert.match(upstream, /installed file closure/);
+  assert.match(upstream, /sha256_file\(path\)\? != asset\.sha256/);
+  assert.match(lock, /https:\/\/ffmpeg\.org\/download\.html/);
+  assert.match(lock, /https:\/\/www\.gyan\.dev\/ffmpeg\/builds\/packages\/ffmpeg-8\.1\.2-essentials_build\.zip/);
+  assert.match(lock, /https:\/\/github\.com\/mpv-player\/mpv\/releases\/download\/v0\.41\.0/);
+  assert.doesNotMatch(lock, /latest|git-release|unsigned-candidate/);
+  assert.match(sidecar, /crate::upstream::resolve_installed_component/);
   assert.match(sidecar, /media-pack-damaged/);
   assert.doesNotMatch(sidecar, /var_os\("PATH"\)|split_paths/);
   assert.match(paths, /\.useful-write-probe-/);
