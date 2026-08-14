@@ -18,13 +18,17 @@ source maintainer. The CLI does not upload. The CLI does not bypass source or pu
 Canonical source repository: `https://github.com/RedeatI/useful`. Use that URL as a clone entry only
 when it is public and reachable. Do not invent other remotes.
 
-## Agent Kit entry (expected attachment)
+## Agent Kit entry (published preview asset)
 
-An extracted `Useful-<version>-agent-kit.zip` needs Node.js 20 or newer. It does not need the
-monorepo, the GUI, or a global install. It does not change this page’s non-interactive JSON rules,
-stop-on-nonzero rule, default `minimal-web` choice, or signature trust chain.
+The current published preview is
+[`Useful-0.1.0-beta.10-agent-kit.zip`](https://github.com/RedeatI/useful/releases/download/v0.1.0-beta.10/Useful-0.1.0-beta.10-agent-kit.zip).
+After extraction it needs Node.js 20 or newer. It does not need the monorepo, the GUI, or a global
+install. It does not change this page’s non-interactive JSON rules, stop-on-nonzero rule, default
+`minimal-web` choice, or signature trust chain. See the
+[`v0.1.0-beta.10` post-publish acceptance record](../releases/0.1.0-beta.10-agent-kit-acceptance.md).
 
-Treat a kit on disk as not published until a controlled release attaches it.
+Treat a later kit on disk as unpublished until a controlled release attaches that exact version with
+checksums and source evidence. A local kit build does not authorize public distribution.
 
 Windows:
 
