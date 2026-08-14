@@ -950,6 +950,17 @@ function inspectReleaseWorkflow(file, workflow) {
   if (buildRun.includes("tauri icon")) {
     violations.push({ file, code: "release-icon-generation-forbidden" });
   }
+  for (const stepName of [
+    "Compile native application without a bundle",
+    "Compile Windows bootstrap compatibility binary",
+    "Create signed Windows NSIS bundle",
+    "Create unsigned Windows NSIS preview bundle",
+  ]) {
+    const step = buildSteps.find((candidate) => String(candidate?.name ?? "") === stepName);
+    if (String(step?.shell ?? "") !== "bash" || String(step?.env?.TARGET ?? "") !== "${{ matrix.target }}") {
+      violations.push({ file, code: "release-target-shell-contract-invalid", details: stepName });
+    }
+  }
   const windowsFetch = buildSteps.find((step) => String(step?.run ?? "").includes("scripts/fetch-binaries.ps1"));
   const windowsFetchIndex = buildSteps.indexOf(windowsFetch);
   const windowsBundleIndexes = buildSteps
