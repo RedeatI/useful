@@ -63,6 +63,7 @@ It is not a publication authorization.
 | Gate | Status | Notes |
 | --- | --- | --- |
 | BUILD-A-TOOL non-interactive path | done | Published beta.10 Kit passed Windows create → doctor → validate → pack → sign/verify → runtime → legacy/modern MCP acceptance; see [evidence](releases/0.1.0-beta.10-agent-kit-acceptance.md) |
+| Published Kit on Node.js 20 + platform launchers | done | `Platform Bundles` run `31781531217` passed Windows x64, macOS arm64 and Linux x64 against the exact beta.10 ZIP; Windows/POSIX launchers, 36 Actions, worker calls and 40-tool MCP surfaces passed |
 | Default 36 Actions / 40 MCP tools | done | Documented and tested in source |
 
 ## 6. Documentation language

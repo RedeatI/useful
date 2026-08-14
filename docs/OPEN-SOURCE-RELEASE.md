@@ -273,8 +273,9 @@ git diff --check
   under `third-party/<package>/<version>/`, with hashes and sizes matching the index; a package
   metadata record or SPDX expression alone is not a distributable license body. SBOM remains a
   software-component inventory, not an Agent Kit asset inventory.
-- [ ] Until actual macOS/Linux Agent Kit CI jobs run, record those paths only as configured and
-  pending remote verification.
+- [x] Run the exact published beta.10 Agent Kit on macOS arm64 and Linux x64 with Node.js 20 and
+  POSIX launchers. `Platform Bundles` run `31781531217` preserved aggregate-only receipts; this does
+  not claim notarization, production signing, or third-party Agent-host UI integration.
 - [ ] Before publicly distributing Portable Full with GPL ffmpeg/mpv, close the Owner Gate for the
   exact corresponding source, build scripts/configuration, license texts, and continuously
   accessible evidence. An internal candidate is not public-release evidence; this checklist makes
