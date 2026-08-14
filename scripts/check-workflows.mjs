@@ -407,6 +407,17 @@ function inspectCiWorkflow(file, workflow) {
     violations.push({ file, code: "ci-linux-release-tests-order-invalid" });
   }
   inspectLinuxDesktopDependencies(file, workflow.jobs?.["linux-rust-lint"], "ci-linux-release-clippy-dependency-missing");
+  const fuzzSteps = workflow.jobs?.["fuzz-smoke"]?.steps ?? [];
+  for (const command of [
+    "go test ./internal/domain/ -run='^$' -fuzz=FuzzIsLowercaseID -fuzztime=100000x",
+    "go test ./internal/publishers/ -run='^$' -fuzz=FuzzVerifySigstoreBundle -fuzztime=100000x",
+    "go test ./internal/tufmeta/ -run='^$' -fuzz=FuzzVerify -fuzztime=100000x",
+    "go test ./internal/httpapi/ -run='^$' -fuzz=FuzzMetadataName -fuzztime=100000x",
+  ]) {
+    if (!fuzzSteps.some((step) => stepRunsExact(step, command))) {
+      violations.push({ file, code: "ci-fuzz-smoke-budget-not-deterministic", details: command });
+    }
+  }
   if (!hasFrozenPnpmBootstrap(workflow.jobs?.["platform-limited-matrix"]?.steps ?? [])) {
     violations.push({ file, code: "ci-platform-matrix-dependency-bootstrap-missing" });
   }

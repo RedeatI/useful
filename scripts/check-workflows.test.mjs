@@ -416,6 +416,21 @@ test("CI matches the Linux release test gate after Clippy", async (t) => {
   assertViolation(runChecker(root), "ci.yml", "ci-linux-release-tests-order-invalid");
 });
 
+test("CI fuzz smoke uses deterministic execution budgets", async (t) => {
+  const root = await createFixture(t);
+  await mutateWorkflow(root, "ci.yml", (workflow) => {
+    const step = workflow.jobs["fuzz-smoke"].steps
+      .find((candidate) => String(candidate.run ?? "").includes("FuzzMetadataName"));
+    step.run = step.run.replace("-fuzztime=100000x", "-fuzztime=20s");
+  });
+  assertViolation(
+    runChecker(root),
+    "ci.yml",
+    "ci-fuzz-smoke-budget-not-deterministic",
+    "go test ./internal/httpapi/ -run='^$' -fuzz=FuzzMetadataName -fuzztime=100000x",
+  );
+});
+
 test("CI Linux release Clippy installs the release desktop dependencies", async (t) => {
   const root = await createFixture(t);
   await mutateWorkflow(root, "ci.yml", (workflow) => {
