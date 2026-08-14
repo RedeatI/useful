@@ -74,10 +74,20 @@ pub(crate) fn file_url_path(url: &str) -> Result<Option<PathBuf>, CmdError> {
     }
     let parsed = reqwest::Url::parse(url)
         .map_err(|error| CmdError::from(format!("本地文件 URL 无效: {error}")))?;
-    parsed
+    let raw_authority_and_path = url["file://".len()..]
+        .split(['?', '#'])
+        .next()
+        .unwrap_or_default();
+    if !raw_authority_and_path.contains('/') {
+        return Err(CmdError::from("本地文件 URL 必须表示当前平台的绝对路径"));
+    }
+    let path = parsed
         .to_file_path()
-        .map(Some)
-        .map_err(|_| CmdError::from("本地文件 URL 必须表示当前平台的绝对路径"))
+        .map_err(|_| CmdError::from("本地文件 URL 必须表示当前平台的绝对路径"))?;
+    if !path.is_absolute() {
+        return Err(CmdError::from("本地文件 URL 必须表示当前平台的绝对路径"));
+    }
+    Ok(Some(path))
 }
 
 /// 拉取 URL 字节（支持开发者模式下 file://）。带大小上限。
@@ -509,5 +519,7 @@ mod tests {
     #[test]
     fn file_url_rejects_non_absolute_or_unrepresentable_paths() {
         assert!(file_url_path("file://").is_err());
+        assert!(file_url_path("file://?query-without-path").is_err());
+        assert!(file_url_path("file://#fragment-without-path").is_err());
     }
 }

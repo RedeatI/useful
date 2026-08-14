@@ -386,6 +386,7 @@ function inspectCiWorkflow(file, workflow) {
   const linuxInstallIndex = linuxRustLintSteps.findIndex((step) => stepRunsExact(step, "pnpm install --frozen-lockfile"));
   const linuxBuildIndex = linuxRustLintSteps.findIndex((step) => stepRunsExact(step, "pnpm -r build"));
   const linuxClippyIndex = linuxRustLintSteps.findIndex((step) => stepRunsExact(step, "cargo clippy --workspace --all-targets -- -D warnings"));
+  const linuxTestIndex = linuxRustLintSteps.findIndex((step) => stepRunsExact(step, "cargo test --workspace"));
   if (linuxClippyIndex < 0) {
     violations.push({ file, code: "ci-linux-release-clippy-missing" });
   }
@@ -399,6 +400,11 @@ function inspectCiWorkflow(file, workflow) {
   }
   if (linuxBuildIndex < 0 || linuxClippyIndex < 0 || !(linuxInstallIndex < linuxBuildIndex && linuxBuildIndex < linuxClippyIndex)) {
     violations.push({ file, code: "ci-linux-release-clippy-build-order-invalid" });
+  }
+  if (linuxTestIndex < 0) {
+    violations.push({ file, code: "ci-linux-release-tests-missing" });
+  } else if (linuxClippyIndex < 0 || linuxClippyIndex > linuxTestIndex) {
+    violations.push({ file, code: "ci-linux-release-tests-order-invalid" });
   }
   inspectLinuxDesktopDependencies(file, workflow.jobs?.["linux-rust-lint"], "ci-linux-release-clippy-dependency-missing");
   if (!hasFrozenPnpmBootstrap(workflow.jobs?.["platform-limited-matrix"]?.steps ?? [])) {
@@ -686,6 +692,9 @@ function inspectReleaseWorkflow(file, workflow) {
 
   const identityRun = jobRunText(workflow.jobs?.identity);
   const verifyRun = jobRunText(workflow.jobs?.verify);
+  if (!identityRun.includes("linux-rust-lint")) {
+    violations.push({ file, code: "release-linux-rust-check-not-required-before-publish" });
+  }
   if (!hasFrozenPnpmBootstrap(workflow.jobs?.["verify-compose"]?.steps ?? [])) {
     violations.push({ file, code: "release-compose-dependency-bootstrap-missing" });
   }
@@ -693,6 +702,9 @@ function inspectReleaseWorkflow(file, workflow) {
   const agentKitRun = jobRunText(workflow.jobs?.["agent-kit"]);
   const assembleRun = jobRunText(workflow.jobs?.assemble);
   const publishRun = jobRunText(publish);
+  if (!publishRun.includes("linux-rust-lint")) {
+    violations.push({ file, code: "release-linux-rust-check-not-revalidated-at-publish" });
+  }
   const sourceRun = jobRunText(sourceJob);
   const sourcePublishRun = jobRunText(sourcePublish);
   if (
