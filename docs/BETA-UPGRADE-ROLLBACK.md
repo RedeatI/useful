@@ -1,24 +1,27 @@
 # Beta 安装、升级、通道切换与回滚
 
-本页描述 `0.1.0-beta.3` 公开 Beta 候选的预期操作。桌面候选资产尚未上传 GitHub，也没有可填写的下载
-URL；只有在所有者完成发布门禁并提供最终资产清单、校验和与签名后，才能把下列步骤当作分发说明。
+本页描述已发布的未签名预览版
+[`v0.1.0-beta.10`](https://github.com/RedeatI/useful/releases/tag/v0.1.0-beta.10) 的安装与本地恢复操作。
+它不是正式签名版本，也没有生产在线更新 feed。
 
 Useful 的 Windows x64 edition 约定为 setup Lite、Portable Lite 和 Portable Full。Lite 不内置媒体
 运行时；Full 计划包含固定版本且经 SHA-256 校验的 `ffmpeg`、`ffprobe`、`mpv`。`Useful.exe` 是
 保留的 Windows 兼容主程序文件名，不表示公开产品仍称为 Useful。macOS/Linux 当前不承诺内置媒体
 运行时或提供 Full edition。
 
-## 安装候选资产
+## 安装预览资产
 
-1. 只使用最终 Release 资产清单中允许的文件，并按同一 Release 提供的 `SHA256SUMS.txt` 校验。
-2. Portable Lite 或 Portable Full ZIP 应解压到新的可写空目录；setup Lite 使用安装程序。不要覆盖
+1. 从同一 GitHub Release 下载 `Useful-0.1.0-beta.10-windows-x64-portable-lite.zip` 或
+   `Useful-0.1.0-beta.10-windows-x64-setup-lite.exe`，并按其中的 `SHA256SUMS.txt` 校验。
+2. Portable Lite ZIP 应解压到新的可写空目录；setup Lite 使用安装程序。不要覆盖
    正式用户目录，也不要混用不同候选版本的文件。
    Portable 启动时会对隔离数据树执行写探针；不可写时会在打开数据库前停止并提示，不会静默改用 AppData。
 3. Portable 版本应确认 `portable.flag` 与 `update/current-version.txt` 存在。
 4. 启动 Useful 的兼容主程序 `Useful.exe`。首次评估建议先从设置页导出一次本地反馈包，并在分享前
    人工预览。
 
-如果正式资产清单、校验和或签名仍缺失，请停止；本地开发构建不能替代公开 Beta 分发资产。
+如果资产不在上述 Release 的闭合集内，或校验和不匹配，请停止；本地开发构建不能替代公开 Beta
+分发资产。Windows Authenticode 仍未验证，因此系统可能显示未知发布者警告。
 
 ## 切换更新通道
 
@@ -34,7 +37,7 @@ Useful 的 Windows x64 edition 约定为 setup Lite、Portable Lite 和 Portable
 3. 应用前备份旧版本；新版本启动成功后才写入 `current-version.txt`。
 4. 签名、摘要或启动失败时返回非零，不更新版本号，并保留失败证据。
 
-这些是升级契约，不是 `beta.2` 已存在或更新链路已在生产环境运行的声明。
+这些是升级契约，不表示 `v0.1.0-beta.10` 已接入生产更新链路。
 
 ## 自动回滚
 

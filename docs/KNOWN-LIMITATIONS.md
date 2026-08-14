@@ -70,8 +70,8 @@ Windows 为主要验证目标的能力。macOS/Linux 应明确降级或报告不
   代替用户确认。它们仍不是已发布的独立 CLI/MCP，真实 ffmpeg/ffprobe、进程终止、取消后的部分输出以及
   Windows/macOS/Linux 行为必须绑定精确候选另行验收。
 - Agent Kit 构建器会产生 3 个命令 bundle 和 2 个固定 worker bundle，并保存 descriptor provenance 源码与
-  实际打包依赖的逐包许可证文件。它仍是 internal candidate；这只证明归档合同已实现，在精确 ZIP、
-  SHA-256、清单、许可证闭集和目标平台执行结果未验证前，不能称为已发布或跨平台验收通过。
+  实际打包依赖的逐包许可证文件。`v0.1.0-beta.10` 已附带由受控发布工作流生成并校验的 Agent Kit；本地
+  构建仍只是候选，不能据此声称已发布或已完成所有目标平台运行验收。
 
 ### Sigstore/Rekor 验证范围
 
@@ -101,22 +101,23 @@ Windows 为主要验证目标的能力。macOS/Linux 应明确降级或报告不
 ### 已完成
 
 - 公开仓库：`https://github.com/RedeatI/useful`
-- 源码/Agent Kit 与未签名 Windows 桌面预览 Release（例如 `v0.1.0-beta.3`、`v0.1.0-beta.4`）
+- 当前源码、Agent Kit 与未签名 Windows 桌面预览 Release：
+  [`v0.1.0-beta.10`](https://github.com/RedeatI/useful/releases/tag/v0.1.0-beta.10)
 - 双语 README 与英文入口文档
 - GitHub Private Vulnerability Reporting 已在 `RedeatI/useful` 启用（见 [`SECURITY.md`](../SECURITY.md)）
 
-### 桌面预览已知产品摩擦（beta.4）
+### 历史桌面预览说明（beta.4）
 
-- `v0.1.0-beta.4` 发布包内部分二进制的**界面版本徽章**可能仍显示较早的 `0.1.0-beta.1`
-  （`HOST_VERSION` 在编译期取自 Cargo 包版本）。Release 文件名与 monorepo 源码版本以
-  `0.1.0-beta.4` 为准。修复方式：用当前源码重新打未签名预览包并替换 Release 资产。
+- `v0.1.0-beta.4` 发布包内部分二进制的界面版本徽章可能仍显示较早的 `0.1.0-beta.1`。该历史
+  Release 保持不变；当前 `v0.1.0-beta.10` 已从版本一致的源码重新构建，下载时不要混用两版资产。
 
 ### 仍需 Owner / 平台证据
 
 - Windows/macOS 正式代码签名身份与 macOS 公证凭据
 - 生产更新根与带真实签名清单的 HTTPS 更新 feed
 - Full edition 的 GPL 对应源码和许可证证据
-- 精确候选的真实 macOS/Linux runner 执行，以及绑定候选的 Windows 原生视觉与运行验收
+- macOS/Linux 平台包已在 `737d9bc` 的真实 GitHub runner 上构建，但仍缺签名/公证与候选绑定的原生
+  启动、界面和长期运行验收；Windows 也仍缺完整原生视觉与安装/卸载验收
 - 命名 CoC 执法联系人后再广泛开放 drive-by 投稿（见 [`CODE_OF_CONDUCT.md`](../CODE_OF_CONDUCT.md)）
 
 ### 最近完成的安全证据

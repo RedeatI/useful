@@ -10,7 +10,7 @@ This page is the practical fill-in list for a **signed** Useful desktop Release 
 
 It is **not** a publication authorization. Values marked **secret** must never be committed.
 
-## Current remote snapshot (2026-08-12)
+## Current remote snapshot (2026-08-14)
 
 | Item | Status |
 | --- | --- |
@@ -18,9 +18,9 @@ It is **not** a publication authorization. Values marked **secret** must never b
 | GitHub Actions **variable** `USEFUL_EXPECTED_REPOSITORY` | set |
 | GitHub Actions **variable** `USEFUL_RELEASE_ACTORS` | set |
 | GitHub Actions **environment** `release` | present |
-| Update-root / feed / ceremony variables | **missing** |
+| Update-root / feed / ceremony variables | set; `updateTrustReady=true` |
 | Windows / Apple signing **secrets** | **missing** (none listed on the repo) |
-| Latest desktop assets | unsigned prerelease `v0.1.0-beta.4` |
+| Latest desktop assets | unsigned prerelease [`v0.1.0-beta.10`](https://github.com/RedeatI/useful/releases/tag/v0.1.0-beta.10) |
 
 Until the missing items are filled and verified, only **unsigned preview** Releases are honest.
 
@@ -30,7 +30,7 @@ Until the missing items are filled and verified, only **unsigned preview** Relea
 
 | Goal | Channel | Minimum extra gates |
 | --- | --- | --- |
-| Unsigned Windows preview (already done) | manual `gh release` / prerelease | none of the production keys |
+| Unsigned Windows preview (already done) | `release.yml`, `beta`, `desktop-lite`, prerelease | exact CI, legal, source, provenance, and publish authorization gates |
 | Signed **beta** via `release.yml` + `publish=true` | `beta` | §1 identity + §2 update trust + §3 Windows secrets (+ §4 if macOS assets required) |
 | Signed **stable** via `release.yml` + `publish=true` | `stable` | all of beta + §5 stable evidence + `USEFUL_SIGNING_READY=true` + verified signing status |
 | Public **Portable Full** with ffmpeg/mpv | any public Full | §6 media source compliance Owner Gate |
@@ -337,7 +337,7 @@ Copy this table into an internal ticket. Do not paste secret material into git.
 
 | Situation | Allowed public claim |
 | --- | --- |
-| Current `v0.1.0-beta.4` desktop assets | Unsigned Windows developer-trust preview |
+| Current `v0.1.0-beta.10` desktop assets | Unsigned Windows developer-trust preview |
 | Agent Kit on that Release | Buildable kit; `publicationAuthorized: false` |
 | Vars §1 only, no secrets | Cannot claim signed Release |
 | §1–§3 complete, beta workflow green | Signed **beta** Windows desktop Release |
