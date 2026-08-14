@@ -703,6 +703,16 @@ function inspectReleaseWorkflow(file, workflow) {
 
   const identityRun = jobRunText(workflow.jobs?.identity);
   const verifyRun = jobRunText(workflow.jobs?.verify);
+  const platformCheckIdentities = [
+    "platform-limited-matrix (native-tauri-smoke, windows-latest)",
+    "platform-limited-matrix (large-file-resume, windows-latest)",
+    "platform-limited-matrix (compose-fault-injection, ubuntu-latest)",
+  ];
+  for (const checkName of platformCheckIdentities) {
+    if (!identityRun.includes(checkName)) {
+      violations.push({ file, code: "release-platform-check-identity-invalid", details: `identity:${checkName}` });
+    }
+  }
   if (!identityRun.includes("linux-rust-lint")) {
     violations.push({ file, code: "release-linux-rust-check-not-required-before-publish" });
   }
@@ -713,6 +723,11 @@ function inspectReleaseWorkflow(file, workflow) {
   const agentKitRun = jobRunText(workflow.jobs?.["agent-kit"]);
   const assembleRun = jobRunText(workflow.jobs?.assemble);
   const publishRun = jobRunText(publish);
+  for (const checkName of platformCheckIdentities) {
+    if (!publishRun.includes(checkName)) {
+      violations.push({ file, code: "release-platform-check-identity-invalid", details: `publish:${checkName}` });
+    }
+  }
   if (!publishRun.includes("linux-rust-lint")) {
     violations.push({ file, code: "release-linux-rust-check-not-revalidated-at-publish" });
   }

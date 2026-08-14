@@ -262,9 +262,9 @@ test("bundle identifier policy fails closed for an invalid base or any platform 
 
 test("bilingual README release tags, portable assets, bundles, and checksums are version-bound", async () => {
   const scenarios = [
-    ["README.md", "releases/tag/v0.1.0-beta.9", "releases/tag/v0.1.0-beta.8"],
-    ["README.zh-CN.md", "Useful-0.1.0-beta.9-windows-x64-portable-lite.zip", "Useful-0.1.0-beta.8-windows-x64-portable-lite.zip"],
-    ["README.md", "Useful-0.1.0-beta.9-windows-x64-setup-lite.exe", "Useful-0.1.0-beta.8-windows-x64-setup-lite.exe"],
+    ["README.md", "releases/tag/v0.1.0-beta.10", "releases/tag/v0.1.0-beta.9"],
+    ["README.zh-CN.md", "Useful-0.1.0-beta.10-windows-x64-portable-lite.zip", "Useful-0.1.0-beta.9-windows-x64-portable-lite.zip"],
+    ["README.md", "Useful-0.1.0-beta.10-windows-x64-setup-lite.exe", "Useful-0.1.0-beta.9-windows-x64-setup-lite.exe"],
   ];
   for (const [relative, from, to] of scenarios) {
     const fixture = await makeVersionDriftFixture();
