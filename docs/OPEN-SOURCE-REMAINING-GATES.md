@@ -1,8 +1,8 @@
 # Open-source remaining gates (status)
 
-Date: 2026-08-13
+Date: 2026-08-14
 Public repository: `https://github.com/RedeatI/useful`  
-Baseline commit for this note: `f77033b` (public Beta readiness plus bounded JSON tree traversal).
+Baseline commit for this note: `737d9bc` (`v0.1.0-beta.10` unsigned preview release commit).
 
 This page is a working status against [OPEN-SOURCE-RELEASE.md](OPEN-SOURCE-RELEASE.md).  
 It is not a publication authorization.
@@ -21,7 +21,7 @@ It is not a publication authorization.
 | Canonical public repo `RedeatI/useful` | done | Public |
 | Useful product identity consistency | done | README and package names use Useful |
 | Root LICENSE / LICENSES map | partial | Files present; each release still needs candidate-specific legal review |
-| Private Vulnerability Reporting enabled and tested | done | API `private-vulnerability-reporting.enabled=true` (2026-08-12); Owner should still click **Report a vulnerability** once in the UI |
+| Private Vulnerability Reporting enabled and tested | partial | API `private-vulnerability-reporting.enabled=true` (rechecked 2026-08-14); Owner UI click-through remains |
 | Public Issues / contribution intake | partial | `has_issues=true` (0 open); CoC still requires a named enforcement contact before inviting drive-by PRs |
 | Branch protection and review rules | done | `main` has protection (linear history, no force-push, conversation resolution); `required_approving_review_count` is still 0 |
 
@@ -30,8 +30,8 @@ It is not a publication authorization.
 | Gate | Status | Notes |
 | --- | --- | --- |
 | Sanitized public history | done | Public main exists |
-| Source + Agent Kit preview Release | done | `v0.1.0-beta.3` history; **current** kit also on `v0.1.0-beta.4` |
-| Unsigned Windows desktop preview Release | done | `v0.1.0-beta.4` portable / MSI / setup / bundle + SHA256SUMS (development-trust only) |
+| Source + Agent Kit preview Release | done | Current closed-set Agent Kit is on [`v0.1.0-beta.10`](https://github.com/RedeatI/useful/releases/tag/v0.1.0-beta.10) |
+| Unsigned Windows desktop preview Release | done | `v0.1.0-beta.10` Portable Lite + Setup Lite + `SHA256SUMS.txt` (development-trust only) |
 | Desktop binaries in an official signed Release | blocked | Windows Authenticode and production update trust missing |
 
 ## 3. Local and remote verification
@@ -39,9 +39,9 @@ It is not a publication authorization.
 | Gate | Status | Notes |
 | --- | --- | --- |
 | Windows source build path | partial | Local release/portable packaging path exists; portable smoke launch OK on build machine |
-| macOS real runner build | blocked | CI config is not runner proof |
-| Linux real runner build | blocked | CI config is not runner proof |
-| Required CI green on release commit | partial | Re-check before any `release.yml` publish=true run |
+| macOS real runner build | done | `Platform Bundles` run `31766070800` built x86_64 + aarch64 preview bundles at `737d9bc`; not notarized or released |
+| Linux real runner build | done | `Platform Bundles` run `31766070800` built x86_64 preview bundle at `737d9bc`; not released |
+| Required CI green on release commit | done | CI `31766066618`, CodeQL `31766068891`, and Platform Bundles `31766070800` passed at `737d9bc` before publish |
 | npm audit clean | done | `pnpm audit` clean after overrides (2026-08-12) |
 | Rust Dependabot open alerts | done | GitHub API returned zero open alerts after alert #1 was dismissed as `not_used` (2026-08-13; see §7) |
 
@@ -53,9 +53,9 @@ It is not a publication authorization.
 | macOS signing and notarization | blocked | Owner credentials / six `APPLE_*` secrets |
 | Production update root variables | done | `USEFUL_UPDATE_ROOT_*` + feed template present; `updateTrustReady=true` |
 | Production update feed with real signed manifests | blocked | Placeholders only until signed Release |
-| Development-trust unsigned Windows preview packages | done | Published on `v0.1.0-beta.4`; labeled non-production |
+| Development-trust unsigned Windows preview packages | done | Published on `v0.1.0-beta.10`; labeled unsigned prerelease |
 | Portable Full / GPL media | blocked | Corresponding-source Owner Gate |
-| Agent Kit closed MANIFEST + legal files | partial | Preview kit attached on beta.4; keep `publicationAuthorized:false` claims honest |
+| Agent Kit closed MANIFEST + legal files | done | `v0.1.0-beta.10` attached the kit, source manifest, legal files, provenance, and checksums as one read-back-verified closed set |
 | `signedBetaPublishReady` | blocked | `node scripts/check-owner-signing-gates.mjs --json` → false until Windows secrets |
 
 ## 5. Third-party Agent path
@@ -72,7 +72,7 @@ It is not a publication authorization.
 | Bilingual README STE rewrite | done | PR #17 and follow-ups |
 | English entry pages for main README links | done | See [README-I18N.md](README-I18N.md) |
 | Real UI screenshots in README | partial | Three PNG screenshots present; optional refresh from current UI |
-| Local 宣发 pack (not in repo) | partial | Owner local pack aligned to beta.4; not required on GitHub |
+| Local 宣发 pack (not in repo) | n/a | Not assessed; not required for GitHub release readiness |
 
 ## 7. Resolved Dependabot triage (Rust)
 
@@ -89,7 +89,7 @@ affected API use changes; adopt a compatible upstream upgrade when one becomes a
 1. Buy or issue Windows Code Signing certificate; run `scripts/upload-windows-code-sign-secrets.ps1`.
 2. Optional: add all six `APPLE_*` secrets for macOS signing and notarization.
 3. Run `node scripts/check-owner-signing-gates.mjs --json` until `signedBetaPublishReady` is true.
-4. Run real macOS and Linux build jobs; store logs and artifact digests with the candidate SHA.
+4. Perform candidate-bound native launch/UI acceptance on macOS, Linux, and Windows; preserve the exact artifacts and results.
 5. Name a CoC enforcement contact (or keep contribution intake limited).
 6. Manually re-test the GitHub **Report a vulnerability** UI once.
 7. After signed Release: publish real update-feed manifests (not placeholders).
@@ -105,7 +105,7 @@ affected API use changes; adopt a compatible upstream upgrade when one becomes a
 
 Until production signing and update trust pass:
 
-- Publish desktop MSI / portable artifacts only as **prerelease**, **unsigned**,
+- Publish desktop setup / portable artifacts only as **prerelease**, **unsigned**,
   **development-trust** previews.
 - Do not mark them as latest stable.
 - Do not claim notarization, SmartScreen trust, or production auto-update.

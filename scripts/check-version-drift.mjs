@@ -19,6 +19,18 @@ const TAURI_PLATFORM_CONFIGS = Object.freeze([
   { platform: "linux", path: "apps/useful/src-tauri/tauri.linux.conf.json" },
 ]);
 const PUBLIC_READMES = Object.freeze(["README.md", "README.zh-CN.md"]);
+const CURRENT_RELEASE_DOCUMENTS = Object.freeze([
+  { path: "docs/BETA-FEEDBACK.md", assets: [] },
+  {
+    path: "docs/BETA-UPGRADE-ROLLBACK.md",
+    assets: ["portableLiteAsset", "setupLiteAsset", "checksumAsset"],
+  },
+  { path: "docs/KNOWN-LIMITATIONS.md", assets: [] },
+  { path: "docs/KNOWN-LIMITATIONS.en.md", assets: [] },
+  { path: "docs/OPEN-SOURCE-REMAINING-GATES.md", assets: [] },
+  { path: "docs/OWNER-SIGNING-GATE-CHECKLIST.md", assets: [] },
+  { path: "docs/OWNER-WINDOWS-CODE-SIGN-GUIDE.zh-CN.md", assets: [] },
+]);
 
 async function readJson(repoRoot, relative) {
   return JSON.parse(await readFile(path.join(repoRoot, relative), "utf8"));
@@ -136,6 +148,36 @@ export async function evaluateReadmeReleaseReferences({ repoRoot = defaultRepoRo
   return { expected, ok: failures.length === 0, required, files, failures };
 }
 
+export async function evaluateCurrentReleaseDocumentation({ repoRoot = defaultRepoRoot, expected }) {
+  const required = Object.freeze({
+    releaseTag: `releases/tag/v${expected}`,
+    portableLiteAsset: `Useful-${expected}-windows-x64-portable-lite.zip`,
+    setupLiteAsset: `Useful-${expected}-windows-x64-setup-lite.exe`,
+    checksumAsset: "SHA256SUMS.txt",
+  });
+  const files = [];
+  const failures = [];
+  const documents = [...CURRENT_RELEASE_DOCUMENTS, { path: `docs/releases/${expected}.md`, assets: [] }];
+  for (const entry of documents) {
+    let raw;
+    try {
+      raw = await readFile(path.join(repoRoot, entry.path), "utf8");
+    } catch (error) {
+      if (error?.code !== "ENOENT") throw error;
+      failures.push({ code: "current-release-documentation-file-missing", path: entry.path });
+      files.push({ path: entry.path, ok: false, required: ["releaseTag", ...entry.assets] });
+      continue;
+    }
+    const fields = ["releaseTag", ...entry.assets];
+    const missing = fields.filter((field) => !raw.includes(required[field]));
+    for (const field of missing) {
+      failures.push({ code: "current-release-documentation-missing", path: entry.path, field });
+    }
+    files.push({ path: entry.path, ok: missing.length === 0, required: fields });
+  }
+  return { expected, ok: failures.length === 0, required, files, failures };
+}
+
 export async function evaluateVersionDrift({ repoRoot = defaultRepoRoot } = {}) {
   const rootPackage = await readJson(repoRoot, "package.json");
   const expected = rootPackage.version;
@@ -172,15 +214,17 @@ export async function evaluateVersionDrift({ repoRoot = defaultRepoRoot } = {}) 
   }
   const bundleIdentifier = evaluateBundleIdentifierConfiguration({ baseConfig, platformConfigs });
   const readmeRelease = await evaluateReadmeReleaseReferences({ repoRoot, expected });
+  const documentationRelease = await evaluateCurrentReleaseDocumentation({ repoRoot, expected });
   const mismatches = observations.filter((entry) => !entry.matches);
   return {
     schemaVersion: "useful.version-drift.v1",
-    ok: mismatches.length === 0 && bundleIdentifier.ok && readmeRelease.ok,
+    ok: mismatches.length === 0 && bundleIdentifier.ok && readmeRelease.ok && documentationRelease.ok,
     version: expected,
     channel,
     checked: observations.length,
     bundleIdentifier,
     readmeRelease,
+    documentationRelease,
     mismatches,
   };
 }
@@ -222,6 +266,9 @@ async function main() {
       process.stderr.write(`- ${failure.path}: ${failure.code}\n`);
     }
     for (const failure of result.readmeRelease.failures) {
+      process.stderr.write(`- ${failure.path}: ${failure.code} (${failure.field})\n`);
+    }
+    for (const failure of result.documentationRelease.failures) {
       process.stderr.write(`- ${failure.path}: ${failure.code} (${failure.field})\n`);
     }
   }

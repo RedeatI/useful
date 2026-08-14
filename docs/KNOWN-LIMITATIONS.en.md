@@ -64,7 +64,8 @@ that a remote job ran. It does not show that a platform binary works.
 ### Distribution
 
 - Public repository: `https://github.com/RedeatI/useful`.
-- Source/Agent Kit and unsigned Windows desktop preview releases exist (for example `v0.1.0-beta.3`, `v0.1.0-beta.4`).
+- The current source, Agent Kit, and unsigned Windows desktop preview are published as
+  [`v0.1.0-beta.10`](https://github.com/RedeatI/useful/releases/tag/v0.1.0-beta.10).
 - Official **signed** desktop installers and a production update feed are not available unless a
   later release explicitly provides signature evidence.
 - Development-trust Windows installers or portable packages are preview artifacts. They are not a
@@ -79,7 +80,9 @@ that a remote job ran. It does not show that a platform binary works.
 - Windows/macOS production code-signing identity and macOS notarization credentials
 - Production update root and HTTPS update feed with real signed manifests
 - Full edition GPL corresponding-source evidence
-- Real macOS/Linux runner results and candidate-bound Windows native visual acceptance
+- macOS/Linux bundles were built on real GitHub runners at `737d9bc`, but signing/notarization and
+  candidate-bound native launch, UI, and longer-running acceptance remain incomplete; Windows native
+  visual and install/uninstall acceptance is also incomplete
 - Named CoC enforcement contact before broad drive-by contribution intake
   ([CODE_OF_CONDUCT.md](../CODE_OF_CONDUCT.md))
 
@@ -92,12 +95,11 @@ that a remote job ran. It does not show that a platform binary works.
   the lockfile, Tauri/GTK/WebKitGTK dependency path, or either API use changes; see
   [OPEN-SOURCE-REMAINING-GATES.md](OPEN-SOURCE-REMAINING-GATES.md) §7.
 
-### Desktop preview product friction (beta.4)
+### Historical desktop preview note (beta.4)
 
-- Some binaries attached to `v0.1.0-beta.4` may still show an in-app badge of `0.1.0-beta.1`
-  because `HOST_VERSION` is compiled from the Cargo package version at build time. Treat the
-  Release asset names and monorepo version as `0.1.0-beta.4`. Fix: rebuild the unsigned preview
-  packages from current source and replace the Release assets.
+- Some binaries attached to `v0.1.0-beta.4` may still show an in-app badge of `0.1.0-beta.1`.
+  That historical Release remains unchanged. The current `v0.1.0-beta.10` assets were rebuilt from
+  version-aligned source; do not mix files from the two Releases.
 
 ## Related documents
 

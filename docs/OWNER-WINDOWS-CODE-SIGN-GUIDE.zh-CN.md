@@ -101,7 +101,7 @@ signedBetaPublishReady: true   # 在更新根变量也已就绪时
 
 - 生产更新根仪式（私钥在本机安全目录，不在 git）  
 - GitHub 变量：`USEFUL_UPDATE_ROOT_PUBKEY_HEX` / feed / ceremony  
-- 未签名预览包：`v0.1.0-beta.4`  
+- 未签名预览包：[`v0.1.0-beta.10`](https://github.com/RedeatI/useful/releases/tag/v0.1.0-beta.10)
 
 你可以：
 

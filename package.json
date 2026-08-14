@@ -21,7 +21,7 @@
     "i18n:check": "node scripts/check-i18n.mjs",
     "action:check": "node --test packages/action-runtime/test/surface-admission.test.mjs && pnpm --filter @useful/app exec vitest run src/lib/tools/registry.spec.ts src/lib/officeRegistry.spec.ts src/lib/actionCatalog.spec.ts && pnpm --filter @useful/mcp exec node --test --test-concurrency=1 test/mcp.test.mjs",
     "workflow:check": "node scripts/check-workflows.mjs",
-    "policy:test": "node --test scripts/check-brand.test.mjs scripts/check-workflows.test.mjs scripts/public-source-check.test.mjs scripts/prepare-public-source.test.mjs scripts/release-readiness.test.mjs scripts/public-release-path.test.mjs scripts/verify-public-commit.test.mjs",
+    "policy:test": "node --test scripts/check-brand.test.mjs scripts/check-version-drift.test.mjs scripts/check-workflows.test.mjs scripts/public-source-check.test.mjs scripts/prepare-public-source.test.mjs scripts/release-readiness.test.mjs scripts/public-release-path.test.mjs scripts/verify-public-commit.test.mjs",
     "release:checks": "node --test scripts/gen-sbom.test.mjs scripts/install-media-pack.test.mjs scripts/media-pack-catalog.test.mjs scripts/media-pack-signing.test.mjs scripts/media-pack-v2.test.mjs scripts/release-metadata-media.test.mjs scripts/release-metadata.test.mjs scripts/release-packaging-contract.test.mjs scripts/release-publish-gate.test.mjs scripts/release-signing-status.test.mjs scripts/size-budget.test.mjs",
     "size:measure": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/measure-size.ps1",
     "size:check": "node scripts/size-budget.mjs",
