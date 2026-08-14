@@ -209,9 +209,9 @@ jobs:
             source-backend
             fuzz-smoke
             compose-e2e
-            'platform-limited-matrix (native-tauri-smoke)'
-            'platform-limited-matrix (large-file-resume)'
-            'platform-limited-matrix (compose-fault-injection)'
+            'platform-limited-matrix (native-tauri-smoke, windows-latest)'
+            'platform-limited-matrix (large-file-resume, windows-latest)'
+            'platform-limited-matrix (compose-fault-injection, ubuntu-latest)'
           )
           for name in "${required[@]}"; do
             latest=$(jq -c --arg name "$name" \
@@ -2046,9 +2046,9 @@ jobs:
             source-backend
             fuzz-smoke
             compose-e2e
-            'platform-limited-matrix (native-tauri-smoke)'
-            'platform-limited-matrix (large-file-resume)'
-            'platform-limited-matrix (compose-fault-injection)'
+            'platform-limited-matrix (native-tauri-smoke, windows-latest)'
+            'platform-limited-matrix (large-file-resume, windows-latest)'
+            'platform-limited-matrix (compose-fault-injection, ubuntu-latest)'
           )
           for name in "${required[@]}"; do
             latest=$(jq -c --arg name "$name" \

@@ -688,6 +688,24 @@ test("release requires the Linux Rust check before and during publish", async (t
   assertViolation(runChecker(root), "release.yml", "release-linux-rust-check-not-revalidated-at-publish");
 });
 
+test("release requires exact matrix check identities including runners", async (t) => {
+  const root = await createFixture(t);
+  await mutateWorkflow(root, "release.yml", (workflow) => {
+    const step = workflow.jobs.identity.steps
+      .find((candidate) => String(candidate.name ?? "").includes("Require all exact-commit"));
+    step.run = step.run.replace(
+      "platform-limited-matrix (native-tauri-smoke, windows-latest)",
+      "platform-limited-matrix (native-tauri-smoke)",
+    );
+  });
+  assertViolation(
+    runChecker(root),
+    "release.yml",
+    "release-platform-check-identity-invalid",
+    "identity:platform-limited-matrix (native-tauri-smoke, windows-latest)",
+  );
+});
+
 test("release actor allowlist preserves a newline for a single configured actor", async (t) => {
   const root = await createFixture(t);
   await mutateWorkflow(root, "release.yml", (workflow) => {
