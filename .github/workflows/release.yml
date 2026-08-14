@@ -926,11 +926,13 @@ jobs:
           test -f "$icon"
           test -s "$icon"
       - name: Compile native application without a bundle
+        shell: bash
         env:
           TARGET: ${{ matrix.target }}
         run: pnpm --filter @useful/app tauri build --target "$TARGET" --no-bundle
       - name: Compile Windows bootstrap compatibility binary
         if: matrix.platform == 'windows'
+        shell: bash
         env:
           TARGET: ${{ matrix.target }}
         run: cargo build -p useful-bootstrap --release --target "$TARGET"
@@ -1006,6 +1008,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "signtool failed with exit code $LASTEXITCODE" }
       - name: Create signed Windows NSIS bundle
         if: matrix.platform == 'windows' && steps.windows-signing.outputs.signed == 'true'
+        shell: bash
         env:
           TARGET: ${{ matrix.target }}
           SIGNING_CONFIG: ${{ steps.windows-cert.outputs.config }}
@@ -1017,6 +1020,7 @@ jobs:
           --ci
       - name: Create unsigned Windows NSIS preview bundle
         if: matrix.platform == 'windows' && steps.windows-signing.outputs.signed != 'true'
+        shell: bash
         env:
           TARGET: ${{ matrix.target }}
         run: pnpm --filter @useful/app tauri bundle --target "$TARGET" --bundles nsis --no-sign --ci

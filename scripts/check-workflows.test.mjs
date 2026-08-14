@@ -656,6 +656,21 @@ test("release publish default true is rejected", async (t) => {
   assertViolation(runChecker(root), "release.yml", "release-publish-input-not-fail-closed");
 });
 
+test("release target commands use an explicit cross-platform shell", async (t) => {
+  const root = await createFixture(t);
+  await mutateWorkflow(root, "release.yml", (workflow) => {
+    const step = workflow.jobs.build.steps
+      .find((candidate) => candidate.name === "Compile native application without a bundle");
+    delete step.shell;
+  });
+  assertViolation(
+    runChecker(root),
+    "release.yml",
+    "release-target-shell-contract-invalid",
+    "Compile native application without a bundle",
+  );
+});
+
 test("release requires the Linux Rust check before and during publish", async (t) => {
   const root = await createFixture(t);
   await mutateWorkflow(root, "release.yml", (workflow) => {
