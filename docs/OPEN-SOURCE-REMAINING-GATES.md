@@ -62,7 +62,7 @@ It is not a publication authorization.
 
 | Gate | Status | Notes |
 | --- | --- | --- |
-| BUILD-A-TOOL non-interactive path | partial | Documented; re-run on release candidate |
+| BUILD-A-TOOL non-interactive path | done | Published beta.10 Kit passed Windows create → doctor → validate → pack → sign/verify → runtime → legacy/modern MCP acceptance; see [evidence](releases/0.1.0-beta.10-agent-kit-acceptance.md) |
 | Default 36 Actions / 40 MCP tools | done | Documented and tested in source |
 
 ## 6. Documentation language
