@@ -3,6 +3,10 @@
 本目录用于放置随软件分发的媒体二进制。**二进制不提交到仓库**，由构建脚本下载并
 校验 SHA-256 后写入本目录（见 `.gitignore`）。
 
+应用内按需安装不写入本目录，也不等待 Useful 自签名包。Windows x64 用户确认后，应用直接下载
+`scripts/media-runtimes.upstream.lock.json` 固定的 FFmpeg/mpv 上游原始 ZIP，只把经过大小与
+SHA-256 校验的白名单文件原子激活到应用数据目录。下面的 v1 lock 和 Full 说明仅适用于内部 Full 候选。
+
 ## 原则
 
 - 记录精确版本、来源 URL、SHA-256、许可证（见 `../THIRD_PARTY_NOTICES.md`）。

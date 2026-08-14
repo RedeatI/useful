@@ -41,27 +41,42 @@ describe("MediaRuntimeView", () => {
       mpv: { name: "mpv", available: true, path: "mpv.exe" },
     });
     ipcMock.mediaPackCatalog.mockResolvedValue({
-      trustState: "blocked",
-      reason: "production-trust-not-configured",
-      publicKeyFingerprint: null,
-      packs: [],
+      trustState: "ready",
+      reason: null,
+      sourceLockSha256: "aa".repeat(32),
+      packs: [
+        {
+          id: "preview", downloadBytes: 77_205_127, archiveBytes: 77_205_127,
+          sourceName: "mpv project", sourcePageUrl: "https://mpv.io/installation/",
+          sourceCodeUrl: "https://github.com/mpv-player/mpv/tree/v0.41.0",
+          archiveSha256: "11".repeat(32), installed: true, previousAvailable: false, damaged: false,
+        },
+        {
+          id: "transcode", downloadBytes: 109_728_040, archiveBytes: 109_728_040,
+          sourceName: "gyan.dev", sourcePageUrl: "https://ffmpeg.org/download.html",
+          sourceCodeUrl: "https://ffmpeg.org/releases/ffmpeg-8.1.2.tar.xz",
+          archiveSha256: "22".repeat(32), installed: false, previousAvailable: false, damaged: false,
+        },
+      ],
     });
     ipcMock.mediaPackInstall.mockResolvedValue("media-task-1");
     ipcMock.mediaPackCancel.mockResolvedValue(undefined);
     ipcMock.mediaPackRollback.mockResolvedValue(undefined);
   });
 
-  it("shows per-pack purpose, measured size, detection state, and a fail-closed install action", async () => {
+  it("shows pinned upstream sources, measured size, detection state, and an enabled install action", async () => {
     const wrapper = mount(MediaRuntimeView);
     await flushPromises();
 
     expect(wrapper.text()).toContain("媒体解码器");
-    expect(wrapper.text()).toContain("正式签名源尚未启用");
+    expect(wrapper.text()).toContain("已启用构建时固定的上游源");
     expect(wrapper.get('[data-testid="media-pack-preview"]').text()).toContain("已检测");
-    expect(wrapper.get('[data-testid="media-pack-preview"]').text()).toContain("43.3 MB");
+    expect(wrapper.get('[data-testid="media-pack-preview"]').text()).toContain("73.6 MB");
+    expect(wrapper.get('[data-testid="media-pack-preview"]').text()).toContain("mpv project");
     expect(wrapper.get('[data-testid="media-pack-transcode"]').text()).toContain("未安装");
-    expect(wrapper.get('[data-testid="media-pack-transcode"]').text()).toContain("175 MB");
-    expect(wrapper.get('[data-testid="install-transcode"]').attributes()).toHaveProperty("disabled");
+    expect(wrapper.get('[data-testid="media-pack-transcode"]').text()).toContain("105 MB");
+    expect(wrapper.get('[data-testid="media-pack-transcode"]').text()).toContain("gyan.dev");
+    expect(wrapper.get('[data-testid="install-transcode"]').attributes("disabled")).toBeUndefined();
     expect(wrapper.get('[data-testid="media-pack-transcode"]').classes()).toContain("runtime-card--required");
   });
 
@@ -94,11 +109,12 @@ describe("MediaRuntimeView", () => {
     ipcMock.mediaPackCatalog.mockResolvedValueOnce({
       trustState: "ready",
       reason: null,
-      publicKeyFingerprint: "aa".repeat(32),
+      sourceLockSha256: "aa".repeat(32),
       packs: [{
-        id: "preview", downloadBytes: 45_356_407, archiveBytes: 45_356_000,
-        correspondingSourceUrl: "https://example.test/preview-source.zip",
-        correspondingSourceSha256: "11".repeat(32), installed: false,
+        id: "preview", downloadBytes: 77_205_127, archiveBytes: 77_205_127,
+        sourceName: "mpv project", sourcePageUrl: "https://mpv.io/installation/",
+        sourceCodeUrl: "https://github.com/mpv-player/mpv/tree/v0.41.0",
+        archiveSha256: "11".repeat(32), installed: false,
         previousAvailable: false, damaged: true,
       }],
     });
@@ -135,17 +151,19 @@ describe("MediaRuntimeView", () => {
     ipcMock.mediaPackCatalog.mockResolvedValue({
       trustState: "ready",
       reason: null,
-      publicKeyFingerprint: "aa".repeat(32),
+      sourceLockSha256: "aa".repeat(32),
       packs: [
         {
-          id: "preview", downloadBytes: 45_356_407, archiveBytes: 45_356_000,
-          correspondingSourceUrl: "https://example.test/preview-source.zip",
-          correspondingSourceSha256: "11".repeat(32), installed: true, previousAvailable: false,
+          id: "preview", downloadBytes: 77_205_127, archiveBytes: 77_205_127,
+          sourceName: "mpv project", sourcePageUrl: "https://mpv.io/installation/",
+          sourceCodeUrl: "https://github.com/mpv-player/mpv/tree/v0.41.0",
+          archiveSha256: "11".repeat(32), installed: true, previousAvailable: false, damaged: false,
         },
         {
-          id: "transcode", downloadBytes: 183_797_099, archiveBytes: 183_796_000,
-          correspondingSourceUrl: "https://example.test/transcode-source.zip",
-          correspondingSourceSha256: "22".repeat(32), installed: false, previousAvailable: false,
+          id: "transcode", downloadBytes: 109_728_040, archiveBytes: 109_728_040,
+          sourceName: "gyan.dev", sourcePageUrl: "https://ffmpeg.org/download.html",
+          sourceCodeUrl: "https://ffmpeg.org/releases/ffmpeg-8.1.2.tar.xz",
+          archiveSha256: "22".repeat(32), installed: false, previousAvailable: false, damaged: false,
         },
       ],
     });
@@ -153,16 +171,17 @@ describe("MediaRuntimeView", () => {
     const wrapper = mount(MediaRuntimeView);
     await flushPromises();
 
-    expect(wrapper.text()).toContain("可信 MediaPack 源已可用");
+    expect(wrapper.text()).toContain("已启用构建时固定的上游源");
     expect(wrapper.get('[data-testid="install-transcode"]').attributes("disabled")).toBeUndefined();
     await wrapper.get('[data-testid="install-transcode"]').trigger("click");
-    expect(confirmSpy).toHaveBeenCalledWith(expect.stringContaining("175 MB"));
+    expect(confirmSpy).toHaveBeenCalledWith(expect.stringContaining("105 MB"));
+    expect(confirmSpy).toHaveBeenCalledWith(expect.stringContaining("gyan.dev"));
     expect(ipcMock.mediaPackInstall).toHaveBeenCalledWith("transcode");
 
     // Native work may emit before Tauri resolves the command response with the task id.
     listeners.get("media-pack-progress")?.({ payload: {
       taskId: "media-task-1", packId: "transcode", phase: "downloading",
-      receivedBytes: 91_898_550, totalBytes: 183_797_099,
+      receivedBytes: 54_864_020, totalBytes: 109_728_040,
     } });
     await flushPromises();
     expect(wrapper.get('[data-testid="media-pack-transcode"]').text()).toContain("50%");
@@ -183,11 +202,12 @@ describe("MediaRuntimeView", () => {
     ipcMock.mediaPackCatalog.mockResolvedValue({
       trustState: "ready",
       reason: null,
-      publicKeyFingerprint: "aa".repeat(32),
+      sourceLockSha256: "aa".repeat(32),
       packs: [{
-        id: "preview", downloadBytes: 45_356_407, archiveBytes: 45_356_000,
-        correspondingSourceUrl: "https://example.test/preview-source.zip",
-        correspondingSourceSha256: "11".repeat(32), installed: true, previousAvailable: true,
+        id: "preview", downloadBytes: 77_205_127, archiveBytes: 77_205_127,
+        sourceName: "mpv project", sourcePageUrl: "https://mpv.io/installation/",
+        sourceCodeUrl: "https://github.com/mpv-player/mpv/tree/v0.41.0",
+        archiveSha256: "11".repeat(32), installed: true, previousAvailable: true, damaged: false,
       }],
     });
     const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);

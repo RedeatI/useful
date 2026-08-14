@@ -1,6 +1,6 @@
 {
   "name": "@useful/cli",
-  "version": "0.1.0-beta.10",
+  "version": "0.1.0-beta.11",
   "private": true,
   "description": "Useful 工具开发命令行：create / dev / validate / pack，以及 useful source 静态源生成器。",
   "type": "module",

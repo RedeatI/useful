@@ -303,6 +303,8 @@ test("media essentials evaluation script pins same version and never mutates pro
   const lock = await read("scripts/media-runtimes.lock.json");
   assert.match(evalScript, /ffmpeg-8\.1\.2-essentials_build\.7z/);
   assert.match(evalScript, /ffmpeg-8\.1\.2-full_build\.7z/);
+  assert.match(evalScript, /libaom-av1/);
+  assert.doesNotMatch(evalScript, /libsvtav1/);
   assert.match(evalScript, /e25b682664025d49034c981afb4bae36238a40f29a3cc1c713ad9a8b5b3528f6/);
   assert.match(evalScript, /productionLockUnchanged = \$true/);
   assert.match(evalScript, /media-essentials-eval\.json/);

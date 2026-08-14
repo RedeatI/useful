@@ -1,7 +1,7 @@
-//! Signed MediaPack catalog, cancellable download, verified install, and rollback commands.
+//! Build-pinned upstream media runtime catalog, cancellable download, verified install, and rollback.
 //!
-//! The renderer selects only a pack id. Catalog URLs and the Ed25519 trust root are compile-time
-//! release inputs; absent production inputs keep installation blocked.
+//! The renderer selects only a pack id. Upstream URLs, archive hashes, selected paths, and
+//! extracted-file hashes are compile-time inputs and cannot be supplied by renderer IPC.
 
 use super::{CmdError, CmdResult};
 use crate::commands::media::MediaPackInstallTask;
@@ -14,30 +14,21 @@ use sha2::{Digest, Sha256};
 use std::path::Path;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::time::Duration;
 use tauri::{AppHandle, Emitter, Manager, State};
-use useful_media::pack::{
-    self, CatalogAsset, CatalogPack, InstallInput, MediaPackCatalog, MAX_CATALOG_BYTES,
+use useful_media::{
+    pack,
+    upstream::{self, UpstreamAsset, UpstreamInstallInput, UpstreamPack, UpstreamRuntimeLock},
 };
 
-const CATALOG_URL: Option<&str> = option_env!("USEFUL_MEDIA_PACK_CATALOG_URL");
-const CATALOG_SIGNATURE_URL: Option<&str> = option_env!("USEFUL_MEDIA_PACK_CATALOG_SIGNATURE_URL");
-const PUBLIC_KEY_HEX: Option<&str> = option_env!("USEFUL_MEDIA_PACK_PUBLIC_KEY_HEX");
 const MAX_DOWNLOAD_ATTEMPTS: u8 = 3;
-
-#[derive(Clone)]
-struct TrustConfig {
-    catalog_url: String,
-    signature_url: String,
-    public_key_hex: String,
-}
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct MediaPackCatalogView {
     pub trust_state: String,
     pub reason: Option<String>,
-    pub public_key_fingerprint: Option<String>,
+    pub source_lock_sha256: Option<String>,
     pub packs: Vec<MediaPackView>,
 }
 
@@ -47,8 +38,10 @@ pub struct MediaPackView {
     pub id: String,
     pub download_bytes: u64,
     pub archive_bytes: u64,
-    pub corresponding_source_url: String,
-    pub corresponding_source_sha256: String,
+    pub source_name: String,
+    pub source_page_url: String,
+    pub source_code_url: String,
+    pub archive_sha256: String,
     pub installed: bool,
     pub previous_available: bool,
     pub damaged: bool,
@@ -73,48 +66,24 @@ struct MediaPackDoneEvent {
     error_code: Option<String>,
 }
 
-fn trust_config() -> CmdResult<Option<TrustConfig>> {
-    match (CATALOG_URL, CATALOG_SIGNATURE_URL, PUBLIC_KEY_HEX) {
-        (None, None, None) => Ok(None),
-        (Some(catalog_url), Some(signature_url), Some(public_key_hex)) => {
-            for (value, label) in [
-                (catalog_url, "MediaPack catalog URL"),
-                (signature_url, "MediaPack catalog signature URL"),
-            ] {
-                let parsed = reqwest::Url::parse(value)
-                    .map_err(|_| CmdError::from(format!("{label} 无效")))?;
-                if parsed.scheme() != "https"
-                    || parsed.host_str().is_none()
-                    || !parsed.username().is_empty()
-                    || parsed.password().is_some()
-                    || parsed.fragment().is_some()
-                {
-                    return Err(CmdError::from(format!("{label} 必须是无凭据 HTTPS URL")));
-                }
-            }
-            if public_key_hex.len() != 64
-                || !public_key_hex
-                    .bytes()
-                    .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
-                || public_key_hex.bytes().all(|byte| byte == b'0')
-            {
-                return Err(CmdError::from("MediaPack production public key 无效"));
-            }
-            Ok(Some(TrustConfig {
-                catalog_url: catalog_url.into(),
-                signature_url: signature_url.into(),
-                public_key_hex: public_key_hex.into(),
-            }))
-        }
-        _ => Err(CmdError::from(
-            "MediaPack production trust configuration 不完整",
-        )),
-    }
-}
-
 fn http_client() -> CmdResult<reqwest::Client> {
     reqwest::Client::builder()
-        .redirect(reqwest::redirect::Policy::none())
+        .redirect(reqwest::redirect::Policy::custom(|attempt| {
+            let host = attempt.url().host_str();
+            let allowed = attempt.url().scheme() == "https"
+                && matches!(
+                    host,
+                    Some("www.gyan.dev")
+                        | Some("github.com")
+                        | Some("release-assets.githubusercontent.com")
+                        | Some("objects.githubusercontent.com")
+                );
+            if allowed && attempt.previous().len() < 5 {
+                attempt.follow()
+            } else {
+                attempt.stop()
+            }
+        }))
         .connect_timeout(Duration::from_secs(15))
         .read_timeout(Duration::from_secs(30))
         .no_gzip()
@@ -122,112 +91,50 @@ fn http_client() -> CmdResult<reqwest::Client> {
         .map_err(|_| CmdError::from("无法初始化 MediaPack HTTPS client"))
 }
 
-async fn fetch_small(client: &reqwest::Client, url: &str, maximum: usize) -> CmdResult<Vec<u8>> {
-    let mut response = client
-        .get(url)
-        .header(ACCEPT_ENCODING, "identity")
-        .send()
-        .await
-        .map_err(|_| CmdError::from("无法读取 MediaPack catalog"))?;
-    if response.status() != reqwest::StatusCode::OK {
-        return Err(CmdError::from("MediaPack catalog HTTP 状态无效"));
-    }
-    if response
-        .content_length()
-        .is_some_and(|length| length as usize > maximum)
-    {
-        return Err(CmdError::from("MediaPack catalog 超过大小限制"));
-    }
-    let mut bytes = Vec::new();
-    while let Some(chunk) = response
-        .chunk()
-        .await
-        .map_err(|_| CmdError::from("无法读取 MediaPack catalog bytes"))?
-    {
-        if bytes.len().saturating_add(chunk.len()) > maximum {
-            return Err(CmdError::from("MediaPack catalog 超过大小限制"));
-        }
-        bytes.extend_from_slice(&chunk);
-    }
-    if bytes.is_empty() {
-        return Err(CmdError::from("MediaPack catalog bytes 无效"));
-    }
-    Ok(bytes)
+fn load_catalog() -> CmdResult<UpstreamRuntimeLock> {
+    upstream::built_in_lock().map_err(|_| CmdError::from("内置上游媒体运行时锁无效"))
 }
 
-async fn load_catalog(config: &TrustConfig) -> CmdResult<MediaPackCatalog> {
-    let client = http_client()?;
-    let (catalog_bytes, signature_bytes) = tokio::try_join!(
-        fetch_small(&client, &config.catalog_url, MAX_CATALOG_BYTES),
-        fetch_small(&client, &config.signature_url, 256),
-    )?;
-    let signature = std::str::from_utf8(&signature_bytes)
-        .map_err(|_| CmdError::from("MediaPack catalog signature 编码无效"))?;
-    let now = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map_err(|_| CmdError::from("系统时间无效"))?
-        .as_secs() as i64;
-    pack::verify_catalog(
-        &catalog_bytes,
-        signature.trim(),
-        &config.public_key_hex,
-        now,
-    )
-    .map_err(|_| CmdError::from("MediaPack catalog 验签或闭合校验失败"))
-}
-
-fn view_for_pack(state: &AppState, pack: &CatalogPack) -> MediaPackView {
-    let installed = pack::installed_status(&state.media.media_root, &pack.id);
+fn view_for_pack(state: &AppState, pack: &UpstreamPack) -> MediaPackView {
+    let upstream_installed = upstream::installed_status(&state.media.media_root, &pack.id);
+    let legacy_installed = pack::installed_status(&state.media.media_root, &pack.id);
     MediaPackView {
         id: pack.id.clone(),
-        download_bytes: pack
-            .archive
-            .size_bytes
-            .saturating_add(pack.manifest.size_bytes)
-            .saturating_add(pack.statement.size_bytes),
+        download_bytes: pack.archive.size_bytes,
         archive_bytes: pack.archive.size_bytes,
-        corresponding_source_url: pack.corresponding_source.url.clone(),
-        corresponding_source_sha256: pack.corresponding_source.sha256.clone(),
-        installed: installed.current_relative_path.is_some(),
-        previous_available: installed.previous_available,
-        damaged: installed.damaged,
+        source_name: pack.provider.clone(),
+        source_page_url: pack.provider_page_url.clone(),
+        source_code_url: pack.source_code_url.clone(),
+        archive_sha256: pack.archive.sha256.clone(),
+        installed: upstream_installed.current_relative_path.is_some()
+            || legacy_installed.current_relative_path.is_some(),
+        previous_available: upstream_installed.previous_available
+            || legacy_installed.previous_available,
+        damaged: upstream_installed.damaged || legacy_installed.damaged,
     }
 }
 
 #[tauri::command]
 pub async fn media_pack_catalog(state: State<'_, AppState>) -> CmdResult<MediaPackCatalogView> {
-    let Some(config) = trust_config()? else {
+    if !cfg!(all(target_os = "windows", target_arch = "x86_64")) {
         return Ok(MediaPackCatalogView {
-            trust_state: "blocked".into(),
-            reason: Some("production-trust-not-configured".into()),
-            public_key_fingerprint: None,
+            trust_state: "unavailable".into(),
+            reason: Some("platform-not-supported".into()),
+            source_lock_sha256: None,
             packs: Vec::new(),
         });
-    };
-    match load_catalog(&config).await {
-        Ok(catalog) => Ok(MediaPackCatalogView {
-            trust_state: "ready".into(),
-            reason: None,
-            public_key_fingerprint: Some(pack::sha256_hex(
-                &hex::decode(&config.public_key_hex)
-                    .map_err(|_| CmdError::from("MediaPack production public key 无效"))?,
-            )),
-            packs: catalog
-                .packs
-                .iter()
-                .map(|item| view_for_pack(&state, item))
-                .collect(),
-        }),
-        Err(error) => {
-            tracing::warn!("MediaPack catalog unavailable: {}", error.message);
-            Ok(MediaPackCatalogView {
-                trust_state: "unavailable".into(),
-                reason: Some("catalog-unavailable".into()),
-                public_key_fingerprint: None,
-                packs: Vec::new(),
-            })
-        }
     }
+    let catalog = load_catalog()?;
+    Ok(MediaPackCatalogView {
+        trust_state: "ready".into(),
+        reason: None,
+        source_lock_sha256: Some(upstream::built_in_lock_sha256()),
+        packs: catalog
+            .packs
+            .iter()
+            .map(|item| view_for_pack(&state, item))
+            .collect(),
+    })
 }
 
 #[tauri::command]
@@ -239,15 +146,16 @@ pub async fn media_pack_install(
     if !matches!(pack_id.as_str(), "preview" | "transcode") {
         return Err(CmdError::from("未知 MediaPack"));
     }
-    let config =
-        trust_config()?.ok_or_else(|| CmdError::from("MediaPack production trust 尚未配置"))?;
-    let catalog = load_catalog(&config).await?;
+    if !cfg!(all(target_os = "windows", target_arch = "x86_64")) {
+        return Err(CmdError::from("当前平台尚不支持内置媒体运行时下载"));
+    }
+    let catalog = load_catalog()?;
     let pack = catalog
         .packs
         .into_iter()
         .find(|item| item.id == pack_id)
-        .ok_or_else(|| CmdError::from("可信 catalog 中不存在该 MediaPack"))?;
-    if pack::installed_status(&state.media.media_root, &pack_id)
+        .ok_or_else(|| CmdError::from("内置上游锁中不存在该媒体组件包"))?;
+    if upstream::installed_status(&state.media.media_root, &pack_id)
         .current_relative_path
         .is_some()
     {
@@ -275,7 +183,7 @@ pub async fn media_pack_install(
 
     let task_id_for_run = task_id.clone();
     tauri::async_runtime::spawn(async move {
-        let result = run_install(&app, &task_id_for_run, &pack, &config, cancel.clone()).await;
+        let result = run_install(&app, &task_id_for_run, &pack, cancel.clone()).await;
         let state = app.state::<AppState>();
         if let Ok(mut tasks) = state.media.pack_installs.lock() {
             tasks.remove(&task_id_for_run);
@@ -311,8 +219,7 @@ pub async fn media_pack_install(
 async fn run_install(
     app: &AppHandle,
     task_id: &str,
-    pack: &CatalogPack,
-    config: &TrustConfig,
+    pack: &UpstreamPack,
     cancel: Arc<AtomicBool>,
 ) -> CmdResult<()> {
     let state = app.state::<AppState>();
@@ -323,49 +230,18 @@ async fn run_install(
         .downloads_dir
         .join(format!("media-pack-{task_id}"));
     std::fs::create_dir(&task_root).map_err(|_| CmdError::from("无法创建 MediaPack 临时目录"))?;
-    let total = pack
-        .archive
-        .size_bytes
-        .saturating_add(pack.manifest.size_bytes)
-        .saturating_add(pack.statement.size_bytes);
+    let total = pack.archive.size_bytes;
     let result = async {
         let client = http_client()?;
-        let mut received = 0u64;
         let archive_path = task_root.join(&pack.archive.file_name);
-        received = download_asset(
+        let _ = download_asset(
             app,
             task_id,
             &pack.id,
             &client,
             &pack.archive,
             &archive_path,
-            received,
-            total,
-            &cancel,
-        )
-        .await?;
-        let manifest_path = task_root.join(&pack.manifest.file_name);
-        received = download_asset(
-            app,
-            task_id,
-            &pack.id,
-            &client,
-            &pack.manifest,
-            &manifest_path,
-            received,
-            total,
-            &cancel,
-        )
-        .await?;
-        let statement_path = task_root.join(&pack.statement.file_name);
-        let _ = download_asset(
-            app,
-            task_id,
-            &pack.id,
-            &client,
-            &pack.statement,
-            &statement_path,
-            received,
+            0,
             total,
             &cancel,
         )
@@ -374,25 +250,18 @@ async fn run_install(
             return Err(CmdError::from("MediaPack install cancelled"));
         }
         emit_progress(app, task_id, &pack.id, "verifying", total, total);
-        let manifest_bytes = read_exact_bounded(&manifest_path, pack.manifest.size_bytes).await?;
-        let statement_bytes =
-            read_exact_bounded(&statement_path, pack.statement.size_bytes).await?;
         let pack_for_install = pack.clone();
-        let public_key = config.public_key_hex.clone();
         let install_root = state.media.media_root.clone();
         let archive_for_install = archive_path.clone();
         emit_progress(app, task_id, &pack.id, "installing", total, total);
         tauri::async_runtime::spawn_blocking(move || {
-            pack::install_verified_pack(InstallInput {
+            upstream::install_upstream_pack(UpstreamInstallInput {
                 pack: &pack_for_install,
-                public_key_hex: &public_key,
                 archive_path: &archive_for_install,
-                manifest_bytes: &manifest_bytes,
-                statement_bytes: &statement_bytes,
                 install_root: &install_root,
                 current_useful_version: HOST_VERSION,
             })
-            .map_err(|_| CmdError::from("MediaPack verification or atomic install failed"))
+            .map_err(|_| CmdError::from("上游归档校验或原子安装失败"))
         })
         .await
         .map_err(|_| CmdError::from("MediaPack install worker failed"))??;
@@ -401,7 +270,7 @@ async fn run_install(
         Ok(())
     }
     .await;
-    if let Err(error) = cleanup_task_root(&task_root, pack) {
+    if let Err(error) = cleanup_task_root(&task_root, &pack.archive) {
         tracing::warn!(
             "MediaPack temp cleanup failed {}: {}",
             task_root.display(),
@@ -409,24 +278,6 @@ async fn run_install(
         );
     }
     result
-}
-
-async fn read_exact_bounded(path: &Path, expected_size: u64) -> CmdResult<Vec<u8>> {
-    use tokio::io::{AsyncReadExt, BufReader};
-
-    let file = tokio::fs::File::open(path)
-        .await
-        .map_err(|_| CmdError::from("无法打开已下载 MediaPack metadata"))?;
-    let mut reader = BufReader::new(file).take(expected_size.saturating_add(1));
-    let mut bytes = Vec::with_capacity(expected_size as usize);
-    reader
-        .read_to_end(&mut bytes)
-        .await
-        .map_err(|_| CmdError::from("无法读取已下载 MediaPack metadata"))?;
-    if bytes.len() as u64 != expected_size {
-        return Err(CmdError::from("MediaPack metadata 大小与 catalog 不一致"));
-    }
-    Ok(bytes)
 }
 
 fn part_path(destination: &Path) -> std::path::PathBuf {
@@ -439,15 +290,13 @@ fn part_path(destination: &Path) -> std::path::PathBuf {
     ))
 }
 
-fn cleanup_task_root(task_root: &Path, pack: &CatalogPack) -> std::io::Result<()> {
-    for asset in [&pack.archive, &pack.manifest, &pack.statement] {
-        let destination = task_root.join(&asset.file_name);
-        for path in [part_path(&destination), destination] {
-            match std::fs::remove_file(&path) {
-                Ok(()) => {}
-                Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
-                Err(error) => return Err(error),
-            }
+fn cleanup_task_root(task_root: &Path, asset: &UpstreamAsset) -> std::io::Result<()> {
+    let destination = task_root.join(&asset.file_name);
+    for path in [part_path(&destination), destination] {
+        match std::fs::remove_file(&path) {
+            Ok(()) => {}
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+            Err(error) => return Err(error),
         }
     }
     std::fs::remove_dir(task_root)
@@ -536,7 +385,7 @@ async fn download_asset(
     task_id: &str,
     pack_id: &str,
     client: &reqwest::Client,
-    asset: &CatalogAsset,
+    asset: &UpstreamAsset,
     destination: &Path,
     base_received: u64,
     total: u64,
@@ -745,8 +594,13 @@ pub fn media_pack_rollback(state: State<AppState>, pack_id: String) -> CmdResult
     {
         return Err(CmdError::from("安装进行中无法回滚 MediaPack"));
     }
-    pack::rollback(&state.media.media_root, &pack_id)
-        .map_err(|_| CmdError::from("没有可用的上一版 MediaPack"))?;
+    if upstream::installed_status(&state.media.media_root, &pack_id).previous_available {
+        upstream::rollback(&state.media.media_root, &pack_id)
+            .map_err(|_| CmdError::from("没有可用的上一版上游媒体组件"))?;
+    } else {
+        pack::rollback(&state.media.media_root, &pack_id)
+            .map_err(|_| CmdError::from("没有可用的上一版 MediaPack"))?;
+    }
     state.media.refresh_sidecars()?;
     Ok(())
 }

@@ -1,0 +1,69 @@
+{
+  "schemaVersion": "useful.media-runtimes-upstream.v1",
+  "platform": "windows",
+  "arch": "x64",
+  "packs": [
+    {
+      "id": "preview",
+      "version": "0.41.0",
+      "provider": "mpv project",
+      "providerPageUrl": "https://mpv.io/installation/",
+      "sourceCodeUrl": "https://github.com/mpv-player/mpv/tree/v0.41.0",
+      "license": "GPLv2+",
+      "minimumUsefulVersion": "0.1.0-beta.11",
+      "archive": {
+        "url": "https://github.com/mpv-player/mpv/releases/download/v0.41.0/mpv-v0.41.0-x86_64-pc-windows-msvc.zip",
+        "fileName": "mpv-v0.41.0-x86_64-pc-windows-msvc.zip",
+        "sha256": "4e197f729f5071c6772f35fffd96e0f36e3e8a044bd9479b136bb09b7c6a80ff",
+        "sizeBytes": 77205127
+      },
+      "files": [
+        {
+          "component": "mpv",
+          "sourcePath": "mpv.exe",
+          "targetName": "mpv.exe",
+          "sha256": "6145e63f026451a764077d53fd60860ec9f5c2bc76dcd6e62a88967ac375453d",
+          "sizeBytes": 57294336
+        },
+        {
+          "component": null,
+          "sourcePath": "vulkan-1.dll",
+          "targetName": "vulkan-1.dll",
+          "sha256": "2baae0a109cb5962437b00a182750308ce9f69f59381df62939c00c21150ee6b",
+          "sizeBytes": 1139712
+        }
+      ]
+    },
+    {
+      "id": "transcode",
+      "version": "8.1.2 essentials_build",
+      "provider": "gyan.dev",
+      "providerPageUrl": "https://ffmpeg.org/download.html",
+      "sourceCodeUrl": "https://ffmpeg.org/releases/ffmpeg-8.1.2.tar.xz",
+      "license": "GPLv3",
+      "minimumUsefulVersion": "0.1.0-beta.11",
+      "archive": {
+        "url": "https://www.gyan.dev/ffmpeg/builds/packages/ffmpeg-8.1.2-essentials_build.zip",
+        "fileName": "ffmpeg-8.1.2-essentials_build.zip",
+        "sha256": "db580001caa24ac104c8cb856cd113a87b0a443f7bdf47d8c12b1d740584a2ec",
+        "sizeBytes": 109728040
+      },
+      "files": [
+        {
+          "component": "ffmpeg",
+          "sourcePath": "ffmpeg-8.1.2-essentials_build/bin/ffmpeg.exe",
+          "targetName": "ffmpeg.exe",
+          "sha256": "1326dde4c84ff1f96fe6b8916c5bed29e163e9b5dccf995f6f3db069d143ec5e",
+          "sizeBytes": 101897728
+        },
+        {
+          "component": "ffprobe",
+          "sourcePath": "ffmpeg-8.1.2-essentials_build/bin/ffprobe.exe",
+          "targetName": "ffprobe.exe",
+          "sha256": "b49ccc7c6547b141ad5a2f6ec69cc04323d7133d7704d70b331b904c63eecb07",
+          "sizeBytes": 101692928
+        }
+      ]
+    }
+  ]
+}

@@ -1,14 +1,28 @@
 # 第三方声明 (Third-Party Notices)
 
-本产品包含或依赖以下第三方组件。二进制运行时（ffmpeg/ffprobe/mpv）不随本仓库源码
-提交，而是在构建时由 `scripts/fetch-binaries.ps1` 下载并**校验 SHA-256** 后使用；
-校验失败即中止构建，绝不使用来源不明的预编译二进制。
+本产品包含或依赖以下第三方组件。二进制运行时（ffmpeg/ffprobe/mpv）不随本仓库源码提交。
+Windows x64 Lite 用户明确确认后，Useful 可以直接下载上游项目的原始 ZIP；内部 Full 候选仍由
+`scripts/fetch-binaries.ps1` 下载。两条路径都校验固定 SHA-256，失败即停止。
+
+## 用户确认后下载的上游运行时（Windows x64 Lite）
+
+`scripts/media-runtimes.upstream.lock.json` 是应用内按需下载的唯一 pin 数据源。Useful 不从自己的
+Release 二次分发这些文件；它直接访问下表来源，只提取白名单文件，并在原子激活前验证归档大小与
+SHA-256、文件闭集、每个选定文件的大小与 SHA-256。来源与源码链接会随 lock 固定。
+
+| 组件 | 版本 | 下载来源 | 压缩包 SHA-256 | 许可证 |
+| --- | --- | --- | --- | --- |
+| ffmpeg.exe / ffprobe.exe | 8.1.2 essentials_build | FFmpeg 官网列出的 gyan.dev Windows 构建（`ffmpeg-8.1.2-essentials_build.zip`） | `db580001caa24ac104c8cb856cd113a87b0a443f7bdf47d8c12b1d740584a2ec` | GPLv3 |
+| mpv.exe / vulkan-1.dll | mpv 0.41.0 Windows x64 MSVC | mpv 项目正式 GitHub Release（`mpv-v0.41.0-x86_64-pc-windows-msvc.zip`） | `4e197f729f5071c6772f35fffd96e0f36e3e8a044bd9479b136bb09b7c6a80ff` | GPLv2+ |
+
+FFmpeg 下载说明与源码分别固定到 `https://ffmpeg.org/download.html` 和 8.1.2 源码归档；mpv 下载
+说明与源码分别固定到 `https://mpv.io/installation/` 和 `v0.41.0` tag。本文不作法律结论。
+
+## 内部 Full 候选的媒体运行时
 
 `scripts/media-runtimes.lock.json` 是媒体版本、来源、归档 SHA-256 和许可证元数据的唯一 pin
 数据源；fetch、release manifest 与 SBOM 必须读取同一份 lock，缺失或不一致即失败。下表只是该
 lock 的人类可读映射，不能覆盖或替代它。
-
-## 随软件分发的二进制运行时（Full 版）
 
 下表为当前锁定的精确版本与来源；SHA-256 为下载压缩包的哈希，均取自官方发布的
 校验文件（获取日期 2026-07-30）。解压后单个 exe 的哈希由 `scripts/fetch-binaries.ps1`

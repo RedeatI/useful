@@ -70,7 +70,7 @@ Windows 为主要验证目标的能力。macOS/Linux 应明确降级或报告不
   代替用户确认。它们仍不是已发布的独立 CLI/MCP，真实 ffmpeg/ffprobe、进程终止、取消后的部分输出以及
   Windows/macOS/Linux 行为必须绑定精确候选另行验收。
 - Agent Kit 构建器会产生 3 个命令 bundle 和 2 个固定 worker bundle，并保存 descriptor provenance 源码与
-  实际打包依赖的逐包许可证文件。`v0.1.0-beta.10` 已附带由受控发布工作流生成并校验的 Agent Kit；本地
+  实际打包依赖的逐包许可证文件。`v0.1.0-beta.11` 已附带由受控发布工作流生成并校验的 Agent Kit；本地
   构建仍只是候选，不能据此声称已发布或已完成所有目标平台运行验收。
 
 ### Sigstore/Rekor 验证范围
@@ -84,11 +84,13 @@ Windows 为主要验证目标的能力。macOS/Linux 应明确降级或报告不
   （stable/beta/nightly）与 edition 是独立轴。
 - Full 计划包含固定版本且经 SHA-256 校验的 `ffmpeg`、`ffprobe`、`mpv`；Lite 不内置这些媒体
   运行时。macOS/Linux 的发布合同不承诺 Full edition 或内置媒体运行时。
-- 应用内 MediaPack 下载、验签、版本化安装和回滚链已实现；生产 catalog 与公钥必须在精确候选中注入
-  并验证，缺失时安装保持 fail closed。已保留 `reqwest` 默认代理发现，并支持同一安装任务内最多三次
-  严格 Range 断点重试；跨应用重启续传及需交互认证的企业代理/PAC 尚未闭合。Portable 已增加逐目录
+- Windows x64 应用内按需媒体下载已改为直接使用构建时固定的上游原始 ZIP：FFmpeg 使用 ffmpeg.org
+  列出的 gyan.dev Windows 构建，mpv 使用 mpv 项目正式 Release。安装前验证固定版本、HTTP 响应事实、
+  归档大小与 SHA-256、选定文件闭集及每个文件的大小与 SHA-256，再写入版本化目录并原子激活；不再依赖
+  未部署的 Useful MediaPack 生产签名源。已保留 `reqwest` 默认代理发现，并支持同一安装任务内最多三次
+  严格 Range 断点重试；非 Windows x64、跨应用重启续传及需交互认证的企业代理/PAC 尚未闭合。Portable 已增加逐目录
   写探针，不可写时在数据库打开
-  前明确停止且不回退 AppData；受损 MediaPack 会停止使用、拒绝 PATH 回退，并可从可信资产修复或回滚。
+  前明确停止且不回退 AppData；受损上游运行时或旧版 MediaPack 会停止使用、拒绝 PATH 回退，并可从固定资产修复或回滚。
   这些是本地合同，不等同于已在主流企业杀毒产品和真实只读介质上完成兼容认证。
 - **Full 公开分发受 GPL 对应源码与许可证证据硬门约束。** 在对应源码包、精确版本映射、许可证与
   notice、校验和及可复现分发证据齐备并经所有者复核前，不得公开发布 Full 资产。
@@ -102,14 +104,14 @@ Windows 为主要验证目标的能力。macOS/Linux 应明确降级或报告不
 
 - 公开仓库：`https://github.com/RedeatI/useful`
 - 当前源码、Agent Kit 与未签名 Windows 桌面预览 Release：
-  [`v0.1.0-beta.10`](https://github.com/RedeatI/useful/releases/tag/v0.1.0-beta.10)
+  [`v0.1.0-beta.11`](https://github.com/RedeatI/useful/releases/tag/v0.1.0-beta.11)
 - 双语 README 与英文入口文档
 - GitHub Private Vulnerability Reporting 已在 `RedeatI/useful` 启用（见 [`SECURITY.md`](../SECURITY.md)）
 
 ### 历史桌面预览说明（beta.4）
 
 - `v0.1.0-beta.4` 发布包内部分二进制的界面版本徽章可能仍显示较早的 `0.1.0-beta.1`。该历史
-  Release 保持不变；当前 `v0.1.0-beta.10` 已从版本一致的源码重新构建，下载时不要混用两版资产。
+  Release 保持不变；当前 `v0.1.0-beta.11` 已从版本一致的源码重新构建，下载时不要混用两版资产。
 
 ### 仍需 Owner / 平台证据
 

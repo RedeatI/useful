@@ -20,7 +20,7 @@ It is **not** a publication authorization. Values marked **secret** must never b
 | GitHub Actions **environment** `release` | present |
 | Update-root / feed / ceremony variables | set; `updateTrustReady=true` |
 | Windows / Apple signing **secrets** | **missing** (none listed on the repo) |
-| Latest desktop assets | unsigned prerelease [`v0.1.0-beta.10`](https://github.com/RedeatI/useful/releases/tag/v0.1.0-beta.10) |
+| Latest desktop assets | unsigned prerelease [`v0.1.0-beta.11`](https://github.com/RedeatI/useful/releases/tag/v0.1.0-beta.11) |
 
 Until the missing items are filled and verified, only **unsigned preview** Releases are honest.
 
@@ -337,7 +337,7 @@ Copy this table into an internal ticket. Do not paste secret material into git.
 
 | Situation | Allowed public claim |
 | --- | --- |
-| Current `v0.1.0-beta.10` desktop assets | Unsigned Windows developer-trust preview |
+| Current `v0.1.0-beta.11` desktop assets | Unsigned Windows developer-trust preview |
 | Agent Kit on that Release | Buildable kit; `publicationAuthorized: false` |
 | Vars §1 only, no secrets | Cannot claim signed Release |
 | §1–§3 complete, beta workflow green | Signed **beta** Windows desktop Release |
