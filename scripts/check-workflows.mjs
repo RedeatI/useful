@@ -501,6 +501,79 @@ function inspectCiWorkflow(file, workflow) {
 }
 
 function inspectPlatformBundlesWorkflow(file, workflow) {
+  const dispatchInputs = workflow?.on?.workflow_dispatch?.inputs ?? {};
+  const expectedInputs = {
+    agent_kit_tag: "v0.1.0-beta.10",
+    agent_kit_version: "0.1.0-beta.10",
+    agent_kit_sha256: "705b23242b666e5c99a943dcb561e262a1bfd469c16aa1cc5eb88fb18a01498b",
+    agent_kit_source_revision: "737d9bc86be3d97f9e5dc12511eaab48476a20e0",
+  };
+  if (Object.entries(expectedInputs).some(([name, defaultValue]) => (
+    dispatchInputs?.[name]?.type !== "string"
+    || dispatchInputs?.[name]?.required !== true
+    || dispatchInputs?.[name]?.default !== defaultValue
+  ))) {
+    violations.push({ file, code: "platform-bundles-agent-kit-input-pins-invalid" });
+  }
+
+  const acceptance = workflow.jobs?.["agent-kit-acceptance"];
+  const acceptanceSteps = acceptance?.steps ?? [];
+  const acceptanceMatrix = acceptance?.strategy?.matrix?.include ?? [];
+  const expectedAcceptanceRunners = new Map([
+    ["windows-x86_64", "windows-latest"],
+    ["macos-aarch64", "macos-15"],
+    ["linux-x86_64", "ubuntu-22.04"],
+  ]);
+  const acceptanceMatrixValid = (
+    acceptanceMatrix.length === expectedAcceptanceRunners.size
+    && acceptanceMatrix.every((entry) => expectedAcceptanceRunners.get(entry?.platform) === entry?.runner)
+  );
+  const acceptanceCheckout = acceptanceSteps.filter((step) => String(step?.uses ?? "").startsWith("actions/checkout@"));
+  const acceptancePnpm = acceptanceSteps.find((step) => (
+    String(step?.uses ?? "").startsWith("pnpm/action-setup@")
+    && String(step?.with?.version ?? "") === "9.15.0"
+  ));
+  const acceptanceNode = acceptanceSteps.find((step) => (
+    String(step?.uses ?? "").startsWith("actions/setup-node@")
+    && String(step?.with?.["node-version"] ?? "") === "20"
+    && String(step?.with?.cache ?? "") === "pnpm"
+  ));
+  const acceptanceInstall = acceptanceSteps.find((step) => (
+    stepRunsExact(step, "pnpm install --frozen-lockfile --ignore-scripts")
+  ));
+  const acceptanceRun = acceptanceSteps.find((step) => (
+    runnableStep(step)
+    && String(step?.shell ?? "") === "bash"
+    && [
+      "gh release download",
+      "scripts/accept-published-agent-kit.mjs",
+      "--expected-sha256",
+      "--expected-source-revision",
+      "--expected-version",
+      "--required-node-major 20",
+      "--json | tee",
+    ].every((required) => String(step?.run ?? "").includes(required))
+  ));
+  const acceptanceUpload = acceptanceSteps.find((step) => (
+    String(step?.uses ?? "").startsWith("actions/upload-artifact@")
+    && step?.with?.name === "agent-kit-${{ matrix.platform }}-node20-acceptance"
+    && step?.with?.path === "${{ runner.temp }}/agent-kit-acceptance-${{ matrix.platform }}.json"
+    && step?.with?.["if-no-files-found"] === "error"
+  ));
+  if (
+    !acceptance
+    || !acceptanceMatrixValid
+    || acceptanceCheckout.length !== 1
+    || acceptanceCheckout[0]?.with?.["persist-credentials"] !== false
+    || !acceptancePnpm
+    || !acceptanceNode
+    || !acceptanceInstall
+    || !acceptanceRun
+    || !acceptanceUpload
+  ) {
+    violations.push({ file, code: "platform-bundles-agent-kit-acceptance-invalid" });
+  }
+
   const bundle = workflow.jobs?.bundle;
   const steps = bundle?.steps ?? [];
   const matrixEntries = bundle?.strategy?.matrix?.include ?? [];

@@ -2,6 +2,27 @@ name: Platform Bundles
 
 on:
   workflow_dispatch:
+    inputs:
+      agent_kit_tag:
+        description: Immutable published Agent Kit release tag
+        required: true
+        type: string
+        default: v0.1.0-beta.10
+      agent_kit_version:
+        description: Agent Kit product version expected in MANIFEST.json
+        required: true
+        type: string
+        default: 0.1.0-beta.10
+      agent_kit_sha256:
+        description: SHA-256 of the published Agent Kit ZIP
+        required: true
+        type: string
+        default: 705b23242b666e5c99a943dcb561e262a1bfd469c16aa1cc5eb88fb18a01498b
+      agent_kit_source_revision:
+        description: Full source revision expected in MANIFEST.json
+        required: true
+        type: string
+        default: 737d9bc86be3d97f9e5dc12511eaab48476a20e0
 
 permissions:
   contents: read
@@ -11,6 +32,69 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  agent-kit-acceptance:
+    name: agent-kit-${{ matrix.platform }}-node20
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: windows-x86_64
+            runner: windows-latest
+          - platform: macos-aarch64
+            runner: macos-15
+          - platform: linux-x86_64
+            runner: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+        with:
+          version: 9.15.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 20
+          cache: pnpm
+      - name: Install locked acceptance-driver dependencies
+        run: pnpm install --frozen-lockfile --ignore-scripts
+      - name: Download and execute the immutable published Agent Kit
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          AGENT_KIT_TAG: ${{ inputs.agent_kit_tag }}
+          AGENT_KIT_VERSION: ${{ inputs.agent_kit_version }}
+          AGENT_KIT_SHA256: ${{ inputs.agent_kit_sha256 }}
+          AGENT_KIT_SOURCE_REVISION: ${{ inputs.agent_kit_source_revision }}
+        run: |
+          set -euo pipefail
+          test "$AGENT_KIT_TAG" = "v$AGENT_KIT_VERSION"
+          [[ "$AGENT_KIT_VERSION" =~ ^[0-9A-Za-z.-]+$ ]]
+          [[ "$AGENT_KIT_SHA256" =~ ^[a-f0-9]{64}$ ]]
+          [[ "$AGENT_KIT_SOURCE_REVISION" =~ ^[a-f0-9]{40}$ ]]
+          download_root="$RUNNER_TEMP/useful-agent-kit-download"
+          extract_root="$RUNNER_TEMP/useful-agent-kit-extracted"
+          receipt="$RUNNER_TEMP/agent-kit-acceptance-${{ matrix.platform }}.json"
+          asset="Useful-$AGENT_KIT_VERSION-agent-kit.zip"
+          mkdir "$download_root"
+          gh release download "$AGENT_KIT_TAG" --repo "$GITHUB_REPOSITORY" --pattern "$asset" --dir "$download_root"
+          test -f "$download_root/$asset"
+          node scripts/accept-published-agent-kit.mjs \
+            --archive "$download_root/$asset" \
+            --extract-root "$extract_root" \
+            --expected-sha256 "$AGENT_KIT_SHA256" \
+            --expected-source-revision "$AGENT_KIT_SOURCE_REVISION" \
+            --expected-version "$AGENT_KIT_VERSION" \
+            --required-node-major 20 \
+            --json | tee "$receipt"
+      - name: Upload aggregate-only Agent Kit acceptance receipt
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: agent-kit-${{ matrix.platform }}-node20-acceptance
+          path: ${{ runner.temp }}/agent-kit-acceptance-${{ matrix.platform }}.json
+          if-no-files-found: error
+          retention-days: 14
+
   bundle:
     name: ${{ matrix.platform }}-${{ matrix.arch }}
     runs-on: ${{ matrix.runner }}

@@ -512,6 +512,32 @@ test("platform bundles require the committed Useful application paths", async (t
   );
 });
 
+test("platform bundles require pinned published Agent Kit acceptance on Node 20", async (t) => {
+  const root = await createFixture(t);
+  await mutateWorkflow(root, "platform-bundles.yml", (workflow) => {
+    const step = workflow.jobs["agent-kit-acceptance"].steps
+      .find((candidate) => String(candidate.uses ?? "").startsWith("actions/setup-node@"));
+    step.with["node-version"] = "22";
+  });
+  assertViolation(
+    runChecker(root),
+    "platform-bundles.yml",
+    "platform-bundles-agent-kit-acceptance-invalid",
+  );
+});
+
+test("platform bundles bind Agent Kit acceptance to the immutable release hash", async (t) => {
+  const root = await createFixture(t);
+  await mutateWorkflow(root, "platform-bundles.yml", (workflow) => {
+    workflow.on.workflow_dispatch.inputs.agent_kit_sha256.default = "0".repeat(64);
+  });
+  assertViolation(
+    runChecker(root),
+    "platform-bundles.yml",
+    "platform-bundles-agent-kit-input-pins-invalid",
+  );
+});
+
 test("release verification serializes workspace tests", async (t) => {
   const root = await createFixture(t);
   await mutateWorkflow(root, "release.yml", (workflow) => {
