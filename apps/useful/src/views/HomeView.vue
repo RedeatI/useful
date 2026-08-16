@@ -19,9 +19,20 @@ const modeLabel = computed(() =>
     : t("home.installedMode"),
 );
 
+const quickStartItems = [
+  { id: "utilities", label: "tools.utilities.name", description: "tools.utilities.description", route: "/tools/utilities", icon: "grid" },
+  { id: "office", label: "tools.office.name", description: "tools.office.description", route: "/tools/office", icon: "office" },
+  { id: "agent-connections", label: "agentConnections.title", description: "agentConnections.inputHint", route: "/settings#agent-connections", icon: "settings" },
+  { id: "sources", label: "sourceCenter.title", description: "sourceCenter.subtitle", route: "/sources", icon: "source" },
+] as const;
+
 function openAction(actionId: string): void {
   const route = actionRoute(actionId);
   if (!route) return;
+  void router.push(route);
+}
+
+function openQuickStart(route: string): void {
   void router.push(route);
 }
 </script>
@@ -38,6 +49,24 @@ function openAction(actionId: string): void {
         </span>
       </div>
     </div>
+
+    <section class="home-quick-start" aria-labelledby="quick-start-title" data-testid="quick-start">
+      <h2 id="quick-start-title" class="useful-section__title">{{ t("home.quickStart") }}</h2>
+      <div class="useful-grid useful-grid--actions">
+        <button
+          v-for="item in quickStartItems"
+          :key="item.id"
+          class="action-card"
+          type="button"
+          :data-testid="`quick-start-${item.id}`"
+          @click="openQuickStart(item.route)"
+        >
+          <span class="action-card__icon"><AppIcon :name="item.icon" :size="20" /></span>
+          <span class="action-card__label">{{ t(item.label) }}</span>
+          <span class="action-card__description">{{ t(item.description) }}</span>
+        </button>
+      </div>
+    </section>
 
     <StateBlock v-if="appStore.loading" variant="loading" />
     <StateBlock
@@ -95,6 +124,9 @@ function openAction(actionId: string): void {
   display: flex;
   gap: var(--useful-space-2);
 }
+.home-quick-start {
+  margin-bottom: var(--useful-space-4);
+}
 .home-empty {
   color: var(--useful-text-tertiary);
   font-size: var(--useful-text-sm);
@@ -132,5 +164,10 @@ function openAction(actionId: string): void {
   font-size: var(--useful-text-sm);
   font-weight: 600;
   color: var(--useful-text);
+}
+.action-card__description {
+  color: var(--useful-text-secondary);
+  font-size: var(--useful-text-xs);
+  line-height: 1.4;
 }
 </style>

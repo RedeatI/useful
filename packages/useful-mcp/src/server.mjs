@@ -15,6 +15,8 @@ export const MCP_SERVER_INFO = Object.freeze({
   version: "0.1.0",
 });
 
+export const MCP_RECEIPT_META_KEY = "io.useful/execution-receipt";
+
 export const DISCOVERY_TOOL_NAMES = Object.freeze({
   SEARCH: "useful.actions.search",
   DESCRIBE: "useful.actions.describe",
@@ -165,6 +167,7 @@ function errorResult(error) {
   return {
     isError: true,
     content: [{ type: "text", text: JSON.stringify(payload) }],
+    ...(safeError.receipt ? { _meta: { [MCP_RECEIPT_META_KEY]: safeError.receipt } } : {}),
   };
 }
 
@@ -287,6 +290,7 @@ export function createActionToolHandler(actionId, executor, executionPolicy = no
       return {
         structuredContent: result.output,
         content: [{ type: "text", text: JSON.stringify(result.output) }],
+        _meta: { [MCP_RECEIPT_META_KEY]: result.receipt },
       };
     } catch (error) {
       return errorResult(error);

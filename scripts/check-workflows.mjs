@@ -15,6 +15,17 @@ const jsonMode = process.argv.includes("--json");
 const violations = [];
 const workflowEvidence = [];
 const EXPECTED_GO_TOOLCHAIN = "1.26.6";
+const NODE24_ACTION_PINS = new Map([
+  ["actions/checkout", "fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09"],
+  ["actions/setup-node", "a0853c24544627f65ddf259abe73b1d18a591444"],
+  ["actions/setup-go", "924ae3a1cded613372ab5595356fb5720e22ba16"],
+  ["actions/upload-artifact", "330a01c490aca151604b8cf639adc76d48f6c5d4"],
+  ["actions/download-artifact", "634f93cb2916e3fdff6788551b99b062d0335ce0"],
+  ["actions/dependency-review-action", "a1d282b36b6f3519aa1f3fc636f609c47dddb294"],
+  ["github/codeql-action/init", "ff2f1c621b7f889edc0d3c761ac2e6a3f8cdb0dd"],
+  ["github/codeql-action/analyze", "ff2f1c621b7f889edc0d3c761ac2e6a3f8cdb0dd"],
+  ["pnpm/action-setup", "fc06bc1257f339d1d5d8b3a19a8cae5388b55320"],
+]);
 const dependabotEvidence = {
   activePath: ".github/dependabot.yml",
   activePresent: false,
@@ -124,6 +135,27 @@ function inspectSteps(file, steps, location) {
         code: "action-not-pinned-to-commit",
         location: `${location}.steps[${index}]`,
         details: uses,
+      });
+    }
+    const actionName = uses.split("@", 1)[0];
+    const requiredNode24Pin = NODE24_ACTION_PINS.get(actionName);
+    if (requiredNode24Pin && uses !== `${actionName}@${requiredNode24Pin}`) {
+      violations.push({
+        file,
+        code: "node24-action-pin-required",
+        location: `${location}.steps[${index}]`,
+        details: uses,
+      });
+    }
+    if (
+      actionName === "actions/setup-node"
+      && step?.with?.cache === undefined
+      && String(step?.with?.["package-manager-cache"] ?? "") !== "false"
+    ) {
+      violations.push({
+        file,
+        code: "setup-node-automatic-cache-forbidden",
+        location: `${location}.steps[${index}]`,
       });
     }
     if (

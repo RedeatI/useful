@@ -21,13 +21,19 @@ These names are fixed compatibility interfaces:
 Use only one entry that already exists on the machine:
 
 - Extracted Agent Kit: `<ABS_KIT>\bin\useful.cmd` (Windows) or `<ABS_KIT>/bin/useful`
-  (macOS/Linux). An Agent Kit on disk is not proof of a published release.
+  (macOS/Linux). The [README](../README.md) and [Known limitations](KNOWN-LIMITATIONS.en.md)
+  identify the current public Release/entry, including the Agent Kit, as
+  [`v0.1.0-beta.11`](https://github.com/RedeatI/useful/releases/tag/v0.1.0-beta.11). For that version,
+  obtain the exact Agent Kit from the matching Release and check that Release’s `SHA256SUMS.txt` and
+  source evidence. The repository’s last exact cross-platform Agent Kit acceptance remains bound only
+  to beta.10; see [`0.1.0-beta.10-agent-kit-acceptance.md`](releases/0.1.0-beta.10-agent-kit-acceptance.md).
 - Source checkout: `packages/useful-cli/bin/useful.mjs` with Node.js `^20.9.0` or `>=22.0.0`.
   The examples below use this entry.
 
 Do not use an online package runner. Do not use a global command that resolves packages from a
 registry during execution. Prepare locked dependencies before this flow. If launcher resolve fails,
-stop. Do not fall back to a network download.
+stop. Do not fall back to a network download. A local Agent Kit build still does not authorize public
+distribution; the beta.10 acceptance record must not be reused as beta.11 acceptance or checksum evidence.
 
 ```powershell
 $useful = (Resolve-Path '.\packages\useful-cli\bin\useful.mjs').Path

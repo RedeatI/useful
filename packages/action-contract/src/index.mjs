@@ -25,6 +25,17 @@ const SCHEMA_KEYS = new Set([
   "uniqueItems",
 ]);
 
+export {
+  EXECUTION_RECEIPT_MAX_BYTES,
+  EXECUTION_RECEIPT_STATUSES,
+  EXECUTION_RECEIPT_VERSION,
+  ExecutionReceiptError,
+  assertExecutionReceipt,
+  parseExecutionReceipt,
+  upgradeExecutionReceipt,
+  validateExecutionReceipt,
+} from "./receipt.mjs";
+
 export const RESERVED_ACTION_NAMES = Object.freeze([
   "useful.actions.search",
   "useful.actions.describe",

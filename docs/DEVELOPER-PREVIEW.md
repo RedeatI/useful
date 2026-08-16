@@ -14,13 +14,19 @@ publisher verify` 流程，以 [`agent/BUILD-A-TOOL.md`](agent/BUILD-A-TOOL.md) 
 只选择一个已经存在于本机的入口：
 
 - 已解压的 Agent Kit：使用 `<ABS_KIT>\bin\useful.cmd`（Windows）或
-  `<ABS_KIT>/bin/useful`（macOS/Linux）。Agent Kit 当前是预期附加资产，不表示已经发布。
+  `<ABS_KIT>/bin/useful`（macOS/Linux）。按 [README](../README.md) 与
+  [已知限制](KNOWN-LIMITATIONS.md)，当前公开 Release/入口（包括 Agent Kit）为
+  [`v0.1.0-beta.11`](https://github.com/RedeatI/useful/releases/tag/v0.1.0-beta.11)。使用该版本时，
+  必须从同版本 Release 取得精确 Agent Kit，并核对该 Release 的 `SHA256SUMS.txt` 与来源证据。
+  仓库中最后一份精确的跨平台 Agent Kit acceptance 仍只绑定 beta.10；见
+  [`0.1.0-beta.10-agent-kit-acceptance.md`](releases/0.1.0-beta.10-agent-kit-acceptance.md)。
 - 源码 checkout：使用仓库内 `packages/useful-cli/bin/useful.mjs`，并由本机 Node.js `^20.9.0` 或 `>=22.0.0`
   版本直接运行。下列示例采用这个入口。
 
 不要使用在线 package runner、全局同名命令或任何会在执行时隐式从 registry 解析包的入口。本页不提供
 依赖下载命令；源码 checkout 的锁定依赖应由操作者在进入本流程前显式准备完成。launcher 解析失败时
-立即停止，不回退到网络下载。
+立即停止，不回退到网络下载。本地 Agent Kit 构建仍不授权公开分发；beta.10 的 acceptance 不能套用为
+beta.11 的验收或校验记录。
 
 ```powershell
 $useful = (Resolve-Path '.\packages\useful-cli\bin\useful.mjs').Path

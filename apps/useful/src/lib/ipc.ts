@@ -20,6 +20,7 @@ import type {
   ToolDefinition,
   ToolVersionInfo,
   TrpMergedItem,
+  TrpInstalledOrigin,
   TrpSourceInfo,
   TrpSourcePreview,
   TrpSyncResult,
@@ -140,6 +141,9 @@ export const ipc = {
   trpSourceSyncAll: (): Promise<TrpSyncResult[]> => invoke("trp_source_sync_all"),
   trpCatalogSearch: (keyword: string): Promise<TrpMergedItem[]> =>
     invoke("trp_catalog_search", { keyword }),
+  /** 只读回读安装来源绑定；调用方必须将其与安装前目录事实逐字段比对。 */
+  trpInstalledOrigin: (toolId: string): Promise<TrpInstalledOrigin | null> =>
+    invoke("trp_installed_origin", { toolId }),
   trpInstall: (
     sourceId: string,
     publisherKeyId: string,

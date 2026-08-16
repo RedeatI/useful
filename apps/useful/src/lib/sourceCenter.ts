@@ -1,5 +1,118 @@
 // 源中心（Phase 6B）的纯逻辑：官方徽章判定、指纹格式化、同步状态文案、源分组。便于单元测试。
-import type { SourceAccountInfo, TrpCatalogItem, TrpMergedItem, TrpSourceInfo, TrpSyncStatus } from "./types";
+import type {
+  SourceAccountInfo,
+  TrpCatalogItem,
+  TrpInstalledOrigin,
+  TrpMergedItem,
+  TrpCapabilities,
+  TrpSourceInfo,
+  TrpSyncStatus,
+} from "./types";
+
+export const SOURCE_CAPABILITY_FIELDS = [
+  "catalog", "remoteSearch", "authentication", "entitlements", "paidDownloads", "staticMirror", "nativeWorkers",
+] as const;
+const SOURCE_CAPABILITY_LABELS = [
+  "sourceCenter.capCatalog", "sourceCenter.capRemoteSearch", "sourceCenter.capAuth", "sourceCenter.capEntitlements",
+  "sourceCenter.capPaid", "sourceCenter.capMirror", "sourceCenter.capNativeWorkers",
+] as const;
+export const INSTALLED_ORIGIN_FIELDS = [
+  ["sourceId", "sourceId"],
+  ["publisherKeyId", "publisherKeyId"],
+  ["toolId", "toolId"],
+  ["installedVersion", "version"],
+  ["artifactSha256", "artifactSha256"],
+  ["channel", "channel"],
+  ["manifestDigest", "manifestDigest"],
+] as const;
+
+/** 搜索结果里可在安装前显示的目录声明，和来源自报能力严格分层。 */
+export interface DirectoryDeclaredFacts {
+  sourceId: string;
+  publisherKeyId: string;
+  toolId: string;
+  version: string;
+  artifactSha256: string;
+  channel: "stable";
+  manifestDigest: string;
+  permissions: string[];
+}
+
+function boundedText(value: string | null, maxLength: number): value is string {
+  return value !== null
+    && value.length > 0
+    && value.length <= maxLength
+    && !/[\u0000-\u001f\u007f]/.test(value);
+}
+
+function sha256(value: string | null): value is string {
+  return value !== null && /^[0-9a-f]{64}$/.test(value);
+}
+
+/**
+ * 将目录候选收窄为可安装的 allowlist 事实。字段不完整、版本/摘要不一致或权限
+ * 非法时返回 null，调用方必须保持安装和“客户端已验证”状态不可用。
+ */
+export function directoryDeclaredFacts(
+  item: Pick<
+    TrpCatalogItem,
+    | "sourceId"
+    | "publisherKeyId"
+    | "toolId"
+    | "latestStable"
+    | "latestStableDigest"
+    | "permissions"
+    | "candidateVersion"
+    | "candidateArtifactSha256"
+    | "candidateManifestDigest"
+    | "candidateChannel"
+  >,
+): DirectoryDeclaredFacts | null {
+  const {
+    sourceId, publisherKeyId, toolId, latestStable: version, latestStableDigest,
+    permissions, candidateVersion, candidateArtifactSha256: artifactSha256,
+    candidateManifestDigest: manifestDigest, candidateChannel,
+  } = item;
+  if (!boundedText(sourceId, 200)
+    || !boundedText(publisherKeyId, 512)
+    || !boundedText(toolId, 200)
+    || !boundedText(version, 128)
+    || candidateVersion !== version
+    || candidateChannel !== "stable"
+    || !sha256(latestStableDigest)
+    || !sha256(artifactSha256)
+    || artifactSha256 !== latestStableDigest
+    || !sha256(manifestDigest)
+    || !Array.isArray(permissions)
+    || permissions.some((permission) => !boundedText(permission, 256))) {
+    return null;
+  }
+  return {
+    sourceId,
+    publisherKeyId,
+    toolId,
+    version: candidateVersion,
+    artifactSha256,
+    channel: "stable",
+    manifestDigest,
+    permissions: [...permissions],
+  };
+}
+
+/**
+ * 安装后只有 SQLite 回读逐字段等于安装前目录候选才允许显示客户端验证层；
+ * 同 tool ID 的其他发布者或来源绝不匹配。
+ */
+export function installedOriginMatches(
+  directory: DirectoryDeclaredFacts | null,
+  origin: TrpInstalledOrigin | null,
+): origin is TrpInstalledOrigin {
+  return directory !== null
+    && origin !== null
+    && INSTALLED_ORIGIN_FIELDS.every(([originField, directoryField]) => (
+      origin[originField] === directory[directoryField]
+    ));
+}
 
 /**
  * 官方徽章是否可见：只看 isOfficial（由 Rust 侧预置根指纹匹配产生）。
@@ -104,18 +217,18 @@ export function splitSources(sources: TrpSourceInfo[]): {
   };
 }
 
+/** 来源自报 capabilities 的标签；它们不与 package permissions 混合。 */
+export function capabilityLabelsFromCapabilities(caps: Partial<TrpCapabilities> | undefined): string[] {
+  const labels: string[] = [];
+  for (let index = 0; index < SOURCE_CAPABILITY_FIELDS.length; index += 1) {
+    if (caps?.[SOURCE_CAPABILITY_FIELDS[index]]) labels.push(SOURCE_CAPABILITY_LABELS[index]);
+  }
+  return labels;
+}
+
 /** 启用的源中已声明的能力标签（用于能力 chips）。 */
 export function capabilityLabels(source: TrpSourceInfo): string[] {
-  const caps = source.capabilities ?? {};
-  const labels: string[] = [];
-  if (caps.catalog) labels.push("sourceCenter.capCatalog");
-  if (caps.remoteSearch) labels.push("sourceCenter.capRemoteSearch");
-  if (caps.authentication) labels.push("sourceCenter.capAuth");
-  if (caps.entitlements) labels.push("sourceCenter.capEntitlements");
-  if (caps.paidDownloads) labels.push("sourceCenter.capPaid");
-  if (caps.staticMirror) labels.push("sourceCenter.capMirror");
-  if (caps.nativeWorkers) labels.push("sourceCenter.capNativeWorkers");
-  return labels;
+  return capabilityLabelsFromCapabilities(source.capabilities);
 }
 
 /** 搜索结果中的同名冲突组数（用于摘要提示）。 */

@@ -1,5 +1,7 @@
 #!/usr/bin/env node
-import { stat, readFile } from "node:fs/promises";
+import { randomUUID } from "node:crypto";
+import { link, open, readFile, stat, unlink } from "node:fs/promises";
+import { basename, dirname, join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import {
   ActionExecutionError,
@@ -36,6 +38,33 @@ class CliError extends Error {
 
 function writeJson(value, stdout) {
   stdout.write(`${JSON.stringify(value)}\n`);
+}
+
+export async function writeReceiptFileAtomic(destination, receipt) {
+  if (typeof destination !== "string" || destination.length === 0) {
+    throw new CliError("RECEIPT_PATH_INVALID", "--receipt-out 路径无效", EXIT_CODES.USAGE_OR_INPUT);
+  }
+  const target = resolve(destination);
+  const temporary = join(dirname(target), `.${basename(target)}.${process.pid}.${randomUUID()}.tmp`);
+  let handle;
+  let publishing = false;
+  try {
+    handle = await open(temporary, "wx", 0o600);
+    await handle.writeFile(`${JSON.stringify(receipt)}\n`, "utf8");
+    await handle.sync();
+    await handle.close();
+    handle = undefined;
+    publishing = true;
+    await link(temporary, target);
+  } catch (error) {
+    await handle?.close().catch(() => {});
+    if (publishing && error?.code === "EEXIST") {
+      throw new CliError("RECEIPT_OUTPUT_EXISTS", "receipt 输出已存在，拒绝覆盖", EXIT_CODES.USAGE_OR_INPUT);
+    }
+    throw new CliError("RECEIPT_WRITE_FAILED", "无法原子写入 receipt", EXIT_CODES.RUNTIME_FAILURE);
+  } finally {
+    await unlink(temporary).catch(() => {});
+  }
 }
 
 function usage(message = "用法: useful-runtime [--plugin-config <file>] [--host-config <file>] [--agent-profile <file>] actions <list|search|suggest|describe|run|recipe> ...") {
@@ -319,8 +348,14 @@ export async function main(argv = process.argv.slice(2), io = process) {
 
     if (command === "run") {
       const actionId = rest[0];
-      if (!actionId || actionId.startsWith("--")) usage("actions run <id> [--input @file|-] [--confirm] --output json");
-      const flags = exactFlags(rest.slice(1), { "--input": "value", "--output": "value", "--preset": "value", "--confirm": "boolean" });
+      if (!actionId || actionId.startsWith("--")) usage("actions run <id> [--input @file|-] [--confirm] [--receipt-out <file>] --output json");
+      const flags = exactFlags(rest.slice(1), {
+        "--input": "value",
+        "--output": "value",
+        "--preset": "value",
+        "--confirm": "boolean",
+        "--receipt-out": "value",
+      });
       if ((flags["--output"] ?? "json") !== "json") usage("--output 目前只支持 json");
       if (flags["--preset"] !== undefined && !exposure) usage("--preset 要求显式 --agent-profile");
       const resolved = exposure ? exposure.resolve(actionId, "cli") : { actionId };
@@ -328,10 +363,19 @@ export async function main(argv = process.argv.slice(2), io = process) {
       const mergedInput = exposure ? exposure.applyPreset(resolved.actionId, flags["--preset"], input) : input;
       const canonicalActionId = registry.resolve(resolved.actionId)?.descriptor.actionId ?? resolved.actionId;
       const trustedGrants = hostExecutionGrants.get(canonicalActionId);
-      const result = await executor.execute(resolved.actionId, mergedInput, {
-        ...(trustedGrants ?? {}),
-        confirmed: flags["--confirm"] === true,
-      });
+      let result;
+      try {
+        result = await executor.execute(resolved.actionId, mergedInput, {
+          ...(trustedGrants ?? {}),
+          confirmed: flags["--confirm"] === true,
+        });
+      } catch (error) {
+        if (flags["--receipt-out"] && error?.receipt) {
+          await writeReceiptFileAtomic(flags["--receipt-out"], error.receipt);
+        }
+        throw error;
+      }
+      if (flags["--receipt-out"]) await writeReceiptFileAtomic(flags["--receipt-out"], result.receipt);
       writeJson({
         protocolVersion: CLI_PROTOCOL_VERSION,
         operation: "actions.run",

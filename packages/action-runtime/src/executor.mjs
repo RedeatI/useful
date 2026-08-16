@@ -1,23 +1,31 @@
-import { utf8JsonBytes, validateValue } from "@useful/action-contract";
+import { assertExecutionReceipt, utf8JsonBytes, validateValue } from "@useful/action-contract";
 import { ActionExecutionError, ERROR_CODES } from "./errors.mjs";
 import { ActionRegistry } from "./registry.mjs";
 
 const nowNs = () => process.hrtime.bigint();
 const elapsedMs = (started) => Number((process.hrtime.bigint() - started) / 1000000n);
 
-function makeReceipt(descriptor, startedAt, started, status, errorCode, permissions) {
-  return {
-    receiptVersion: "1.0",
+function makeReceipt(descriptor, startedAt, started, status, errorCode) {
+  const durationMs = elapsedMs(started);
+  const receipt = {
+    receiptVersion: "2.0",
     actionId: descriptor.actionId,
     actionVersion: descriptor.version,
     contractVersion: descriptor.contractVersion,
     source: structuredClone(descriptor.source),
-    permissions: [...permissions],
-    startedAt,
-    durationMs: elapsedMs(started),
+    permissions: {
+      required: [...descriptor.permissions.required],
+      capabilities: [...descriptor.permissions.capabilities],
+    },
     status,
+    createdAt: startedAt,
+    startedAt,
+    completedAt: new Date(Date.parse(startedAt) + durationMs).toISOString(),
+    durationMs,
     ...(errorCode ? { error: { code: errorCode } } : {}),
   };
+  assertExecutionReceipt(receipt);
+  return receipt;
 }
 
 function guardedCall(handler, input, timeoutMs, signal) {
@@ -60,10 +68,8 @@ export class ActionExecutor {
     const started = nowNs();
     const grantedPermissions = new Set(options.grantedPermissions ?? []);
     const grantedCapabilities = new Set(options.grantedCapabilities ?? []);
-    const receiptPermissions = descriptor.permissions.required;
-
     const fail = (code, extra = {}) => {
-      const receipt = makeReceipt(descriptor, startedAt, started, code === ERROR_CODES.CANCELLED ? "cancelled" : "error", code, receiptPermissions);
+      const receipt = makeReceipt(descriptor, startedAt, started, code === ERROR_CODES.CANCELLED ? "cancelled" : "error", code);
       throw new ActionExecutionError(code, { ...extra, receipt });
     };
 
@@ -115,7 +121,7 @@ export class ActionExecutor {
 
     return {
       output,
-      receipt: makeReceipt(descriptor, startedAt, started, "success", undefined, receiptPermissions),
+      receipt: makeReceipt(descriptor, startedAt, started, "success"),
     };
   }
 }

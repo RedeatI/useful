@@ -14,16 +14,19 @@ Release 或交给 Useful source 维护者，绝不代表 CLI 会自动上传或�
 规范源码仓库地址：`https://github.com/RedeatI/useful`。只有该地址实际公开且可访问后，才把它当作
 可克隆的发布入口；不要根据文档文字推断远端状态，也不要编造其他远端。
 
-## Agent Kit 入口（已发布预览资产）
+## Agent Kit 入口（当前公开 Release）
 
-当前发布预览是
-[`Useful-0.1.0-beta.10-agent-kit.zip`](https://github.com/RedeatI/useful/releases/download/v0.1.0-beta.10/Useful-0.1.0-beta.10-agent-kit.zip)。
-解压后只要求 Node.js 20 或更高版本；无需 monorepo、GUI 或全局安装，也不改变本文的非交互 JSON、
-非零即停、默认 `minimal-web` 和签名信任链边界。发布后 Windows 验收记录见
-[`0.1.0-beta.10-agent-kit-acceptance.md`](../releases/0.1.0-beta.10-agent-kit-acceptance.md)。
+README 与[已知限制](../KNOWN-LIMITATIONS.md)将当前源码、Agent Kit 入口和未签名 Windows 预览 Release
+指向 [`v0.1.0-beta.11`](https://github.com/RedeatI/useful/releases/tag/v0.1.0-beta.11)。使用该版本的
+Agent Kit 时，必须从同版本 Release 取得精确资产，并核对该 Release 的 `SHA256SUMS.txt` 与来源证据；
+不能套用其他版本的验收或校验记录。解压后只要求 Node.js 20 或更高版本；无需 monorepo、GUI 或全局安装，
+也不改变本文的非交互 JSON、非零即停、默认 `minimal-web` 和签名信任链边界。
 
-后续版本只有在受控工作流把同版本 Kit 附到匹配的 GitHub Release，并提供校验和与来源证据后，才是
-已发布资产；本地 Kit 构建仍不授权公开分发。
+仓库中最后一份精确的跨平台 Agent Kit acceptance 仍是
+[`0.1.0-beta.10-agent-kit-acceptance.md`](../releases/0.1.0-beta.10-agent-kit-acceptance.md)。它只绑定
+beta.10 的精确 ZIP、SHA 和 Windows x64/macOS arm64/Linux x64 结果，是不可变的历史证据，不接受或证明
+beta.11。后续版本只有在受控工作流把同版本 Kit 附到匹配的 GitHub Release，并提供校验和与来源证据后，
+才是已发布资产；本地 Kit 构建仍不授权公开分发。
 
 Windows launcher 示例：
 

@@ -7,6 +7,7 @@ import { createRouter, createWebHistory } from "vue-router";
 
 vi.mock("@tauri-apps/plugin-dialog", () => ({
   open: vi.fn().mockResolvedValue(null),
+  confirm: vi.fn().mockResolvedValue(true),
 }));
 
 vi.mock("@/lib/ipc", () => ({

@@ -5,6 +5,11 @@ import { setLocale } from "@/i18n";
 
 const listeners = new Map<string, (event: { payload: unknown }) => void>();
 const routerMock = vi.hoisted(() => ({ push: vi.fn().mockResolvedValue(undefined) }));
+const dialogMock = vi.hoisted(() => ({
+  confirm: vi.fn().mockResolvedValue(true),
+  open: vi.fn().mockResolvedValue(null),
+  save: vi.fn().mockResolvedValue(null),
+}));
 const ipcMock = vi.hoisted(() => ({
   mediaSidecars: vi.fn(),
   mediaDetectEncoders: vi.fn().mockResolvedValue({ nvenc: false, qsv: false, amf: false }),
@@ -31,10 +36,7 @@ const ipcMock = vi.hoisted(() => ({
 
 vi.mock("@/lib/ipc", () => ({ default: ipcMock }));
 vi.mock("vue-router", () => ({ useRouter: () => routerMock }));
-vi.mock("@tauri-apps/plugin-dialog", () => ({
-  open: vi.fn().mockResolvedValue(null),
-  save: vi.fn().mockResolvedValue(null),
-}));
+vi.mock("@tauri-apps/plugin-dialog", () => dialogMock);
 vi.mock("@tauri-apps/api/event", () => ({
   listen: vi.fn((name: string, callback: (event: { payload: unknown }) => void) => {
     listeners.set(name, callback);
@@ -165,7 +167,7 @@ describe("VideoTrimView preview capability", () => {
       ffprobe: { name: "ffprobe", available: false },
       mpv: { name: "mpv", available: false },
     });
-    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
+    dialogMock.confirm.mockResolvedValueOnce(true);
     const wrapper = mountView();
     await flushPromises();
 
@@ -173,7 +175,7 @@ describe("VideoTrimView preview capability", () => {
     await wrapper.get('[data-testid="choose-video"]').trigger("click");
     await flushPromises();
 
-    expect(confirmSpy).toHaveBeenCalledWith(expect.stringContaining("导入视频需要转码组件"));
+    expect(dialogMock.confirm).toHaveBeenCalledWith(expect.stringContaining("导入视频需要转码组件"));
     expect(routerMock.push).toHaveBeenCalledWith({
       name: "media-runtime",
       query: { required: "transcode", returnTo: "/tools/video-trim" },
@@ -181,12 +183,11 @@ describe("VideoTrimView preview capability", () => {
     expect(ipcMock.mediaProbe).not.toHaveBeenCalled();
 
     wrapper.unmount();
-    confirmSpy.mockRestore();
   });
 
   it("fails closed and still offers the decoder manager when runtime detection fails", async () => {
     ipcMock.mediaSidecars.mockRejectedValueOnce(new Error("Tauri IPC unavailable"));
-    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
+    dialogMock.confirm.mockResolvedValueOnce(true);
     const wrapper = mountView();
     await flushPromises();
 
@@ -196,13 +197,12 @@ describe("VideoTrimView preview capability", () => {
     await wrapper.get('[data-testid="choose-video"]').trigger("click");
     await flushPromises();
 
-    expect(confirmSpy).toHaveBeenCalled();
+    expect(dialogMock.confirm).toHaveBeenCalled();
     expect(routerMock.push).toHaveBeenCalledWith({
       name: "media-runtime",
       query: { required: "transcode", returnTo: "/tools/video-trim" },
     });
 
     wrapper.unmount();
-    confirmSpy.mockRestore();
   });
 });

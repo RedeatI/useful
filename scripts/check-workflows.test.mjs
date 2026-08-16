@@ -81,6 +81,31 @@ test("manual-only first-public fixture passes as local static evidence", async (
   assert.ok(run.result.workflows.every((workflow) => workflow.manualOnly));
 });
 
+test("workflows keep Node-based actions on the reviewed Node 24 pins", async (t) => {
+  const root = await createFixture(t);
+  await mutateWorkflow(root, "ci.yml", (workflow) => {
+    const checkout = workflow.jobs["build-and-test"].steps
+      .find((step) => String(step.uses ?? "").startsWith("actions/checkout@"));
+    checkout.uses = "actions/checkout@11d5960a326750d5838078e36cf38b85af677262";
+  });
+  assertViolation(
+    runChecker(root),
+    "ci.yml",
+    "node24-action-pin-required",
+    "actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+  );
+});
+
+test("setup-node disables implicit package-manager caching when no cache is declared", async (t) => {
+  const root = await createFixture(t);
+  await mutateWorkflow(root, "release.yml", (workflow) => {
+    const setupNode = workflow.jobs.identity.steps
+      .find((step) => String(step.uses ?? "").startsWith("actions/setup-node@"));
+    delete setupNode.with["package-manager-cache"];
+  });
+  assertViolation(runChecker(root), "release.yml", "setup-node-automatic-cache-forbidden");
+});
+
 test("CI requires the repository brand gate", async (t) => {
   const root = await createFixture(t);
   await mutateWorkflow(root, "ci.yml", (workflow) => {

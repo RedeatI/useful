@@ -55,7 +55,7 @@ jobs:
       publish_gate_json: ${{ steps.publish-gate.outputs.publish_gate_json }}
       source_publish_gate_json: ${{ steps.source-owner-gate.outputs.source_publish_gate_json }}
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with:
           persist-credentials: false
       - name: Verify exact clean source checkout
@@ -67,9 +67,10 @@ jobs:
           test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
           test -z "$(git status --porcelain --untracked-files=all)"
           echo "SOURCE_DATE_EPOCH=$(git show -s --format=%ct "$EXPECTED_SHA")" >> "$GITHUB_ENV"
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
         with:
           node-version: 20
+          package-manager-cache: false
       - name: Require a manually selected existing tag
         shell: bash
         env:
@@ -229,7 +230,7 @@ jobs:
     if: inputs.scope == 'desktop-lite' || inputs.scope == 'desktop-full'
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with:
           persist-credentials: false
       - name: Verify exact clean source checkout
@@ -241,10 +242,10 @@ jobs:
           test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
           test -z "$(git status --porcelain --untracked-files=all)"
           echo "SOURCE_DATE_EPOCH=$(git show -s --format=%ct "$EXPECTED_SHA")" >> "$GITHUB_ENV"
-      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+      - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v5.0.0
         with:
           version: 9.15.0
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
         with:
           node-version: 20
           cache: pnpm
@@ -270,7 +271,7 @@ jobs:
             libxdo-dev \
             patchelf \
             wget
-      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
         with:
           go-version: "1.26.6"
           cache-dependency-path: services/go.sum
@@ -333,7 +334,7 @@ jobs:
     if: inputs.scope == 'desktop-lite' || inputs.scope == 'desktop-full'
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with:
           persist-credentials: false
       - name: Verify exact clean source checkout
@@ -345,10 +346,10 @@ jobs:
           test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
           test -z "$(git status --porcelain --untracked-files=all)"
           echo "SOURCE_DATE_EPOCH=$(git show -s --format=%ct "$EXPECTED_SHA")" >> "$GITHUB_ENV"
-      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+      - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v5.0.0
         with:
           version: 9.15.0
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
         with:
           node-version: 20
           cache: pnpm
@@ -369,7 +370,7 @@ jobs:
     if: inputs.scope == 'source-agent-kit'
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with:
           persist-credentials: false
       - name: Verify exact clean source checkout
@@ -381,10 +382,10 @@ jobs:
           test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
           test -z "$(git status --porcelain --untracked-files=all)"
           echo "SOURCE_DATE_EPOCH=$(git show -s --format=%ct "$EXPECTED_SHA")" >> "$GITHUB_ENV"
-      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+      - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v5.0.0
         with:
           version: 9.15.0
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
         with:
           node-version: 20
           cache: pnpm
@@ -566,7 +567,7 @@ jobs:
             for asset in "${expected[@]}"; do sha256sum "$asset" >> SHA256SUMS.txt; done
             sha256sum --check --strict SHA256SUMS.txt
           )
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+      - uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
         with:
           name: useful-source-agent-kit-candidate-${{ needs.identity.outputs.version }}
           path: source-release-candidate/*
@@ -583,13 +584,13 @@ jobs:
       contents: write
       checks: read
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with:
           persist-credentials: false
-      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+      - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v5.0.0
         with:
           version: 9.15.0
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
         with:
           node-version: 20
           cache: pnpm
@@ -604,7 +605,7 @@ jobs:
           test -z "$(git status --porcelain --untracked-files=all)"
           echo "SOURCE_DATE_EPOCH=$(git show -s --format=%ct "$EXPECTED_SHA")" >> "$GITHUB_ENV"
           node scripts/public-source-check.mjs --json > "$RUNNER_TEMP/PUBLISH-SOURCE-CHECK.json"
-      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+      - uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0
         with:
           name: useful-source-agent-kit-candidate-${{ needs.identity.outputs.version }}
           path: source-release-candidate
@@ -705,7 +706,7 @@ jobs:
     if: inputs.scope == 'desktop-lite' || inputs.scope == 'desktop-full'
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with:
           persist-credentials: false
       - name: Verify exact clean source checkout
@@ -717,10 +718,10 @@ jobs:
           test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
           test -z "$(git status --porcelain --untracked-files=all)"
           echo "SOURCE_DATE_EPOCH=$(git show -s --format=%ct "$EXPECTED_SHA")" >> "$GITHUB_ENV"
-      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+      - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v5.0.0
         with:
           version: 9.15.0
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
         with:
           node-version: 20
           cache: pnpm
@@ -729,7 +730,7 @@ jobs:
           toolchain: 1.97.1
       - run: pnpm install --frozen-lockfile
       - run: node scripts/gen-sbom.mjs
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+      - uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
         with:
           name: useful-sbom
           path: dist-sbom/sbom.cdx.json
@@ -742,7 +743,7 @@ jobs:
     if: inputs.scope == 'desktop-lite' || inputs.scope == 'desktop-full'
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with:
           persist-credentials: false
       - name: Verify exact clean source checkout
@@ -754,10 +755,10 @@ jobs:
           test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
           test -z "$(git status --porcelain --untracked-files=all)"
           echo "SOURCE_DATE_EPOCH=$(git show -s --format=%ct "$EXPECTED_SHA")" >> "$GITHUB_ENV"
-      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+      - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v5.0.0
         with:
           version: 9.15.0
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
         with:
           node-version: 20
           cache: pnpm
@@ -827,7 +828,7 @@ jobs:
           test "${#manifests[@]}" -eq 1
           unzip -p "$out/$zip" "${manifests[0]}" | VERSION="$VERSION" REVISION="$GITHUB_SHA" node --input-type=module -e \
             "let s=''; process.stdin.setEncoding('utf8'); process.stdin.on('data', c => s += c); process.stdin.on('end', () => { const m=JSON.parse(s); if(m.schemaVersion!=='useful.agent-kit.manifest.v1'||m.product?.name!=='Useful'||m.product?.version!==process.env.VERSION||m.source?.revision!==process.env.REVISION) throw new Error('Agent Kit MANIFEST identity binding failed'); });"
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+      - uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
         with:
           name: useful-agent-kit
           path: ${{ runner.temp }}/useful-agent-kit/*
@@ -863,7 +864,7 @@ jobs:
             runner: ubuntu-22.04
             target: x86_64-unknown-linux-gnu
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with:
           persist-credentials: false
       - name: Verify exact clean source checkout
@@ -875,10 +876,10 @@ jobs:
           test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
           test -z "$(git status --porcelain --untracked-files=all)"
           echo "SOURCE_DATE_EPOCH=$(git show -s --format=%ct "$EXPECTED_SHA")" >> "$GITHUB_ENV"
-      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+      - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v5.0.0
         with:
           version: 9.15.0
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
         with:
           node-version: 20
           cache: pnpm
@@ -1402,7 +1403,7 @@ jobs:
             "$version" > signing-linux-x64.json
 
       - name: Upload build output for release assembly
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
         with:
           name: useful-build-${{ matrix.platform }}-${{ matrix.arch }}
           path: |
@@ -1422,7 +1423,7 @@ jobs:
       make_latest: ${{ steps.metadata.outputs.make_latest }}
       signed: ${{ steps.metadata.outputs.signed }}
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with:
           persist-credentials: false
       - name: Verify exact clean source checkout
@@ -1434,17 +1435,17 @@ jobs:
           test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
           test -z "$(git status --porcelain --untracked-files=all)"
           echo "SOURCE_DATE_EPOCH=$(git show -s --format=%ct "$EXPECTED_SHA")" >> "$GITHUB_ENV"
-      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+      - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v5.0.0
         with:
           version: 9.15.0
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
         with:
           node-version: 20
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - name: Capture public source evidence from the clean checkout
         run: node scripts/public-source-check.mjs --json > "$RUNNER_TEMP/SOURCE-CHECK.json"
-      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+      - uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0
         with:
           pattern: useful-*
           path: _downloads
@@ -1798,7 +1799,7 @@ jobs:
             sha256sum "$asset" >> SHA256SUMS.txt
           done
           sha256sum --check SHA256SUMS.txt
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+      - uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
         with:
           name: useful-release-candidate-${{ needs.identity.outputs.version }}
           path: release-candidate/*
@@ -1815,7 +1816,7 @@ jobs:
       contents: write
       checks: read
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with:
           persist-credentials: false
       - name: Verify exact clean source checkout
@@ -1827,17 +1828,17 @@ jobs:
           test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
           test -z "$(git status --porcelain --untracked-files=all)"
           echo "SOURCE_DATE_EPOCH=$(git show -s --format=%ct "$EXPECTED_SHA")" >> "$GITHUB_ENV"
-      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+      - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v5.0.0
         with:
           version: 9.15.0
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
         with:
           node-version: 20
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - name: Capture public source evidence before downloading candidate files
         run: node scripts/public-source-check.mjs --json > "$RUNNER_TEMP/SOURCE-CHECK.json"
-      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+      - uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0
         with:
           name: useful-release-candidate-${{ needs.identity.outputs.version }}
           path: release-candidate

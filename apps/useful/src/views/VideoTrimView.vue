@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, reactive, ref } from "vue";
 import { useRouter } from "vue-router";
-import { open, save } from "@tauri-apps/plugin-dialog";
+import { confirm as confirmDialog, open, save } from "@tauri-apps/plugin-dialog";
 import { listen } from "@tauri-apps/api/event";
 import type { UnlistenFn } from "@tauri-apps/api/event";
 import { t } from "@/i18n";
@@ -109,7 +109,7 @@ async function ensureTranscodeRuntime(): Promise<boolean> {
     await loadSidecars();
   }
   if (mediaAvailable.value) return true;
-  if (window.confirm(t("vtrim.installRuntimeConfirm"))) {
+  if (await confirmDialog(t("vtrim.installRuntimeConfirm"))) {
     await openRuntimeManager("transcode");
   }
   return false;

@@ -2,6 +2,7 @@
 import { computed, onMounted, onUnmounted, reactive, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { listen } from "@tauri-apps/api/event";
+import { confirm as confirmDialog } from "@tauri-apps/plugin-dialog";
 import type { UnlistenFn } from "@tauri-apps/api/event";
 import AppIcon from "@/components/AppIcon.vue";
 import StateBlock from "@/components/StateBlock.vue";
@@ -133,11 +134,11 @@ function phaseLabel(phase: MediaPackPhase | null): string {
 
 async function install(packId: PackId, bytes: number, repair: boolean): Promise<void> {
   if (!trustReady.value || operations[packId].status === "running") return;
-  if (!window.confirm(t(repair ? "mediaRuntime.repairConfirm" : "mediaRuntime.installConfirm", {
+  if (!(await confirmDialog(t(repair ? "mediaRuntime.repairConfirm" : "mediaRuntime.installConfirm", {
     pack: t(`mediaRuntime.pack.${packId}.title`),
     size: formatBytes(bytes),
     source: packs.value.find((pack) => pack.id === packId)?.sourceName ?? "upstream",
-  }))) return;
+  })))) return;
   const operation = operations[packId];
   operation.status = "running";
   operation.phase = "downloading";
@@ -159,7 +160,7 @@ async function cancel(packId: PackId): Promise<void> {
 }
 
 async function rollback(packId: PackId): Promise<void> {
-  if (!window.confirm(t("mediaRuntime.rollbackConfirm"))) return;
+  if (!(await confirmDialog(t("mediaRuntime.rollbackConfirm")))) return;
   try {
     await ipc.mediaPackRollback(packId);
     await refresh();

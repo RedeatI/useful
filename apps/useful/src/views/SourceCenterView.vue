@@ -2,6 +2,7 @@
 // 源中心：legacy catalog 兼容索引源 + TRP discovery 信任源的分区管理。
 // 官方徽章只来自 isOfficial（预置根指纹匹配）；伪官方源永远不显示官方徽章。
 import { computed, onMounted, ref } from "vue";
+import { confirm as confirmDialog } from "@tauri-apps/plugin-dialog";
 import { t } from "@/i18n";
 import ipc from "@/lib/ipc";
 import {
@@ -10,8 +11,10 @@ import {
   advisorySeverityKey,
   capabilityLabels,
   conflictCount,
+  directoryDeclaredFacts,
   deliveryTypeKey,
   formatFingerprint,
+  installedOriginMatches,
   loginStatusKey,
   officialBadgeVisible,
   requiresAuth,
@@ -23,6 +26,7 @@ import {
 import type {
   SourceAccountInfo,
   SourceInfo,
+  TrpInstalledOrigin,
   TrpMergedItem,
   TrpSourceInfo,
   TrpSourcePreview,
@@ -30,6 +34,7 @@ import type {
 import AppIcon from "@/components/AppIcon.vue";
 import StateBlock from "@/components/StateBlock.vue";
 import PermissionDiffDialog from "@/components/PermissionDiffDialog.vue";
+import TrustFactCard from "@/components/TrustFactCard.vue";
 
 const sources = ref<TrpSourceInfo[]>([]);
 const legacySources = ref<SourceInfo[]>([]);
@@ -55,12 +60,35 @@ const legacyPublicKey = ref("");
 const keyword = ref("");
 const results = ref<TrpMergedItem[]>([]);
 const searched = ref(false);
+// 只有本次安装成功后的 SQLite 回读，且与安装前的目录候选逐字段一致，才保留在这里。
+const verifiedOrigins = ref<Record<string, TrpInstalledOrigin>>({});
 
 const grouped = computed(() => splitSources(sources.value));
 const conflicts = computed(() => conflictCount(results.value));
 
 // 源 -> 账户信息（登录状态）
 const accounts = ref<Record<string, SourceAccountInfo | null>>({});
+
+function resultKey(r: TrpMergedItem): string {
+  return `${r.item.sourceId}/${r.item.publisherKeyId}/${r.item.toolId}`;
+}
+
+function directoryFacts(r: TrpMergedItem) {
+  return directoryDeclaredFacts(r.item);
+}
+
+function sourceCapabilities(r: TrpMergedItem) {
+  return sources.value.find((source) => source.id === r.item.sourceId)?.capabilities ?? {};
+}
+
+function verifiedOrigin(r: TrpMergedItem): boolean {
+  const origin = verifiedOrigins.value[resultKey(r)] ?? null;
+  return installedOriginMatches(directoryFacts(r), origin);
+}
+
+function clearVerifiedOrigin(r: TrpMergedItem): void {
+  delete verifiedOrigins.value[resultKey(r)];
+}
 
 function note(msg: string): void {
   message.value = msg;
@@ -123,7 +151,7 @@ async function toggleLegacySource(source: SourceInfo): Promise<void> {
 }
 
 async function removeLegacySource(source: SourceInfo): Promise<void> {
-  if (!window.confirm(t("sourceCenter.legacyRemoveConfirm", { name: source.name }))) return;
+  if (!(await confirmDialog(t("sourceCenter.legacyRemoveConfirm", { name: source.name })))) return;
   try { await ipc.sourceRemove(source.id); await reload(); }
   catch (cause) { fail(cause); }
 }
@@ -143,7 +171,7 @@ async function login(s: TrpSourceInfo): Promise<void> {
 }
 
 async function logout(s: TrpSourceInfo): Promise<void> {
-  if (!window.confirm(t("sourceCenter.logoutConfirm", { source: s.displayName }))) return;
+  if (!(await confirmDialog(t("sourceCenter.logoutConfirm", { source: s.displayName })))) return;
   try {
     await ipc.sourceLogout(s.id);
     accounts.value[s.id] = null;
@@ -233,7 +261,7 @@ async function setPriority(s: TrpSourceInfo, ev: Event): Promise<void> {
 }
 
 async function removeSource(s: TrpSourceInfo): Promise<void> {
-  if (!window.confirm(t("sourceCenter.removeConfirm", { name: s.displayName }))) return;
+  if (!(await confirmDialog(t("sourceCenter.removeConfirm", { name: s.displayName })))) return;
   try {
     await ipc.trpSourceRemove(s.id);
     await reload();
@@ -280,6 +308,7 @@ async function requestInstall(r: TrpMergedItem): Promise<void> {
 
 async function doInstall(r: TrpMergedItem, confirmed: boolean): Promise<void> {
   busy.value = true;
+  clearVerifiedOrigin(r);
   try {
     const tool = await ipc.trpInstall(
       r.item.sourceId,
@@ -287,6 +316,17 @@ async function doInstall(r: TrpMergedItem, confirmed: boolean): Promise<void> {
       r.item.toolId,
       confirmed,
     );
+    const directory = directoryFacts(r);
+    if (directory) {
+      try {
+        const origin = await ipc.trpInstalledOrigin(r.item.toolId);
+        if (installedOriginMatches(directory, origin)) {
+          verifiedOrigins.value[resultKey(r)] = origin;
+        }
+      } catch {
+        // 安装已成功，但读取失败或字段不匹配时绝不显示客户端验证层。
+      }
+    }
     note(t("sourceCenter.installedOk", { name: tool.name }));
   } finally {
     busy.value = false;
@@ -542,7 +582,7 @@ function syncTimeText(s: TrpSourceInfo): string {
           data-testid="search-input"
           @keydown.enter="doSearch"
         />
-        <button class="useful-btn" @click="doSearch">
+        <button class="useful-btn" data-testid="search-btn" @click="doSearch">
           <AppIcon name="search" :size="14" />
           {{ t("common.search") }}
         </button>
@@ -607,10 +647,18 @@ function syncTimeText(s: TrpSourceInfo): string {
               {{ t("sourceCenter.mirrorsLabel", { sources: r.mirrorSourceIds.join(", ") }) }}
             </div>
             <div v-if="r.item.summary" class="sc-source__meta">{{ r.item.summary }}</div>
+            <TrustFactCard
+              v-if="directoryFacts(r)"
+              :source-id="r.item.sourceId"
+              :source-capabilities="sourceCapabilities(r)"
+              :availability="r.item.availability"
+              :directory="directoryFacts(r)"
+              :verified="verifiedOrigin(r)"
+            />
           </div>
           <div class="sc-result__actions">
             <button
-              v-if="r.item.accessMode === 'free' && !r.item.isNativeWorker && r.item.latestStable"
+              v-if="r.item.accessMode === 'free' && !r.item.isNativeWorker && directoryFacts(r)"
               class="useful-btn useful-btn--primary"
               :disabled="busy"
               data-testid="install-btn"
