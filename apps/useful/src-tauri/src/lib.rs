@@ -462,6 +462,7 @@ pub fn run() {
             commands::trp_sources::trp_source_sync,
             commands::trp_sources::trp_source_sync_all,
             commands::trp_sources::trp_catalog_search,
+            commands::trp_sources::trp_installed_origin,
             commands::trp_sources::trp_install,
             commands::trp_sources::trp_rollback,
             commands::trp_sources::trp_check_update,

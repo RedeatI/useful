@@ -16,7 +16,8 @@ use std::sync::{Arc, Mutex, OnceLock};
 use std::time::Instant;
 use tauri::{AppHandle, State};
 use useful_repository_client::catalog::{
-    latest_stable_digest, max_advisory_severity, parse_catalog, CatalogEntry, MAX_CATALOG_SIZE,
+    latest_stable_digest, max_advisory_severity, parse_catalog, ArtifactInfo, CatalogEntry,
+    MAX_CATALOG_SIZE,
 };
 use useful_repository_client::discovery::{
     parse_discovery, RepositoryDiscovery, MAX_DISCOVERY_SIZE,
@@ -27,7 +28,7 @@ use useful_repository_client::pinning::{
 use useful_repository_client::publisher::{
     select_unique_publisher_target, PublisherTargetExpectation,
 };
-use useful_repository_client::search::{filter_items, merge_catalog, CatalogItem, MergedItem};
+use useful_repository_client::search::{filter_items, merge_catalog, CatalogItem};
 use useful_repository_client::trust::is_official_root;
 use useful_repository_client::tuf::{
     ensure_monotonic_versions, now_rfc3339, verify_target_bytes, BuiltinTufBackend, TrustBackend,
@@ -87,6 +88,57 @@ pub struct TrpSyncResult {
     pub message: Option<String>,
     pub entry_count: i64,
     pub duration_ms: i64,
+}
+
+/// 搜索前可展示的目录声明。它不代表客户端已验证安装，也不包含来源 URL、账户或凭据。
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TrpCatalogItem {
+    pub source_id: String,
+    pub source_priority: i64,
+    pub publisher_key_id: String,
+    pub tool_id: String,
+    pub name: String,
+    pub summary: String,
+    pub license: String,
+    pub latest_stable: Option<String>,
+    pub latest_stable_digest: Option<String>,
+    pub access_mode: String,
+    pub is_native_worker: bool,
+    pub repository_signature_verified: bool,
+    pub publisher_signature_verified: bool,
+    pub official_review_passed: bool,
+    pub security_scan_passed: bool,
+    pub availability: Option<useful_repository_client::catalog::AvailabilityView>,
+    pub advisory_count: u32,
+    pub max_advisory_severity: Option<String>,
+    /// 仅选中的 stable/windows/x86_64 制品的目录声明；缺失时 UI 不提供安装。
+    pub permissions: Vec<String>,
+    pub candidate_version: Option<String>,
+    pub candidate_artifact_sha256: Option<String>,
+    pub candidate_manifest_digest: Option<String>,
+    pub candidate_channel: Option<String>,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TrpMergedItem {
+    pub item: TrpCatalogItem,
+    pub mirror_source_ids: Vec<String>,
+    pub name_conflict: bool,
+}
+
+/// installed_origins 的最小只读投影。只导出安装绑定事实，绝不导出 URL、账户或认证数据。
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TrpInstalledOriginView {
+    pub source_id: String,
+    pub publisher_key_id: String,
+    pub tool_id: String,
+    pub installed_version: String,
+    pub artifact_sha256: String,
+    pub channel: String,
+    pub manifest_digest: String,
 }
 
 /// 校验 discovery URL 策略；返回是否为本地/开发源。
@@ -666,7 +718,10 @@ pub async fn trp_source_sync_all(state: State<'_, AppState>) -> CmdResult<Vec<Tr
 /// 多源本地搜索：默认使用已同步的本地缓存（不把搜索词发给任何源）。
 /// 合并规则见 useful_repository_client::search（同名不同发布者不合并；镜像折叠）。
 #[tauri::command]
-pub fn trp_catalog_search(state: State<AppState>, keyword: String) -> CmdResult<Vec<MergedItem>> {
+pub fn trp_catalog_search(
+    state: State<AppState>,
+    keyword: String,
+) -> CmdResult<Vec<TrpMergedItem>> {
     if keyword.len() > 256 {
         return Err(CmdError::from("搜索词过长"));
     }
@@ -717,8 +772,24 @@ pub fn trp_catalog_search(state: State<AppState>, keyword: String) -> CmdResult<
         })?;
         rows.filter_map(|r| r.ok()).collect()
     };
-    let merged = merge_catalog(items);
-    Ok(filter_items(&merged, &keyword))
+    let merged = filter_items(&merge_catalog(items), &keyword);
+    merged
+        .into_iter()
+        .map(|merged| {
+            let entry = load_entry(
+                &state,
+                &merged.item.source_id,
+                &merged.item.publisher_key_id,
+                &merged.item.tool_id,
+            )?;
+            let candidate = pick_stable_artifact(&entry)?;
+            Ok(TrpMergedItem {
+                item: catalog_item_view(merged.item, candidate),
+                mirror_source_ids: merged.mirror_source_ids,
+                name_conflict: merged.name_conflict,
+            })
+        })
+        .collect()
 }
 
 // ---------- TRP 安装与更新（TUF 验证 + 来源/发布者固定） ----------
@@ -895,6 +966,36 @@ fn pick_stable_artifact(
     Ok(selected)
 }
 
+fn catalog_item_view(item: CatalogItem, candidate: Option<&ArtifactInfo>) -> TrpCatalogItem {
+    TrpCatalogItem {
+        source_id: item.source_id,
+        source_priority: item.source_priority,
+        publisher_key_id: item.publisher_key_id,
+        tool_id: item.tool_id,
+        name: item.name,
+        summary: item.summary,
+        license: item.license,
+        latest_stable: item.latest_stable,
+        latest_stable_digest: item.latest_stable_digest,
+        access_mode: item.access_mode,
+        is_native_worker: item.is_native_worker,
+        repository_signature_verified: item.repository_signature_verified,
+        publisher_signature_verified: item.publisher_signature_verified,
+        official_review_passed: item.official_review_passed,
+        security_scan_passed: item.security_scan_passed,
+        availability: item.availability,
+        advisory_count: item.advisory_count,
+        max_advisory_severity: item.max_advisory_severity,
+        permissions: candidate
+            .map(|artifact| artifact.permissions.clone())
+            .unwrap_or_default(),
+        candidate_version: candidate.map(|artifact| artifact.version.clone()),
+        candidate_artifact_sha256: candidate.map(|artifact| artifact.artifact_sha256.clone()),
+        candidate_manifest_digest: candidate.map(|artifact| artifact.manifest_digest.clone()),
+        candidate_channel: candidate.map(|artifact| artifact.channel.clone()),
+    }
+}
+
 fn pick_stable_artifact_version<'a>(
     entry: &'a CatalogEntry,
     version: &str,
@@ -955,6 +1056,82 @@ fn load_installed_origin(state: &AppState, tool_id: &str) -> Option<InstalledOri
             },
         )
         .ok()
+}
+
+fn is_lower_hex(value: &str, expected_len: usize) -> bool {
+    value.len() == expected_len
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+}
+
+fn is_bounded_identifier(value: &str, max_len: usize) -> bool {
+    !value.is_empty() && value.len() <= max_len && !value.chars().any(char::is_control)
+}
+
+fn installed_origin_view(origin: InstalledOrigin) -> Result<TrpInstalledOriginView, CmdError> {
+    if !is_bounded_identifier(&origin.source_id, 200)
+        || !is_bounded_identifier(&origin.publisher_key_id, 512)
+        || !is_bounded_identifier(&origin.tool_id, 200)
+        || !is_bounded_identifier(&origin.installed_version, 128)
+        || origin.channel != "stable"
+        || !is_lower_hex(&origin.artifact_sha256, 64)
+        || !is_lower_hex(&origin.manifest_digest, 64)
+    {
+        return Err(CmdError::coded(
+            "TRP_INSTALLED_ORIGIN_INVALID",
+            "安装来源记录不符合受限事实视图",
+        ));
+    }
+    Ok(TrpInstalledOriginView {
+        source_id: origin.source_id,
+        publisher_key_id: origin.publisher_key_id,
+        tool_id: origin.tool_id,
+        installed_version: origin.installed_version,
+        artifact_sha256: origin.artifact_sha256,
+        channel: origin.channel,
+        manifest_digest: origin.manifest_digest,
+    })
+}
+
+/// 只读回读当前 SQLite 安装绑定。未找到或字段无效都不会被前端呈现为已验证。
+#[tauri::command]
+pub fn trp_installed_origin(
+    state: State<AppState>,
+    tool_id: String,
+) -> CmdResult<Option<TrpInstalledOriginView>> {
+    if !is_bounded_identifier(&tool_id, 200) {
+        return Err(CmdError::coded(
+            "TRP_INSTALLED_ORIGIN_REQUEST_INVALID",
+            "工具标识不符合安装来源查询约束",
+        ));
+    }
+    let db = state
+        .db
+        .lock()
+        .map_err(|_| CmdError::from("锁定数据库失败"))?;
+    let origin = match db.conn.query_row(
+        "SELECT source_id, publisher_key_id, tool_id, installed_version, artifact_sha256,
+                channel, manifest_digest
+         FROM installed_origins WHERE tool_id = ?1",
+        [tool_id],
+        |r| {
+            Ok(InstalledOrigin {
+                source_id: r.get(0)?,
+                publisher_key_id: r.get(1)?,
+                tool_id: r.get(2)?,
+                installed_version: r.get(3)?,
+                artifact_sha256: r.get(4)?,
+                channel: r.get(5)?,
+                manifest_digest: r.get(6)?,
+            })
+        },
+    ) {
+        Ok(origin) => origin,
+        Err(rusqlite::Error::QueryReturnedNoRows) => return Ok(None),
+        Err(error) => return Err(error.into()),
+    };
+    installed_origin_view(origin).map(Some)
 }
 
 fn granted_permissions(state: &AppState, tool_id: &str) -> Vec<String> {
@@ -1517,5 +1694,57 @@ mod tests {
             digest
         );
         assert!(match_discovery_root_fingerprint(root, &"00".repeat(32)).is_err());
+    }
+
+    #[test]
+    fn installed_origin_view_serializes_only_the_allowlist() {
+        let view = installed_origin_view(InstalledOrigin {
+            source_id: "com.example.source".into(),
+            publisher_key_id: format!("ed25519:{}", "a".repeat(64)),
+            tool_id: "com.example.tool".into(),
+            installed_version: "1.2.3".into(),
+            artifact_sha256: "b".repeat(64),
+            channel: "stable".into(),
+            manifest_digest: "c".repeat(64),
+        })
+        .unwrap();
+        let json = serde_json::to_value(view).unwrap();
+        let object = json.as_object().unwrap();
+        assert_eq!(object.len(), 7);
+        assert_eq!(
+            object.get("sourceId").and_then(|value| value.as_str()),
+            Some("com.example.source")
+        );
+        assert_eq!(
+            object.get("channel").and_then(|value| value.as_str()),
+            Some("stable")
+        );
+        assert!(!object.contains_key("discoveryUrl"));
+        assert!(!object.contains_key("token"));
+        assert!(!object.contains_key("account"));
+    }
+
+    #[test]
+    fn installed_origin_view_rejects_noncanonical_or_nonstable_records() {
+        let origin = InstalledOrigin {
+            source_id: "com.example.source".into(),
+            publisher_key_id: "ed25519:publisher".into(),
+            tool_id: "com.example.tool".into(),
+            installed_version: "1.2.3".into(),
+            artifact_sha256: "A".repeat(64),
+            channel: "stable".into(),
+            manifest_digest: "c".repeat(64),
+        };
+        assert!(installed_origin_view(origin).is_err());
+        let nonstable = InstalledOrigin {
+            source_id: "com.example.source".into(),
+            publisher_key_id: "ed25519:publisher".into(),
+            tool_id: "com.example.tool".into(),
+            installed_version: "1.2.3".into(),
+            artifact_sha256: "b".repeat(64),
+            channel: "beta".into(),
+            manifest_digest: "c".repeat(64),
+        };
+        assert!(installed_origin_view(nonstable).is_err());
     }
 }

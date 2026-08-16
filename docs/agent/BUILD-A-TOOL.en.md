@@ -18,17 +18,23 @@ source maintainer. The CLI does not upload. The CLI does not bypass source or pu
 Canonical source repository: `https://github.com/RedeatI/useful`. Use that URL as a clone entry only
 when it is public and reachable. Do not invent other remotes.
 
-## Agent Kit entry (published preview asset)
+## Agent Kit entry (current public Release)
 
-The current published preview is
-[`Useful-0.1.0-beta.10-agent-kit.zip`](https://github.com/RedeatI/useful/releases/download/v0.1.0-beta.10/Useful-0.1.0-beta.10-agent-kit.zip).
-After extraction it needs Node.js 20 or newer. It does not need the monorepo, the GUI, or a global
-install. It does not change this page’s non-interactive JSON rules, stop-on-nonzero rule, default
-`minimal-web` choice, or signature trust chain. See the
-[`v0.1.0-beta.10` post-publish acceptance record](../releases/0.1.0-beta.10-agent-kit-acceptance.md).
+The [README](../../README.md) and [Known limitations](../KNOWN-LIMITATIONS.en.md) identify the current
+source, Agent Kit entry, and unsigned Windows preview Release as
+[`v0.1.0-beta.11`](https://github.com/RedeatI/useful/releases/tag/v0.1.0-beta.11). When using that
+version’s Agent Kit, obtain the exact asset from the matching Release and check that Release’s
+`SHA256SUMS.txt` and source evidence; do not reuse an acceptance or checksum record from another version.
+After extraction it needs Node.js 20 or newer. It does not need the monorepo, the GUI, or a global install.
+It does not change this page’s non-interactive JSON rules, stop-on-nonzero rule, default `minimal-web`
+choice, or signature trust chain.
 
-Treat a later kit on disk as unpublished until a controlled release attaches that exact version with
-checksums and source evidence. A local kit build does not authorize public distribution.
+The repository’s last exact cross-platform Agent Kit acceptance is the
+[`0.1.0-beta.10-agent-kit-acceptance.md`](../releases/0.1.0-beta.10-agent-kit-acceptance.md) record. It
+binds only beta.10’s exact ZIP, SHA, and Windows x64/macOS arm64/Linux x64 results; it is immutable
+historical evidence and does not accept or prove beta.11. A later version is published only when a
+controlled workflow attaches that exact Kit to the matching GitHub Release with checksums and source
+evidence. A local Kit build does not authorize public distribution.
 
 Windows:
 

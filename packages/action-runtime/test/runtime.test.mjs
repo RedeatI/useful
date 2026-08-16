@@ -228,7 +228,13 @@ test("input and output byte limits are enforced", async () => {
   const registry = new ActionRegistry([{ descriptor, handler: async () => ({ text: "x".repeat(32) }) }]);
   await assert.rejects(
     new ActionExecutor(registry).execute(descriptor.actionId, { operation: "format", text: "{}" }),
-    (error) => error.code === "OUTPUT_TOO_LARGE",
+    (error) => {
+      assert.equal(error.code, "OUTPUT_TOO_LARGE");
+      assert.equal(error.receipt.receiptVersion, "2.0");
+      assert.equal(error.receipt.status, "error");
+      assert.deepEqual(error.receipt.error, { code: "OUTPUT_TOO_LARGE" });
+      return true;
+    },
   );
 });
 
@@ -242,11 +248,21 @@ test("timeouts and cancellation map to stable errors", async () => {
   descriptor.execution.supportsCancellation = true;
   const registry = new ActionRegistry([{ descriptor, handler: () => new Promise(() => {}) }]);
   const executor = new ActionExecutor(registry);
-  await assert.rejects(executor.execute(descriptor.actionId, { operation: "format", text: "{}" }), (error) => error.code === "TIMEOUT");
+  await assert.rejects(executor.execute(descriptor.actionId, { operation: "format", text: "{}" }), (error) => {
+    assert.equal(error.code, "TIMEOUT");
+    assert.equal(error.receipt.status, "error");
+    assert.deepEqual(error.receipt.error, { code: "TIMEOUT" });
+    return true;
+  });
 
   const controller = new AbortController();
   controller.abort();
-  await assert.rejects(executor.execute(descriptor.actionId, { operation: "format", text: "{}" }, { signal: controller.signal }), (error) => error.code === "CANCELLED");
+  await assert.rejects(executor.execute(descriptor.actionId, { operation: "format", text: "{}" }, { signal: controller.signal }), (error) => {
+    assert.equal(error.code, "CANCELLED");
+    assert.equal(error.receipt.status, "cancelled");
+    assert.deepEqual(error.receipt.error, { code: "CANCELLED" });
+    return true;
+  });
 });
 
 test("permission and confirmation gates run before handlers", async () => {
@@ -260,16 +276,35 @@ test("permission and confirmation gates run before handlers", async () => {
   descriptor.behavior.requiresConfirmation = true;
   const registry = new ActionRegistry([{ descriptor, handler: async () => assert.fail("handler must not run") }]);
   const executor = new ActionExecutor(registry);
-  await assert.rejects(executor.execute(descriptor.actionId, { operation: "format", text: "{}" }), (error) => error.code === "CONFIRMATION_REQUIRED");
-  await assert.rejects(executor.execute(descriptor.actionId, { operation: "format", text: "{}" }, { confirmed: true }), (error) => error.code === "PERMISSION_DENIED");
+  await assert.rejects(executor.execute(descriptor.actionId, { operation: "format", text: "{}" }), (error) => {
+    assert.equal(error.code, "CONFIRMATION_REQUIRED");
+    assert.deepEqual(error.receipt.permissions, {
+      required: ["fs.read.user-selected"],
+      capabilities: [],
+    });
+    return true;
+  });
+  await assert.rejects(executor.execute(descriptor.actionId, { operation: "format", text: "{}" }, { confirmed: true }), (error) => {
+    assert.equal(error.code, "PERMISSION_DENIED");
+    assert.equal(error.receipt.status, "error");
+    assert.deepEqual(error.receipt.error, { code: "PERMISSION_DENIED" });
+    return true;
+  });
 });
 
 test("successful receipts contain provenance but never input/output", async () => {
   const result = await new ActionExecutor().execute("builtin.utilities.hash", { algorithm: "SHA-256", text: "TOP_SECRET" });
+  assert.equal(result.receipt.receiptVersion, "2.0");
   assert.equal(result.receipt.status, "success");
   assert.equal(result.receipt.source.digest.length, 64);
   assert.equal(result.receipt.actionVersion, "1.0.0");
   assert.ok(!JSON.stringify(result.receipt).includes("TOP_SECRET"));
   assert.ok(!("input" in result.receipt));
   assert.ok(!("output" in result.receipt));
+  assert.ok(!("cause" in result.receipt));
+  assert.ok(!("stack" in result.receipt));
+  assert.deepEqual(result.receipt.permissions, { required: [], capabilities: [] });
+  assert.match(result.receipt.createdAt, /Z$/);
+  assert.match(result.receipt.startedAt, /Z$/);
+  assert.match(result.receipt.completedAt, /Z$/);
 });

@@ -2,7 +2,7 @@
 // 发现与安装：本地 .useful 导入 + legacy catalog 浏览与安装。
 // legacy/TRP 源信任管理统一从 Source Center 进入；安装、下载与信任契约保持不变。
 import { computed, onMounted, ref } from "vue";
-import { open } from "@tauri-apps/plugin-dialog";
+import { confirm as confirmDialog, open } from "@tauri-apps/plugin-dialog";
 import { useAppStore } from "@/stores/app";
 import { useUiStore } from "@/stores/ui";
 import { t } from "@/i18n";
@@ -98,7 +98,7 @@ async function togglePin(pkg: ShopPackage): Promise<void> {
 }
 
 async function rollbackTool(toolId: string): Promise<void> {
-  if (!window.confirm(t("shop.rollbackConfirm"))) return;
+  if (!(await confirmDialog(t("shop.rollbackConfirm")))) return;
   try {
     const tool = await ipc.toolRollback(toolId);
     await Promise.all([appStore.reloadTools(), reload()]);
@@ -109,11 +109,11 @@ async function rollbackTool(toolId: string): Promise<void> {
 }
 
 async function uninstallTool(toolId: string, name: string): Promise<void> {
-  if (!window.confirm(t("shop.uninstallConfirm", { name }))) return;
+  if (!(await confirmDialog(t("shop.uninstallConfirm", { name })))) return;
   try {
     // 卸载时提示是否删除对应桌面快捷方式
     const shortcuts = (await ipc.listShortcuts()).filter((s) => s.toolId === toolId);
-    if (shortcuts.length > 0 && window.confirm(t("shortcut.uninstallWithShortcut"))) {
+    if (shortcuts.length > 0 && await confirmDialog(t("shortcut.uninstallWithShortcut"))) {
       for (const s of shortcuts) {
         await ipc.deleteShortcut(s.id);
       }

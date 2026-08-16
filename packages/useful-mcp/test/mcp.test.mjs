@@ -5,6 +5,7 @@ import test from "node:test";
 import { Client } from "@modelcontextprotocol/client";
 import { StdioClientTransport } from "@modelcontextprotocol/client/stdio";
 import {
+  ActionExecutionError,
   ActionRegistry,
   ERROR_CODES,
 } from "@useful/action-runtime";
@@ -13,6 +14,7 @@ import {
   createActionToolHandler,
   descriptorToToolMetadata,
   DISCOVERY_TOOL_NAMES,
+  MCP_RECEIPT_META_KEY,
 } from "../src/server.mjs";
 
 const entry = fileURLToPath(new URL("../bin/useful-mcp.mjs", import.meta.url));
@@ -128,7 +130,7 @@ test("tool handler forwards the SDK request abort signal and redacts unexpected 
   const handler = createActionToolHandler("builtin.utilities.json", {
     async execute(actionId, input, options) {
       observed = { actionId, input, options };
-      return { output: { text: "ok" }, receipt: { ignored: true } };
+      return { output: { text: "ok" }, receipt: { receiptVersion: "2.0", status: "success" } };
     },
   });
   const result = await handler(
@@ -140,6 +142,9 @@ test("tool handler forwards the SDK request abort signal and redacts unexpected 
   assert.deepEqual(result.structuredContent, { text: "ok" });
   assert.deepEqual(JSON.parse(textContent(result)), result.structuredContent);
   assert.equal("receipt" in result, false);
+  assert.deepEqual(result._meta, {
+    [MCP_RECEIPT_META_KEY]: { receiptVersion: "2.0", status: "success" },
+  });
 
   const failed = await createActionToolHandler("builtin.utilities.json", {
     async execute() {
@@ -147,6 +152,15 @@ test("tool handler forwards the SDK request abort signal and redacts unexpected 
     },
   })({}, { mcpReq: { signal: controller.signal } });
   assertSafeError(failed, ERROR_CODES.ACTION_FAILED, ["TOP_SECRET_FAILURE"]);
+
+  const deniedReceipt = { receiptVersion: "2.0", status: "error", error: { code: "PERMISSION_DENIED" } };
+  const denied = await createActionToolHandler("local.test.denied", {
+    async execute() {
+      throw new ActionExecutionError(ERROR_CODES.PERMISSION_DENIED, { receipt: deniedReceipt });
+    },
+  })({}, {});
+  assertSafeError(denied, ERROR_CODES.PERMISSION_DENIED);
+  assert.deepEqual(denied._meta, { [MCP_RECEIPT_META_KEY]: deniedReceipt });
 });
 
 test("official client drives real legacy stdio tools/list and tools/call", async () => {
@@ -243,6 +257,8 @@ test("official client drives real legacy stdio tools/list and tools/call", async
           assert.equal(mcpResult.isError, undefined, `${descriptor.actionId}: ${vector.name}`);
           assert.deepEqual(mcpResult.structuredContent, vector.expectedOutput);
           assert.deepEqual(JSON.parse(textContent(mcpResult)), vector.expectedOutput);
+          assert.equal(mcpResult._meta[MCP_RECEIPT_META_KEY].receiptVersion, "2.0");
+          assert.equal(mcpResult._meta[MCP_RECEIPT_META_KEY].status, "success");
           assert.equal(cliResult.status, 0);
           assert.deepEqual(cliResult.json.output, vector.expectedOutput);
         } else {
@@ -316,6 +332,8 @@ test("official v2 client pins 2026-07-28 against the same serveStdio entry", asy
       encoding: "hex",
     });
     assert.deepEqual(JSON.parse(textContent(result)), result.structuredContent);
+    assert.equal(result._meta[MCP_RECEIPT_META_KEY].receiptVersion, "2.0");
+    assert.equal(result._meta[MCP_RECEIPT_META_KEY].status, "success");
     assert.match(connection.stderr(), /useful-mcp: ready/);
   } finally {
     await closeAndAssertReaped(connection);

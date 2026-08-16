@@ -27,6 +27,15 @@ fn beta_feedback_template() -> &'static str {
      提交前请检查诊断包内容；不要加入密码、JWT、Token、私钥或用户文件内容。\n"
 }
 
+/// 当前运行目标的平台信息（不包含主机特定数据）。
+fn platform_summary_line() -> String {
+    format!(
+        "OS: {} ({})",
+        std::env::consts::OS,
+        std::env::consts::ARCH
+    )
+}
+
 /// 生成诊断摘要文本（不含敏感信息）。
 fn summary_text(state: &AppState) -> String {
     let p = &state.paths;
@@ -52,10 +61,11 @@ fn summary_text(state: &AppState) -> String {
          数据库 schema 版本: {schema_version}\n\
          注册工具数: {tool_count}\n\
          官方信任根: {official_root}\n\
-         OS: Windows\n\
+         {}\n\
          生成时间(unix): {}\n",
         p.mode,
         p.data_dir.display(),
+        platform_summary_line(),
         std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .map(|d| d.as_secs())
@@ -159,7 +169,7 @@ pub fn diagnostics_export(state: State<AppState>, dest_path: String) -> CmdResul
 
 #[cfg(test)]
 mod tests {
-    use super::beta_feedback_template;
+    use super::{beta_feedback_template, platform_summary_line};
 
     #[test]
     fn beta_feedback_template_is_actionable_and_warns_about_secrets() {
@@ -167,5 +177,16 @@ mod tests {
         assert!(template.contains("期望行为"));
         assert!(template.contains("可重复步骤"));
         assert!(template.contains("不要加入密码、JWT、Token、私钥"));
+    }
+
+    #[test]
+    fn platform_summary_uses_the_running_target_os_and_architecture() {
+        let line = platform_summary_line();
+
+        assert_eq!(
+            line,
+            format!("OS: {} ({})", std::env::consts::OS, std::env::consts::ARCH)
+        );
+        assert_ne!(line, "OS: Windows");
     }
 }

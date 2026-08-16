@@ -7,9 +7,11 @@ import {
   availabilityDetail,
   capabilityLabels,
   conflictCount,
+  directoryDeclaredFacts,
   deliveryTypeKey,
   formatFingerprint,
   loginStatusKey,
+  installedOriginMatches,
   officialBadgeVisible,
   requiresAuth,
   reviewBadges,
@@ -17,7 +19,7 @@ import {
   splitSources,
   syncStatusKey,
 } from "./sourceCenter";
-import type { TrpMergedItem, TrpSourceInfo } from "./types";
+import type { TrpInstalledOrigin, TrpMergedItem, TrpSourceInfo } from "./types";
 
 function source(partial: Partial<TrpSourceInfo>): TrpSourceInfo {
   return {
@@ -63,6 +65,11 @@ function mergedItem(toolId: string, nameConflict: boolean): TrpMergedItem {
       securityScanPassed: true,
       advisoryCount: 0,
       maxAdvisorySeverity: null,
+      permissions: ["filesystem.read"],
+      candidateVersion: "1.0.0",
+      candidateArtifactSha256: "aa".repeat(32),
+      candidateManifestDigest: "bb".repeat(32),
+      candidateChannel: "stable",
     },
     mirrorSourceIds: [],
     nameConflict,
@@ -176,6 +183,50 @@ describe("conflictCount", () => {
       mergedItem("com.x.other", false),
     ];
     expect(conflictCount(items)).toBe(1);
+  });
+});
+
+describe("directoryDeclaredFacts / installedOriginMatches", () => {
+  it("保留目录权限，且不与来源 capabilities 混合", () => {
+    const item = mergedItem("com.example.tool", false).item;
+    const facts = directoryDeclaredFacts(item);
+    expect(facts).toEqual({
+      sourceId: "com.example.src",
+      publisherKeyId: "ed25519:abcdef0123456789abcdef",
+      toolId: "com.example.tool",
+      version: "1.0.0",
+      artifactSha256: "aa".repeat(32),
+      channel: "stable",
+      manifestDigest: "bb".repeat(32),
+      permissions: ["filesystem.read"],
+    });
+    expect(facts?.permissions).not.toContain("catalog");
+  });
+
+  it("候选摘要、版本或频道不完整时 fail closed", () => {
+    const item = mergedItem("com.example.tool", false).item;
+    expect(directoryDeclaredFacts({ ...item, candidateArtifactSha256: "cc".repeat(32) })).toBeNull();
+    expect(directoryDeclaredFacts({ ...item, candidateVersion: null })).toBeNull();
+    expect(directoryDeclaredFacts({ ...item, candidateChannel: "beta" })).toBeNull();
+  });
+
+  it("只有安装后 origin 回读逐字段匹配时才成立；同 toolId 的另一发布者不匹配", () => {
+    const facts = directoryDeclaredFacts(mergedItem("com.example.tool", false).item);
+    const matching: TrpInstalledOrigin = {
+      sourceId: "com.example.src",
+      publisherKeyId: "ed25519:abcdef0123456789abcdef",
+      toolId: "com.example.tool",
+      installedVersion: "1.0.0",
+      artifactSha256: "aa".repeat(32),
+      channel: "stable",
+      manifestDigest: "bb".repeat(32),
+    };
+    expect(installedOriginMatches(facts, matching)).toBe(true);
+    expect(installedOriginMatches(facts, {
+      ...matching,
+      publisherKeyId: "ed25519:another-publisher",
+    })).toBe(false);
+    expect(installedOriginMatches(facts, null)).toBe(false);
   });
 });
 

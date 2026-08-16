@@ -453,6 +453,30 @@ export interface TrpCatalogItem {
   advisoryCount: number;
   /** 公告最高严重级别（low|medium|high|critical） */
   maxAdvisorySeverity: string | null;
+  /**
+   * 选中的 stable/windows/x86_64 制品在目录中的权限声明。它与来源 capabilities
+   * 属于不同事实层，不能互相推导。
+   */
+  permissions: string[];
+  /** 安装前目录中选出的制品绑定；缺失或不一致时 UI 不提供安装。 */
+  candidateVersion: string | null;
+  candidateArtifactSha256: string | null;
+  candidateManifestDigest: string | null;
+  candidateChannel: string | null;
+}
+
+/**
+ * installed_origins 的只读 allowlist 投影。它只在安装成功后由客户端回读；
+ * 不携带 discovery URL、账户、查询参数或认证资料。
+ */
+export interface TrpInstalledOrigin {
+  sourceId: string;
+  publisherKeyId: string;
+  toolId: string;
+  installedVersion: string;
+  artifactSha256: string;
+  channel: "stable";
+  manifestDigest: string;
 }
 
 /** 来源自报可用性视图（UI 显示状态、检查时间与报告来源）。 */
