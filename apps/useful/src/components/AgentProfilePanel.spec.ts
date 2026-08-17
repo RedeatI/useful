@@ -191,4 +191,66 @@ describe("AgentProfilePanel", () => {
     await preset.findAll("button").find((button) => button.text() === "删除")!.trigger("click");
     expect(panel.findAll("fieldset.preset-card")).toHaveLength(2);
   });
+
+  it("only copies commands from a saved profile", async () => {
+    const profile = profileFor("builtin.utilities.json");
+    profile.actions[0].presets = [{
+      presetId: "format",
+      name: "Format",
+      defaults: { operation: "format" },
+    }];
+    const { wrapper: panel } = await mountPanel(profile);
+    const copyCli = () => panel.findAll("button").find((button) => button.text().includes("复制 CLI"))!;
+    const copyMcp = () => panel.findAll("button").find((button) => button.text().includes("复制 MCP 启动命令"))!;
+    expect(copyCli().attributes("disabled")).toBeUndefined();
+    await copyCli().trigger("click");
+    expect(navigator.clipboard.writeText).toHaveBeenCalledTimes(1);
+
+    const profileName = panel.findAll<HTMLInputElement>(".agent-panel__meta input")[0];
+    await profileName.setValue("Edited profile");
+    expect(copyCli().attributes("disabled")).toBeDefined();
+    expect(copyMcp().attributes("disabled")).toBeDefined();
+    copyCli().element.removeAttribute("disabled");
+    copyMcp().element.removeAttribute("disabled");
+    await copyCli().trigger("click");
+    await copyMcp().trigger("click");
+    expect(navigator.clipboard.writeText).toHaveBeenCalledTimes(1);
+    expect(panel.text()).toContain("请先保存 profile，再复制命令。");
+
+    const presetId = panel.find("fieldset.preset-card input");
+    await presetId.setValue("compact");
+    const save = panel.findAll("button").find((button) => button.text() === "保存")!;
+    await save.trigger("click");
+    await flushPromises();
+    expect(copyCli().attributes("disabled")).toBeUndefined();
+    await copyCli().trigger("click");
+    expect(navigator.clipboard.writeText).toHaveBeenLastCalledWith(expect.stringContaining("--preset compact"));
+  });
+
+  it("keeps new and failed-save profiles blocked while catalog search stays clean", async () => {
+    const { wrapper: newPanel } = await mountPanel(null);
+    const newCopyMcp = newPanel.findAll("button").find((button) => button.text().includes("复制 MCP 启动命令"))!;
+    expect(newCopyMcp.attributes("disabled")).toBeDefined();
+    const newSave = newPanel.findAll("button").find((button) => button.text() === "保存")!;
+    await newSave.trigger("click");
+    await flushPromises();
+    expect(newCopyMcp.attributes("disabled")).toBeUndefined();
+
+    newPanel.unmount();
+    const stored = profileFor("builtin.utilities.base64");
+    const { wrapper: storedPanel } = await mountPanel(stored);
+    const storedCopyMcp = storedPanel.findAll("button").find((button) => button.text().includes("复制 MCP 启动命令"))!;
+    const search = storedPanel.get<HTMLInputElement>('input[type="search"]');
+    await search.setValue("hash");
+    expect(storedCopyMcp.attributes("disabled")).toBeUndefined();
+
+    ipcMock.agentProfileSave.mockRejectedValueOnce(new Error("SAVE_FAILED"));
+    await storedPanel.findAll<HTMLInputElement>(".agent-panel__meta input")[0].setValue("Unsaved");
+    const save = storedPanel.findAll("button").find((button) => button.text() === "保存")!;
+    await save.trigger("click");
+    await flushPromises();
+    expect(storedCopyMcp.attributes("disabled")).toBeDefined();
+    await storedCopyMcp.trigger("click");
+    expect(navigator.clipboard.writeText).not.toHaveBeenCalled();
+  });
 });

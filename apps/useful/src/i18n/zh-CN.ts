@@ -605,6 +605,8 @@ export default {
     exportProfile: "导出 profile",
     openDirectory: "打开目录",
     copyMcpCommand: "复制 MCP 启动命令",
+    unsaved: "尚未保存",
+    saveBeforeCopy: "请先保存 profile，再复制命令。",
     fieldOperation: "操作",
     fieldAlgorithm: "算法",
     fieldIndent: "缩进",

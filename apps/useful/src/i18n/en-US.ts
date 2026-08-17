@@ -412,6 +412,8 @@ const enUS = {
     exportProfile: "Export profile",
     openDirectory: "Open folder",
     copyMcpCommand: "Copy MCP launch command",
+    unsaved: "Unsaved changes",
+    saveBeforeCopy: "Save the profile before copying commands.",
     fieldOperation: "Operation",
     fieldAlgorithm: "Algorithm",
     fieldIndent: "Indent",
