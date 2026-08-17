@@ -2,8 +2,7 @@
 
 [简体中文](README.zh-CN.md) · English
 
-Useful is a desktop application that runs tools on the local computer. It groups tasks that often
-need separate browser tabs, command snippets, or small programs.
+Useful is a desktop toolbox for the small jobs that otherwise end up spread across browser tabs, command-line snippets, and one-off apps. People can use its utilities directly, while AI agents can call the same capabilities through the CLI, a local MCP server, and shared Actions.
 
 Useful includes:
 
@@ -15,8 +14,7 @@ Useful includes:
 
 The stack is Vue 3, Tauri 2, and Rust.
 
-Unless a feature requires the network, tool input stays on the device. Useful does not include an
-AI model. Useful does not change the configuration of Codex, Claude, or other Agent hosts.
+Unless a feature requires the network, tool input stays on the device. Useful does not include an AI model. Useful does not change the configuration of Codex, Claude, or other Agent hosts.
 
 > [!IMPORTANT]
 > Useful is a developer preview. Official **signed** installers and a production
