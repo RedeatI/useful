@@ -40,6 +40,11 @@ function writeJson(value, stdout) {
   stdout.write(`${JSON.stringify(value)}\n`);
 }
 
+function writePlain(value, stdout) {
+  const text = typeof value === "string" ? value : JSON.stringify(value, null, 2);
+  stdout.write(`${text}\n`);
+}
+
 export async function writeReceiptFileAtomic(destination, receipt) {
   if (typeof destination !== "string" || destination.length === 0) {
     throw new CliError("RECEIPT_PATH_INVALID", "--receipt-out 路径无效", EXIT_CODES.USAGE_OR_INPUT);
@@ -348,7 +353,7 @@ export async function main(argv = process.argv.slice(2), io = process) {
 
     if (command === "run") {
       const actionId = rest[0];
-      if (!actionId || actionId.startsWith("--")) usage("actions run <id> [--input @file|-] [--confirm] [--receipt-out <file>] --output json");
+      if (!actionId || actionId.startsWith("--")) usage("actions run <id> [--input @file|-] [--confirm] [--receipt-out <file>] --output json|plain");
       const flags = exactFlags(rest.slice(1), {
         "--input": "value",
         "--output": "value",
@@ -356,7 +361,8 @@ export async function main(argv = process.argv.slice(2), io = process) {
         "--confirm": "boolean",
         "--receipt-out": "value",
       });
-      if ((flags["--output"] ?? "json") !== "json") usage("--output 目前只支持 json");
+      const outputMode = flags["--output"] ?? "json";
+      if (outputMode !== "json" && outputMode !== "plain") usage("--output 只支持 json 或 plain");
       if (flags["--preset"] !== undefined && !exposure) usage("--preset 要求显式 --agent-profile");
       const resolved = exposure ? exposure.resolve(actionId, "cli") : { actionId };
       const input = parseJson(await readInput(flags["--input"], io.stdin));
@@ -376,14 +382,18 @@ export async function main(argv = process.argv.slice(2), io = process) {
         throw error;
       }
       if (flags["--receipt-out"]) await writeReceiptFileAtomic(flags["--receipt-out"], result.receipt);
-      writeJson({
-        protocolVersion: CLI_PROTOCOL_VERSION,
-        operation: "actions.run",
-        ok: true,
-        actionId: resolved.actionId,
-        output: result.output,
-        receipt: result.receipt,
-      }, io.stdout);
+      if (outputMode === "plain") {
+        writePlain(result.output, io.stdout);
+      } else {
+        writeJson({
+          protocolVersion: CLI_PROTOCOL_VERSION,
+          operation: "actions.run",
+          ok: true,
+          actionId: resolved.actionId,
+          output: result.output,
+          receipt: result.receipt,
+        }, io.stdout);
+      }
       return EXIT_CODES.OK;
     }
 
