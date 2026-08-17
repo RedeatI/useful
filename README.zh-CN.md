@@ -2,8 +2,7 @@
 
 简体中文 · [English](README.md)
 
-Useful 是在本地计算机上运行工具的桌面应用。它把常分散在浏览器标签页、命令片段和零散小程序里的
-任务集中到一处。
+Useful 把常用开发工具、文件处理、媒体任务和 Windows 系统观测集中到一个桌面应用里。其中支持自动化的工具也能通过 CLI 和本地 MCP 服务调用，方便接入脚本和 AI 工作流。
 
 Useful 包含：
 
@@ -15,8 +14,7 @@ Useful 包含：
 
 技术栈：Vue 3、Tauri 2、Rust。
 
-除非功能明确要求联网，工具输入留在本机。Useful 不包含 AI 模型。Useful 不修改 Codex、Claude 或
-其他 Agent 宿主的配置。
+除非某项工具明确需要联网，它的输入会留在本机。Useful 不内置 AI 模型，也不会改动 Codex、Claude 等 Agent 宿主的配置。
 
 > [!IMPORTANT]
 > Useful 是开发者预览版。官方**签名**安装包和生产更新源尚不可用。未签名的 Windows 桌面预览包已在
