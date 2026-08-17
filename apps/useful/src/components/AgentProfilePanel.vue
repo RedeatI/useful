@@ -60,6 +60,7 @@ const error = ref("");
 const status = ref("");
 const exportedPath = ref("");
 const catalogSearch = ref("");
+const savedProfileSnapshot = ref<string | null>(null);
 
 const exportPath = computed(() => exportedPath.value
   || appStore.agentProfile?.exportPath
@@ -82,6 +83,15 @@ const availableDescriptors = computed(() => {
     return tokens.every((token) => haystack.includes(token));
   });
 });
+const isDirty = computed(() => {
+  if (savedProfileSnapshot.value === null) return true;
+  try {
+    return canonicalProfileJson(profile.value) !== savedProfileSnapshot.value;
+  } catch {
+    return true;
+  }
+});
+const commandCopyBlocked = computed(() => loading.value || busy.value || Boolean(error.value) || isDirty.value);
 
 function addAction(actionId: string): void {
   if (profile.value.actions.some((action) => action.actionId === actionId)) return;
@@ -210,6 +220,14 @@ async function copyText(value: string): Promise<void> {
   status.value = t("agentProfile.commandCopied");
 }
 
+async function copyCommand(value: string): Promise<void> {
+  if (commandCopyBlocked.value) {
+    status.value = t("agentProfile.saveBeforeCopy");
+    return;
+  }
+  await copyText(value);
+}
+
 function applyAliases(): void {
   for (const action of profile.value.actions) {
     action.aliases = (aliasText.value[action.actionId] ?? "")
@@ -253,6 +271,9 @@ async function saveProfile(): Promise<void> {
     const view = await ipc.agentProfileSave(canonicalProfileJson(profile.value));
     appStore.setAgentProfile(view);
     exportedPath.value = view.exportPath;
+    profile.value = JSON.parse(view.profileJson) as AgentProfileV1;
+    syncAliasText();
+    savedProfileSnapshot.value = canonicalProfileJson(profile.value);
     status.value = t("agentProfile.saved");
   } catch (cause) {
     error.value = String(cause);
@@ -301,7 +322,7 @@ onMounted(async () => {
       exportedPath.value = stored.exportPath;
     }
     syncAliasText();
-    validateNow();
+    if (validateNow() && stored) savedProfileSnapshot.value = canonicalProfileJson(profile.value);
   } catch (cause) {
     error.value = String(cause);
   } finally {
@@ -404,7 +425,7 @@ watch(() => route.query.action, (actionId) => { void ensureRequestedAction(actio
             </div>
             <code class="preset-card__command useful-mono">{{ commandFor(action, preset) }}</code>
             <div class="preset-card__actions">
-              <button class="useful-btn" @click="copyText(commandFor(action, preset))"><AppIcon name="copy" :size="14" /> {{ t("agentProfile.copyCli") }}</button>
+              <button class="useful-btn" :disabled="commandCopyBlocked" aria-describedby="agent-profile-copy-guard" @click="copyCommand(commandFor(action, preset))"><AppIcon name="copy" :size="14" /> {{ t("agentProfile.copyCli") }}</button>
               <button class="useful-btn" @click="copyPreset(action, preset); validateNow()">{{ t("agentProfile.copyPreset") }}</button>
               <button class="useful-btn" @click="action.presets = action.presets.filter((item) => item !== preset); validateNow()">{{ t("common.delete") }}</button>
             </div>
@@ -420,13 +441,16 @@ watch(() => route.query.action, (actionId) => { void ensureRequestedAction(actio
 
       <p v-if="error" id="agent-profile-error" class="agent-panel__error" role="alert">{{ error }}</p>
       <p v-if="status" class="agent-panel__status" role="status">{{ status }}</p>
+      <p v-if="commandCopyBlocked" id="agent-profile-copy-guard" class="agent-panel__status" role="status">
+        <span v-if="isDirty">{{ t("agentProfile.unsaved") }} · </span>{{ t("agentProfile.saveBeforeCopy") }}
+      </p>
       <div class="agent-panel__export">
         <div><span>{{ t("agentProfile.exportPath") }}</span><code class="useful-mono">{{ exportPath }}</code></div>
         <div class="agent-panel__actions">
           <button class="useful-btn useful-btn--primary" :disabled="busy || Boolean(error)" aria-describedby="agent-profile-error" @click="saveProfile">{{ t("common.save") }}</button>
           <button class="useful-btn" :disabled="busy || Boolean(error)" @click="exportProfile">{{ t("agentProfile.exportProfile") }}</button>
           <button class="useful-btn" @click="ipc.agentProfileOpenDirectory()">{{ t("agentProfile.openDirectory") }}</button>
-          <button class="useful-btn" @click="copyText(`useful-mcp --agent-profile ${shellQuote(exportPath)}`)">{{ t("agentProfile.copyMcpCommand") }}</button>
+          <button class="useful-btn" :disabled="commandCopyBlocked" aria-describedby="agent-profile-copy-guard" @click="copyCommand(`useful-mcp --agent-profile ${shellQuote(exportPath)}`)">{{ t("agentProfile.copyMcpCommand") }}</button>
         </div>
       </div>
     </template>

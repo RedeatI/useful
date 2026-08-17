@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
@@ -18,12 +18,16 @@ const EXPECTED_DEFAULT_ACTION_IDS = Object.freeze([
   ...Object.values(OFFICE_ACTION_IDS),
 ].sort());
 
-function run(args, input) {
-  const result = spawnSync(process.execPath, [cli, ...args], {
+function runRaw(args, input) {
+  return spawnSync(process.execPath, [cli, ...args], {
     input,
     encoding: "utf8",
     windowsHide: true,
   });
+}
+
+function run(args, input) {
+  const result = runRaw(args, input);
   return { ...result, json: JSON.parse(result.stdout) };
 }
 
@@ -203,6 +207,37 @@ test("actions run accepts stdin JSON and keeps results on stdout", () => {
   assert.equal(result.json.ok, true);
   assert.equal(result.json.output.digest, "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad");
   assert.equal(result.json.receipt.status, "success");
+});
+
+test("actions run plain writes only formatted output and still persists receipts", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "useful-runtime-plain-"));
+  try {
+    const receipt = join(directory, "receipt.json");
+    const result = runRaw(
+      ["actions", "run", "builtin.utilities.base64", "--output", "plain", "--receipt-out", receipt],
+      JSON.stringify({ operation: "encode", text: "Man" }),
+    );
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(result.stderr, "");
+    assert.equal(result.stdout, '{\n  "text": "TWFu"\n}\n');
+    assert.ok(!result.stdout.includes("receipt"));
+    assert.equal(JSON.parse(await readFile(receipt, "utf8")).status, "success");
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+test("actions run rejects unknown output modes and keeps plain errors as JSON", () => {
+  const invalid = run(
+    ["actions", "run", "builtin.utilities.base64", "--output", "text"],
+    JSON.stringify({ operation: "encode", text: "Man" }),
+  );
+  assert.equal(invalid.status, 2);
+  assert.equal(invalid.json.error.code, "USAGE");
+
+  const failed = run(["actions", "run", "missing.action", "--output", "plain"], "{}");
+  assert.equal(failed.status, 3);
+  assert.equal(failed.json.error.code, "UNKNOWN_ACTION");
 });
 
 test("GUI browser adapter and runtime CLI consume the same utility vectors", async () => {

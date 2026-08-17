@@ -179,11 +179,13 @@ function discoveryError(code) {
 function actionSummary(descriptor) {
   return {
     actionId: descriptor.actionId,
+    toolName: descriptor.actionId,
     version: descriptor.version,
     title: descriptor.title,
     description: descriptor.description,
     keywords: descriptor.keywords,
     aliases: descriptor.aliases,
+    inputSchema: structuredClone(descriptor.inputSchema),
     source: descriptor.source,
     presentation: descriptor.presentation,
     execution: descriptor.execution,

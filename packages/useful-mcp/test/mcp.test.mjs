@@ -184,6 +184,15 @@ test("official client drives real legacy stdio tools/list and tools/call", async
     );
     assert.equal(allActions.structuredContent.nextCursor, undefined);
     assert.deepEqual(JSON.parse(textContent(allActions)), allActions.structuredContent);
+    const base64Summary = allActions.structuredContent.actions.find((action) => action.actionId === "builtin.utilities.base64");
+    const base64Descriptor = new ActionRegistry().describe("builtin.utilities.base64");
+    assert.ok(base64Summary && base64Descriptor);
+    assert.equal(base64Summary.toolName, base64Summary.actionId);
+    assert.deepEqual(base64Summary.inputSchema, base64Descriptor.inputSchema);
+    base64Summary.inputSchema.properties.operation.maxLength = 1;
+    assert.notDeepEqual(base64Summary.inputSchema, new ActionRegistry().describe("builtin.utilities.base64").inputSchema);
+    assert.equal("permissions" in base64Summary, false);
+    assert.equal("network" in base64Summary, false);
 
     const searched = await connection.client.callTool({
       name: DISCOVERY_TOOL_NAMES.SEARCH,
