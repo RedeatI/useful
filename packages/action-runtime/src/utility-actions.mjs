@@ -412,7 +412,7 @@ function rgbToHsl({ r, g, b }) {
   return { h: Math.round(hue * 360), s: Math.round(saturation * 100), l: Math.round(lightness * 100) };
 }
 
-function colorHandler(input) {
+export function colorHandler(input) {
   assertExactObject(input, ["hex"]);
   const rgb = parseHex(input.hex);
   if (!rgb) throw actionInputError("非法 HEX 颜色");

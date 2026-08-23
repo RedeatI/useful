@@ -8,7 +8,7 @@ import {
   digestToHex,
   jsonHandler,
 } from "./semantics.mjs";
-import { createAdditionalBuiltinDescriptors, createAdditionalBuiltinHandlers } from "./utility-actions.mjs";
+import { colorHandler, createAdditionalBuiltinDescriptors, createAdditionalBuiltinHandlers } from "./utility-actions.mjs";
 import { createOfficeActionDescriptors, createOfficeActionHandlers, OFFICE_ACTION_IDS } from "./office-actions.mjs";
 export { ACTION_SUGGEST_LIMITS, suggestActions } from "./action-suggest.mjs";
 
@@ -53,6 +53,10 @@ export function runJsonAction(input) {
 
 export function runBase64Action(input) {
   return base64Handler(input);
+}
+
+export function runColorAction(input) {
+  return colorHandler(input);
 }
 
 export async function runHashAction(input, options = {}) {
