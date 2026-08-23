@@ -7,6 +7,13 @@ import ToolShell from "@/components/ToolShell.vue";
 type CopyFormat = "hex" | "rgb" | "hsl" | "css";
 type CopyState = { status: "idle" | "success" | "failure"; format: CopyFormat | null };
 
+const formats = [
+  ["hex", "HEX", "util.color.copyHex"],
+  ["rgb", "RGB", "util.color.copyRgb"],
+  ["hsl", "HSL", "util.color.copyHsl"],
+  ["css", "", "util.color.copyCss"],
+] as const;
+
 const hex = ref("#3b82f6");
 const actionResult = computed<{ output: ColorActionOutput | null; error: string | null }>(() => {
   if (!hex.value.trim()) return { output: null, error: null };
@@ -18,15 +25,18 @@ const actionResult = computed<{ output: ColorActionOutput | null; error: string 
 });
 const output = computed(() => actionResult.value.output);
 const error = computed(() => actionResult.value.error);
-const rgbCss = computed(() => output.value
-  ? `rgb(${output.value.rgb.r} ${output.value.rgb.g} ${output.value.rgb.b})`
-  : "");
-const hslCss = computed(() => output.value
-  ? `hsl(${output.value.hsl.h} ${output.value.hsl.s}% ${output.value.hsl.l}%)`
-  : "");
-const cssVariables = computed(() => output.value
-  ? `--color-hex: ${output.value.hex};\n--color-rgb: ${rgbCss.value};\n--color-hsl: ${hslCss.value};`
-  : "");
+const values = computed<Record<CopyFormat, string>>(() => {
+  const value = output.value;
+  if (!value) return { hex: "", rgb: "", hsl: "", css: "" };
+  const rgb = `rgb(${value.rgb.r} ${value.rgb.g} ${value.rgb.b})`;
+  const hsl = `hsl(${value.hsl.h} ${value.hsl.s}% ${value.hsl.l}%)`;
+  return {
+    hex: value.hex,
+    rgb,
+    hsl,
+    css: `--color-hex: ${value.hex};\n--color-rgb: ${rgb};\n--color-hsl: ${hsl};`,
+  };
+});
 
 const copyState = ref<CopyState>({ status: "idle", format: null });
 let copyAttempt = 0;
@@ -35,14 +45,6 @@ watch(hex, () => {
   copyAttempt += 1;
   copyState.value = { status: "idle", format: null };
 });
-
-function copyValue(format: CopyFormat): string {
-  if (!output.value) return "";
-  if (format === "hex") return output.value.hex;
-  if (format === "rgb") return rgbCss.value;
-  if (format === "hsl") return hslCss.value;
-  return cssVariables.value;
-}
 
 const copyMessage = computed(() => {
   if (copyState.value.status === "failure") return t("util.color.copyFailed");
@@ -53,7 +55,7 @@ const copyMessage = computed(() => {
 });
 
 async function copyFormat(format: CopyFormat): Promise<void> {
-  const value = copyValue(format);
+  const value = values.value[format];
   if (!value) return;
   const attempt = ++copyAttempt;
   copyState.value = { status: "idle", format: null };
@@ -98,53 +100,26 @@ async function copyFormat(format: CopyFormat): Promise<void> {
       aria-hidden="true"
     />
     <div class="grid">
-      <div class="tool-field">
-        <span>HEX</span>
-        <code class="v useful-mono" data-testid="color-hex-value">{{ output?.hex ?? "" }}</code>
+      <div
+        v-for="[format, label, copyKey] in formats"
+        :key="format"
+        class="tool-field"
+        :class="{ 'color-css-field': format === 'css' }"
+      >
+        <span>{{ format === "css" ? t("util.color.cssVariables") : label }}</span>
+        <component
+          :is="format === 'css' ? 'pre' : 'code'"
+          class="v useful-mono"
+          :data-testid="`color-${format}-value`"
+        >{{ values[format] }}</component>
         <button
           type="button"
           class="useful-btn useful-btn--ghost"
           :disabled="!output"
-          :aria-label="t('util.color.copyHex')"
-          data-testid="color-copy-hex"
-          @click="copyFormat('hex')"
-        >{{ t("util.color.copyHex") }}</button>
-      </div>
-      <div class="tool-field">
-        <span>RGB</span>
-        <code class="v useful-mono" data-testid="color-rgb-value">{{ rgbCss }}</code>
-        <button
-          type="button"
-          class="useful-btn useful-btn--ghost"
-          :disabled="!output"
-          :aria-label="t('util.color.copyRgb')"
-          data-testid="color-copy-rgb"
-          @click="copyFormat('rgb')"
-        >{{ t("util.color.copyRgb") }}</button>
-      </div>
-      <div class="tool-field">
-        <span>HSL</span>
-        <code class="v useful-mono" data-testid="color-hsl-value">{{ hslCss }}</code>
-        <button
-          type="button"
-          class="useful-btn useful-btn--ghost"
-          :disabled="!output"
-          :aria-label="t('util.color.copyHsl')"
-          data-testid="color-copy-hsl"
-          @click="copyFormat('hsl')"
-        >{{ t("util.color.copyHsl") }}</button>
-      </div>
-      <div class="tool-field color-css-field">
-        <span>{{ t("util.color.cssVariables") }}</span>
-        <pre class="v useful-mono" data-testid="color-css-value">{{ cssVariables }}</pre>
-        <button
-          type="button"
-          class="useful-btn useful-btn--ghost"
-          :disabled="!output"
-          :aria-label="t('util.color.copyCss')"
-          data-testid="color-copy-css"
-          @click="copyFormat('css')"
-        >{{ t("util.color.copyCss") }}</button>
+          :aria-label="t(copyKey)"
+          :data-testid="`color-copy-${format}`"
+          @click="copyFormat(format)"
+        >{{ t(copyKey) }}</button>
       </div>
     </div>
     <p
