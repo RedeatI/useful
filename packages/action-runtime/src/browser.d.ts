@@ -4,8 +4,14 @@ export type JsonActionInput =
   | { operation: "query"; text: string; pointer: string; indent?: number };
 export type Base64ActionInput = { operation: "encode" | "decode"; text: string };
 export type HashActionInput = { algorithm: HashAlgorithm; text: string };
+export type ColorActionInput = { hex: string };
 export type TextActionOutput = { text: string };
 export type HashActionOutput = { algorithm: HashAlgorithm; digest: string; encoding: "hex" };
+export type ColorActionOutput = {
+  hex: string;
+  rgb: { r: number; g: number; b: number };
+  hsl: { h: number; s: number; l: number };
+};
 
 export const ACTION_IDS: Readonly<Record<string, string>>;
 export const ERROR_CODES: Readonly<Record<string, string>>;
@@ -60,6 +66,7 @@ export function createBrowserActionHandlers(options?: {
 }): Readonly<Record<string, (input: Record<string, unknown>, context?: { signal?: AbortSignal }) => unknown>>;
 export function runJsonAction(input: JsonActionInput): TextActionOutput;
 export function runBase64Action(input: Base64ActionInput): TextActionOutput;
+export function runColorAction(input: ColorActionInput): ColorActionOutput;
 export function runHashAction(input: HashActionInput, options?: { subtle?: SubtleCrypto }): Promise<HashActionOutput>;
 export function runBrowserAction(
   actionId: string,
