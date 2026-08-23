@@ -26,12 +26,12 @@ test("in-process MCP color tool preserves output and the 36 plus 4 closed surfac
   assert.equal(result.content[0].text, JSON.stringify(output));
 });
 
-test("in-process MCP color tool rejects non-HEX expansion", async () => {
+test("in-process MCP color tool rejects non-HEX expansion and overlong raw input", async () => {
   const registry = new ActionRegistry();
-  const result = await createActionToolHandler(
-    "builtin.utilities.color",
-    new ActionExecutor(registry),
-  )({ hex: "rgb(59 130 246)" });
-  assert.equal(result.isError, true);
-  assert.match(result.content[0].text, /INPUT_INVALID/);
+  const handler = createActionToolHandler("builtin.utilities.color", new ActionExecutor(registry));
+  for (const hex of ["rgb(59 130 246)", `${" ".repeat(17)}#f00`]) {
+    const result = await handler({ hex });
+    assert.equal(result.isError, true);
+    assert.match(result.content[0].text, /INPUT_INVALID/);
+  }
 });

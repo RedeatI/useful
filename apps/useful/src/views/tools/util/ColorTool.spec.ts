@@ -83,6 +83,12 @@ describe("ColorTool CSS handoff", () => {
     for (const button of copyButtons(wrapper)) expect(button.attributes()).toHaveProperty("disabled");
     expect(wrapper.text()).toContain("不是合法的 HEX 颜色");
     expect(navigator.clipboard.writeText).not.toHaveBeenCalled();
+
+    const overlong = `${" ".repeat(17)}#f00`;
+    await wrapper.get('[data-testid="color-input"]').setValue(overlong);
+    expect(runtime.runColorAction).toHaveBeenLastCalledWith({ hex: overlong });
+    for (const button of copyButtons(wrapper)) expect(button.attributes()).toHaveProperty("disabled");
+    expect(navigator.clipboard.writeText).not.toHaveBeenCalled();
   });
 
   it("announces success only after resolution and never on rejection", async () => {

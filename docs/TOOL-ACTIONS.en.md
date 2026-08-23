@@ -61,6 +61,20 @@ com.example.tool.convert
 | builtin.utilities.text-diff | text-diff | /tools/utilities/text-diff | diff, compare | compare, patch |
 | builtin.utilities.ipv4 | ipv4 | /tools/utilities/ipv4 | ipv4, cidr, subnet | subnet, network |
 
+### Color CSS handoff
+
+`builtin.utilities.color` accepts exactly one `{ "hex": string }` input object. The raw `hex` string
+is limited to 16 characters. Within that boundary it accepts surrounding whitespace, either hex
+case, `#rgb`, and `#rrggbb`. Named colors, `rgb()`, `hsl()`, alpha HEX, extra fields, and overlong raw
+input fail closed with `INPUT_INVALID`. The GUI, browser adapter, runtime CLI, and MCP share this
+boundary and return normalized lowercase `#rrggbb`, integer RGB, and integer HSL values.
+
+The GUI writes to the clipboard only after an explicit copy-button click. It can copy `#rrggbb`,
+`rgb(r g b)`, `hsl(h s% l%)`, or a three-line CSS custom-property block containing `--color-hex`,
+`--color-rgb`, and `--color-hsl`. Mounting, typing, and picker changes never access the clipboard.
+Empty or invalid input disables every copy button. Success is announced only after the clipboard
+Promise resolves; rejection produces a failure announcement.
+
 ## 5 Office Actions
 
 Each Office Action uses one stable ID. Select the operation with a validated `operation` field.

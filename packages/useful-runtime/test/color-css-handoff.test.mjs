@@ -30,4 +30,11 @@ test("runtime CLI keeps the canonical color output and 36-action closure", () =>
     rgb: { r: 59, g: 130, b: 246 },
     hsl: { h: 217, s: 91, l: 60 },
   });
+
+  const overlong = run(
+    ["actions", "run", "builtin.utilities.color", "--output", "json"],
+    JSON.stringify({ hex: `${" ".repeat(17)}#f00` }),
+  );
+  assert.notEqual(overlong.status, 0);
+  assert.equal(overlong.json.error.code, "INPUT_INVALID");
 });

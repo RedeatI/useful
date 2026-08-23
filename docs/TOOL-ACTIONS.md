@@ -59,6 +59,18 @@ com.example.tool.convert
 | builtin.utilities.text-diff | text-diff | /tools/utilities/text-diff | diff,文本,比较,差异 | compare,patch |
 | builtin.utilities.ipv4 | ipv4 | /tools/utilities/ipv4 | ipv4,cidr,子网,地址 | subnet,network |
 
+### Color CSS handoff
+
+`builtin.utilities.color` 只接受一个精确的 `{ "hex": string }` 输入对象。原始 `hex` 字符串最长 16 个
+字符；在这个边界内允许首尾空白、大小写十六进制、`#rgb` 和 `#rrggbb`。命名色、`rgb()`、`hsl()`、
+带 alpha 的 HEX、额外字段以及超长原始输入都会以 `INPUT_INVALID` fail closed。GUI、browser adapter、
+runtime CLI 与 MCP 使用同一边界，并返回规范化的小写 `#rrggbb`、整数 RGB 和整数 HSL。
+
+GUI 只在用户点击对应按钮后写入剪贴板，可复制 `#rrggbb`、`rgb(r g b)`、`hsl(h s% l%)`，或由
+`--color-hex`、`--color-rgb`、`--color-hsl` 组成的三行 CSS custom-property block。挂载、文本输入和
+颜色选择器变化都不会自动访问剪贴板；空值或非法值禁用全部复制按钮，成功提示只在剪贴板 Promise
+完成后出现，拒绝时显示失败提示。
+
 ## 5 个 Office Actions
 
 Office Action 将一组相关操作放在同一个稳定 ID 下，具体操作由严格校验的 `operation` 字段选择。

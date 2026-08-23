@@ -414,6 +414,7 @@ function rgbToHsl({ r, g, b }) {
 
 export function colorHandler(input) {
   assertExactObject(input, ["hex"]);
+  if (typeof input.hex !== "string" || input.hex.length > 16) throw actionInputError("非法 HEX 颜色");
   const rgb = parseHex(input.hex);
   if (!rgb) throw actionInputError("非法 HEX 颜色");
   const hex = `#${[rgb.r, rgb.g, rgb.b].map((value) => value.toString(16).padStart(2, "0")).join("")}`;
