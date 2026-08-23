@@ -184,7 +184,13 @@ const enUS = {
     },
     timestamp: { name: "Timestamp converter", desc: "Convert between Unix timestamps and dates", placeholder: "Enter Unix seconds, milliseconds, or a date", now: "Now", local: "Local time" },
     baseConvert: { name: "Base converter", desc: "Convert between binary, octal, decimal, and hexadecimal", from: "Source base", placeholder: "Enter a number" },
-    color: { name: "Color converter", desc: "Convert HEX, RGB, and HSL colors", invalid: "Invalid HEX color" },
+    color: {
+      name: "Color converter", desc: "Convert HEX through the shared Action and explicitly copy CSS-ready formats", invalid: "Invalid HEX color",
+      pickerLabel: "Color picker", inputLabel: "HEX color", cssVariables: "CSS custom properties",
+      copyHex: "Copy HEX", copyRgb: "Copy RGB", copyHsl: "Copy HSL", copyCss: "Copy CSS custom properties",
+      copySucceeded: "Copied {format}.", copyFailed: "Clipboard write failed. Check clipboard access and try again.",
+      formats: { hex: "HEX", rgb: "RGB", hsl: "HSL", css: "CSS custom properties" },
+    },
     case: { name: "Case converter", desc: "camel/snake/kebab/Pascal/CONSTANT/Title" },
     regex: {
       name: "Regex tester", desc: "Live matches and groups isolated in a worker to mitigate ReDoS", pattern: "Regular expression", testText: "Test text",
