@@ -28,7 +28,7 @@
   },
   "devDependencies": {
     "esbuild": "0.25.12",
-    "vitest": "^3.2.6",
+    "vitest": "^4.1.11",
     "eslint": "^8.57.1"
   },
   "license": "Apache-2.0"
