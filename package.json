@@ -37,7 +37,7 @@
     "release:path-test": "node --test scripts/public-release-path.test.mjs scripts/verify-public-commit.test.mjs"
   },
   "devDependencies": {
-    "adm-zip": "^0.6.0",
+    "adm-zip": "^0.6.1",
     "esbuild": "0.25.12",
     "png-to-ico": "^2.1.8",
     "sharp": "^0.35.0",
