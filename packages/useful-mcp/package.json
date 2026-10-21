@@ -11,7 +11,7 @@
     ".": "./src/server.mjs"
   },
   "dependencies": {
-    "@modelcontextprotocol/server": "2.0.0",
+    "@modelcontextprotocol/server": "2.3.0",
     "@useful/action-runtime": "workspace:^",
     "@useful/agent-profile": "workspace:^",
     "@useful/host-actions": "workspace:^",
